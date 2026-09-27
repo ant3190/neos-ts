@@ -100,12 +100,16 @@ const CardImpl: React.FC<{ idx: number; visible: boolean }> = ({
     task: Task,
     fn: (...args: T) => Promise<unknown>,
   ) => {
-    return eventbus.register(task, async (uuid, ...rest: T) => {
-      if (uuid === card.uuid) {
-        await fn(...rest);
-        return true;
-      } else return false;
-    });
+    return eventbus.register(
+      task,
+      async (uuid, ...rest: T) => {
+        if (uuid === card.uuid) {
+          await fn(...rest);
+          return true;
+        } else return false;
+      },
+      card.uuid,
+    );
   };
 
   useEffect(() => {
