@@ -52,7 +52,10 @@ import type { SpringApiProps } from "./springs/types";
 
 const { HAND, GRAVE, REMOVED, EXTRA, MZONE, SZONE, TZONE } = ygopro.CardZone;
 
-export const Card: React.FC<{ idx: number }> = React.memo(({ idx }) => {
+const CardImpl: React.FC<{ idx: number; visible: boolean }> = ({
+  idx,
+  visible,
+}) => {
   const container = getUIContainer();
   const card = cardStore.inner[idx];
   const snap = useSnapshot(card);
@@ -67,7 +70,7 @@ export const Card: React.FC<{ idx: number }> = React.memo(({ idx }) => {
         ry: 0,
         rz: 0,
         zIndex: 0,
-        height: 0,
+        scale: 0,
         focusScale: 1,
         focusDisplay: "none",
         focusOpacity: 1,
@@ -97,7 +100,7 @@ export const Card: React.FC<{ idx: number }> = React.memo(({ idx }) => {
     task: Task,
     fn: (...args: T) => Promise<unknown>,
   ) => {
-    eventbus.register(task, async (uuid, ...rest: T) => {
+    return eventbus.register(task, async (uuid, ...rest: T) => {
       if (uuid === card.uuid) {
         await fn(...rest);
         return true;
@@ -106,18 +109,29 @@ export const Card: React.FC<{ idx: number }> = React.memo(({ idx }) => {
   };
 
   useEffect(() => {
-    register(Task.Move, async (options?: MoveOptions) => {
-      await addToAnimation(() => move({ card, api, options }));
-    });
+    const unsubscribeMove = register(
+      Task.Move,
+      async (options?: MoveOptions) => {
+        await addToAnimation(() => move({ card, api, options }));
+      },
+    );
 
-    register(Task.Focus, async () => {
+    const unsubscribeFocus = register(Task.Focus, async () => {
       setClassFocus(true);
       await focus({ card, api });
     });
 
-    register(Task.Attack, async (options: AttackOptions) => {
-      await addToAnimation(() => attack({ card, api, options }));
-    });
+    const unsubscribeAttack = register(
+      Task.Attack,
+      async (options: AttackOptions) => {
+        await addToAnimation(() => attack({ card, api, options }));
+      },
+    );
+    return () => {
+      unsubscribeMove();
+      unsubscribeFocus();
+      unsubscribeAttack();
+    };
   }, []);
 
   // <<< 动画 <<<
@@ -381,51 +395,55 @@ export const Card: React.FC<{ idx: number }> = React.memo(({ idx }) => {
       style={
         {
           transform: to(
-            [spring.x, spring.y, spring.z, spring.rx, spring.ry, spring.rz],
-            (x, y, z, rx, ry, rz) =>
-              `translate(${x}px, ${y}px) rotateX(${rx}deg) rotateZ(${rz}deg)`,
+            [spring.x, spring.y, spring.rx, spring.rz, spring.scale],
+            (x, y, rx, rz, scale) =>
+              `translate(${x}px, ${y}px) rotateX(${rx}deg) rotateZ(${rz}deg) scale(${scale})`,
           ),
           "--z": spring.z,
           "--sub-z": spring.subZ.to([0, 50, 100], [0, 200, 0]), // 中间高，两边低
           "--ry": spring.ry,
-          height: spring.height,
           zIndex: spring.zIndex,
           "--focus-scale": spring.focusScale,
           "--focus-display": spring.focusDisplay,
           "--focus-opacity": spring.focusOpacity,
           opacity: spring.opacity,
+          visibility: visible ? "visible" : "hidden",
         } as any as CSSProperties
       }
       onClick={onClick}
     >
-      <div className={styles.focus} />
-      <div className={styles.shadow} />
-      <Dropdown
-        menu={dropdownMenu}
-        placement="top"
-        overlayClassName={classnames(styles.dropdown, {
-          [styles["dropdown-disabled"]]: dropdownMenuDisabled,
-        })}
-        arrow
-        trigger={["click"]}
-      >
-        <div
-          className={classnames(styles["img-wrap"], {
-            [styles.focusing]: classFocus,
+      {visible && <div className={styles.focus} />}
+      {visible && <div className={styles.shadow} />}
+      {visible && (
+        <Dropdown
+          menu={dropdownMenu}
+          placement="top"
+          overlayClassName={classnames(styles.dropdown, {
+            [styles["dropdown-disabled"]]: dropdownMenuDisabled,
           })}
+          arrow
+          trigger={["click"]}
         >
-          <YgoCard
-            className={styles.cover}
-            code={snap.code === 0 ? snap.meta.id : snap.code}
-            disabled={disabled}
-          />
-          <YgoCard className={styles.back} isBack />
-        </div>
-      </Dropdown>
-      {snap.targeted ? <div className={styles.streamer} /> : <></>}
+          <div
+            className={classnames(styles["img-wrap"], {
+              [styles.focusing]: classFocus,
+            })}
+          >
+            <YgoCard
+              className={styles.cover}
+              code={snap.code === 0 ? snap.meta.id : snap.code}
+              disabled={disabled}
+            />
+            <YgoCard className={styles.back} isBack />
+          </div>
+        </Dropdown>
+      )}
+      {visible && snap.targeted && <div className={styles.streamer} />}
     </animated.div>
   );
-});
+};
+
+export const Card = React.memo(CardImpl);
 
 // >>> 下拉菜单：点击动作 >>>
 interface Interactivy {

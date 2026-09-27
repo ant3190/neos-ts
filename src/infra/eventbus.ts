@@ -18,13 +18,12 @@ const register = <T extends unknown[]>(
   task: Task,
   fn: (...args: T) => Promise<boolean>,
 ) => {
-  eventEmitter.on(
-    task,
-    async ({ taskId, args }: { taskId: string; args: T }) => {
-      const result = await fn(...args);
-      if (result) eventEmitter.emit(getEnd(task), taskId);
-    },
-  );
+  const listener = async ({ taskId, args }: { taskId: string; args: T }) => {
+    const result = await fn(...args);
+    if (result) eventEmitter.emit(getEnd(task), taskId);
+  };
+  eventEmitter.on(task, listener);
+  return () => eventEmitter.off(task, listener);
 };
 
 /** 在service之中调用组件中的方法 */

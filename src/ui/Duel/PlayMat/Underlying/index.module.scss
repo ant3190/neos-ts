@@ -22,12 +22,12 @@
   background: radial-gradient(#00814f, #1c0161);
   background-size: contain;
   background-repeat: repeat;
-  filter: blur(502px);
-  transition: 0.5s;
+  transition:
+    transform 0.5s,
+    opacity 0.5s;
 }
 .opponent .inner {
   background: radial-gradient(#810000, #54005f98);
   transform: translateY(-50%);
-  filter: blur(602px);
   opacity: 0.8;
 }

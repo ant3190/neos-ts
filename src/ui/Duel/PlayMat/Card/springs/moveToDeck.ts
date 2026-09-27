@@ -14,6 +14,7 @@ const {
   DECK_OFFSET_Y,
   DECK_ROTATE_Z,
   DECK_CARD_HEIGHT,
+  HAND_CARD_HEIGHT,
 } = matConfig;
 
 const { DECK, EXTRA } = ygopro.CardZone;
@@ -44,7 +45,7 @@ export const moveToDeck: MoveFunc = async (props) => {
     rz,
     ry: isMe(controller) ? (zone === DECK ? 180 : 0) : 180,
     zIndex: z,
-    height: DECK_CARD_HEIGHT,
+    scale: DECK_CARD_HEIGHT / HAND_CARD_HEIGHT,
 
     config: {
       duration: getDuration(),

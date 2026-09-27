@@ -84,7 +84,8 @@ img {
 }
 
 .duel-mat-camera,
-.duel-mat-camera * {
+.duel-mat-plane,
+.duel-mat-card-container {
   transform-style: preserve-3d;
 }
 

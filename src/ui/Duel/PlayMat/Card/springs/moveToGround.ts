@@ -16,6 +16,7 @@ const {
   ROW_GAP,
   BLOCK_OUTSIDE_OFFSET_X,
   CARD_HEIGHT_O,
+  HAND_CARD_HEIGHT,
 } = matConfig;
 
 const { MZONE, SZONE, TZONE } = ygopro.CardZone;
@@ -96,13 +97,13 @@ export const moveToGround: MoveFunc = async (props) => {
       y,
       ry,
       rz,
-      height: 0,
+      scale: 0,
     });
   } else {
     await asyncStart(api)({
       x,
       y,
-      height,
+      scale: height / HAND_CARD_HEIGHT,
       z: is_overlay ? 120 : 200,
       ry,
       rz,
@@ -115,7 +116,7 @@ export const moveToGround: MoveFunc = async (props) => {
   }
 
   await asyncStart(api)({
-    height,
+    scale: height / HAND_CARD_HEIGHT,
     z: 0,
     subZ: isToken ? 100 : 0,
     zIndex: is_overlay ? 1 : 3,

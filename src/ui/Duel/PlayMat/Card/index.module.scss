@@ -2,7 +2,7 @@
   position: absolute;
   --card-height: 100px;
   width: auto !important;
-  height: var(--card-height);
+  height: var(--hand-card-height);
   aspect-ratio: var(--card-ratio);
   transform-style: preserve-3d;
   .img-wrap {
@@ -29,13 +29,15 @@
     .cover {
       z-index: 1;
       transform: translateZ(0.5px);
+      backface-visibility: hidden;
     }
     &.focusing .cover {
       animation: focus 0.6s ease-in-out;
     }
     .back {
       z-index: 0;
-      transform: translateZ(0px);
+      transform: rotateY(180deg) translateZ(0.5px);
+      backface-visibility: hidden;
     }
   }
   .shadow {
@@ -112,13 +114,17 @@
 
 @keyframes shadow-fadding {
   0% {
-    box-shadow: 0 0 4px 0 var(--shadow-color), 0 0 25px 2px #0099ff87;
+    box-shadow:
+      0 0 4px 0 var(--shadow-color),
+      0 0 25px 2px #0099ff87;
   }
   50% {
     box-shadow: none;
   }
   100% {
-    box-shadow: 0 0 4px 0 var(--shadow-color), 0 0 25px 2px #0099ff87;
+    box-shadow:
+      0 0 4px 0 var(--shadow-color),
+      0 0 25px 2px #0099ff87;
   }
 }
 

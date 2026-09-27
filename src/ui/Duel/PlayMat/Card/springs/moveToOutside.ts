@@ -13,6 +13,7 @@ const {
   CARD_HEIGHT_O,
   BLOCK_OUTSIDE_OFFSET_X,
   CARD_RATIO,
+  HAND_CARD_HEIGHT,
 } = matConfig;
 
 const { REMOVED } = ygopro.CardZone;
@@ -36,7 +37,7 @@ export const moveToOutside: MoveFunc = async (props) => {
     x,
     y,
     z: 0,
-    height: CARD_HEIGHT_O,
+    scale: CARD_HEIGHT_O / HAND_CARD_HEIGHT,
     rz: isMe(controller) ? 0 : 180,
     ry: [ygopro.CardPosition.FACEDOWN].includes(position) ? 180 : 0,
     subZ: 100,

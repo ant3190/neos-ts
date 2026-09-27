@@ -1,5 +1,5 @@
 import classNames from "classnames";
-import { CSSProperties, useMemo } from "react";
+import { CSSProperties, useState } from "react";
 
 import { getCardImgUrl } from "@/api";
 import { useConfig } from "@/config";
@@ -34,40 +34,52 @@ export const YgoCard: React.FC<Props> = (props) => {
     onClick,
     onLoad,
   } = props;
+  const src = getCardImgUrl(code, isBack);
+  const [loadError, setLoadError] = useState({
+    src: "",
+    attempts: 0,
+    retryKey: 0,
+  });
+  const attempts = loadError.src === src ? loadError.attempts : 0;
+  const failed = attempts >= 2;
+  const imageSrc =
+    attempts === 1
+      ? `${src}${src.includes("?") ? "&" : "?"}retry=${loadError.retryKey}`
+      : src;
 
-  return useMemo(
-    () => (
-      <div
-        className={classNames(styles["ygo-card"], className)}
-        style={
-          {
-            width,
-            "--src": `url(${getCardImgUrl(code, isBack)})`,
-            ...style,
-          } as any
-        }
-        onClick={onClick}
-        // 加载完成
-        onLoad={onLoad}
-      >
-        {/* 暂时不能这么写...但如果用onload的话来判断可能又很消耗性能，再看看吧 */}
-        {/* {cardName} */}
-        {targeted ? (
-          <div className={styles.targeted}>
-            <img src={`${assetsPath}/targeted.png`} />
-          </div>
-        ) : (
-          <></>
-        )}
-        {disabled ? (
-          <div className={styles.disabled}>
-            <img src={`${assetsPath}/disabled.png`} />
-          </div>
-        ) : (
-          <></>
-        )}
-      </div>
-    ),
-    [code, targeted, disabled],
+  return (
+    <div
+      className={classNames(styles["ygo-card"], className)}
+      style={{ width, ...style }}
+      onClick={onClick}
+    >
+      {failed ? (
+        <span className={styles.missing}>
+          {isBack || code === 0 ? "NEOS" : `#${code}`}
+        </span>
+      ) : (
+        <img
+          className={styles.art}
+          src={imageSrc}
+          alt={isBack || code === 0 ? "" : `Card ${code}`}
+          decoding="async"
+          draggable={false}
+          onLoad={onLoad}
+          onError={() =>
+            setLoadError({ src, attempts: attempts + 1, retryKey: Date.now() })
+          }
+        />
+      )}
+      {targeted && (
+        <div className={styles.targeted}>
+          <img src={`${assetsPath}/targeted.png`} alt="" />
+        </div>
+      )}
+      {disabled && (
+        <div className={styles.disabled}>
+          <img src={`${assetsPath}/disabled.png`} alt="" />
+        </div>
+      )}
+    </div>
   );
 };

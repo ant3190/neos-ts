@@ -52,7 +52,7 @@ export const moveToHand: MoveFunc = async (props) => {
     z: sequence + 5,
     rz: isMe(controller) ? _rz : 180 - _rz,
     ry: isMe(controller) ? 0 : 180,
-    height: HAND_CARD_HEIGHT,
+    scale: 1,
     zIndex: sequence,
     // rx: -PLANE_ROTATE_X,
     config: {

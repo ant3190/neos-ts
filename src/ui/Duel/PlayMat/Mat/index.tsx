@@ -1,5 +1,6 @@
 import { useSnapshot } from "valtio";
 
+import { ygopro } from "@/api";
 import { cardStore } from "@/stores";
 
 import { Bg } from "../Bg";
@@ -24,12 +25,29 @@ export const Mat: React.FC = () => {
 
 const Cards: React.FC = () => {
   const { inner } = useSnapshot(cardStore);
-  const length = inner.length;
+  const topSequences = new Map<string, number>();
+  for (const card of inner) {
+    const { zone, controller, sequence } = card.location;
+    if (zone !== ygopro.CardZone.DECK && zone !== ygopro.CardZone.EXTRA)
+      continue;
+    const key = `${controller}:${zone}`;
+    topSequences.set(key, Math.max(topSequences.get(key) ?? -1, sequence));
+  }
+
   return (
     <>
-      {Array.from({ length }).map((_, i) => (
-        <Card key={inner[i].uuid} idx={i} />
-      ))}
+      {inner.map((card, i) => {
+        const { zone, controller, sequence } = card.location;
+        const stacked =
+          zone === ygopro.CardZone.DECK || zone === ygopro.CardZone.EXTRA;
+        // A few cards retain the pile's visible depth. All other cards keep
+        // their game state and animation handler without painting an image.
+        const visible =
+          zone !== ygopro.CardZone.TZONE &&
+          (!stacked ||
+            sequence >= (topSequences.get(`${controller}:${zone}`) ?? 0) - 2);
+        return <Card key={card.uuid} idx={i} visible={visible} />;
+      })}
     </>
   );
 };
