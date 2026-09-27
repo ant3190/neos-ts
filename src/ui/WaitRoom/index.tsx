@@ -1,5 +1,5 @@
 import { CheckCircleFilled, LoadingOutlined } from "@ant-design/icons";
-import HandType = ygopro.HandType;
+
 import {
   sendHandResult,
   sendHsNotReady,
@@ -54,10 +54,11 @@ export const Component: React.FC = () => {
   const { message } = App.useApp();
   const { user } = useSnapshot(accountStore);
   const [collapsed, setCollapsed] = useState(false);
-  const { decks } = deckStore;
-  const defaultDeck =
-    decks.length > 0 ? JSON.parse(JSON.stringify(decks[0])) : undefined;
-  const [deck, setDeck] = useState<IDeck | undefined>(defaultDeck);
+  const { decks } = useSnapshot(deckStore);
+  const [selectedDeckName, setSelectedDeckName] = useState<string>();
+  const deck =
+    deckStore.get(selectedDeckName ?? "") ??
+    deckStore.get(decks[0]?.deckName ?? "");
   const room = useSnapshot(roomStore);
   const { errorMsg } = room;
   const me = room.getMePlayer();
@@ -74,8 +75,7 @@ export const Component: React.FC = () => {
     const newDeck = deckStore.get(deckName);
     if (newDeck) {
       sendHsNotReady(container.conn);
-      updateDeck(newDeck);
-      setDeck(newDeck);
+      setSelectedDeckName(deckName);
     } else {
       message.error(`Deck ${deckName} not found`);
     }
@@ -95,11 +95,11 @@ export const Component: React.FC = () => {
   };
 
   useEffect(() => {
-    // 组件初始化时发一次更新卡组的包
+    // 卡组异步加载后，及切换卡组时发送更新包。
     //
     // 否则娱乐匹配准备会有问题（原因不明）
-    if (deck) sendUpdateDeck(container.conn, deck);
-  }, []);
+    if (deck) updateDeck(deck);
+  }, [deck?.deckName, container.conn]);
   useEffect(() => {
     if (room.stage === RoomStage.DUEL_START) {
       // 决斗开始，跳转决斗页面
@@ -131,7 +131,10 @@ export const Component: React.FC = () => {
           switchCollapse={() => setCollapsed(!collapsed)}
         />
         <div className={styles.wrap}>
-          <Controller onDeckChange={onDeckSelected} />
+          <Controller
+            onDeckChange={onDeckSelected}
+            selectedDeckName={deck?.deckName}
+          />
           <div className={styles["both-side-container"]}>
             <PlayerZone
               who={Who.Me}
@@ -154,9 +157,8 @@ export const Component: React.FC = () => {
                 ) : (
                   <MoraAvatar
                     mora={
-                      me?.moraResult !== undefined &&
-                      me.moraResult !== HandType.UNKNOWN
-                        ? Object.values(Mora)[me.moraResult - 1]
+                      me?.moraResult !== undefined
+                        ? moraFromResult(me.moraResult)
                         : undefined
                     }
                   />
@@ -175,9 +177,8 @@ export const Component: React.FC = () => {
                     room.stage === RoomStage.WAITING ? null : (
                       <MoraAvatar
                         mora={
-                          op?.moraResult !== undefined &&
-                          op.moraResult !== HandType.UNKNOWN
-                            ? Object.values(Mora)[op.moraResult - 1]
+                          op?.moraResult !== undefined
+                            ? moraFromResult(op.moraResult)
                             : undefined
                         }
                       />
@@ -269,9 +270,23 @@ const MoraAvatar: React.FC<{ mora?: Mora }> = ({ mora }) => (
   </div>
 );
 
-const Controller: React.FC<{ onDeckChange: (deckName: string) => void }> = ({
-  onDeckChange,
-}) => {
+const moraFromResult = (result: ygopro.HandType): Mora | undefined => {
+  switch (result) {
+    case ygopro.HandType.SCISSORS:
+      return Mora.Scissors;
+    case ygopro.HandType.ROCK:
+      return Mora.Rock;
+    case ygopro.HandType.PAPER:
+      return Mora.Paper;
+    default:
+      return undefined;
+  }
+};
+
+const Controller: React.FC<{
+  onDeckChange: (deckName: string) => void;
+  selectedDeckName?: string;
+}> = ({ onDeckChange, selectedDeckName }) => {
   const container = getUIContainer();
   const { t: i18n } = useTranslation("WaitRoom");
   const snapDeck = useSnapshot(deckStore);
@@ -283,15 +298,15 @@ const Controller: React.FC<{ onDeckChange: (deckName: string) => void }> = ({
         title={i18n("Deck")}
         showSearch
         style={{ width: "15.6rem" }}
-        defaultValue={snapDeck.decks[0].deckName}
+        value={selectedDeckName}
+        disabled={
+          snapRoom.stage !== RoomStage.WAITING || !snapDeck.decks.length
+        }
         options={snapDeck.decks.map((deck) => ({
           value: deck.deckName,
-          title: deck.deckName,
+          label: deck.deckName,
         }))}
-        onChange={
-          // @ts-ignore
-          (value) => onDeckChange(value)
-        }
+        onChange={(value) => onDeckChange(value as string)}
       />
       <Button
         size="large"

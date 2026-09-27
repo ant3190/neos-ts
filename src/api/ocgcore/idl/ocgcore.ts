@@ -7,8 +7,8 @@ import * as pb_1 from "google-protobuf";
 export namespace ygopro {
     export enum HandType {
         UNKNOWN = 0,
-        ROCK = 1,
-        SCISSORS = 2,
+        SCISSORS = 1,
+        ROCK = 2,
         PAPER = 3
     }
     export enum CardZone {

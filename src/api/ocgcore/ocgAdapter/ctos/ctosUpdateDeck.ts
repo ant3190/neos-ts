@@ -47,6 +47,6 @@ export default class CtosUpdateDeck extends YgoProPacket {
       offset += 1;
     }
 
-    super(exDataLen + 3, CTOS_UPDATE_DECK, exData);
+    super(exDataLen + 1, CTOS_UPDATE_DECK, exData);
   }
 }

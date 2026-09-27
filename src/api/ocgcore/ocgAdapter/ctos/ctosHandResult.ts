@@ -17,26 +17,8 @@ export default class CtosHandResultPacket extends YgoProPacket {
     const exData = new Uint8Array(1);
     const dataView = new DataView(exData.buffer);
 
-    switch (hand) {
-      case ygopro.HandType.SCISSORS: {
-        dataView.setUint8(0, 2);
-
-        break;
-      }
-      case ygopro.HandType.ROCK: {
-        dataView.setUint8(0, 1);
-
-        break;
-      }
-      case ygopro.HandType.PAPER: {
-        dataView.setUint8(0, 3);
-
-        break;
-      }
-      default: {
-        console.log("Unknown HandResult type" + hand);
-      }
-    }
+    // The YGOPro wire protocol uses 1 = scissors, 2 = rock, 3 = paper.
+    dataView.setUint8(0, hand);
 
     super(exData.length + 1, CTOS_HAND_RESULT, exData);
   }

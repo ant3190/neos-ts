@@ -1,8 +1,8 @@
 import { Button, Popover, Space } from "antd";
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSnapshot } from "valtio";
 
-import { eventbus, Task } from "@/infra";
+import { RoomStage, roomStore } from "@/stores";
 
 import { IconFont } from "../Shared";
 
@@ -20,20 +20,10 @@ export enum Tp {
 export const MoraPopover: React.FC<
   React.PropsWithChildren<{ onSelect?: (result: Mora) => void }>
 > = ({ children, onSelect }) => {
-  const [open, setOpen] = useState(false);
-
-  // 需要在mora的service之中，emit一个事件，让这个组件监听到，然后打开popover
-  useEffect(() => {
-    // 这里不能用`once`，因为如果双方猜拳结果一样的话会重新猜拳
-    eventbus.on(Task.Mora, () => {
-      setOpen(true);
-    });
-  }, []);
+  const open = useSnapshot(roomStore).stage === RoomStage.HAND_SELECTING;
 
   const onClick = (result: Mora) => {
-    result; // 这里send猜拳的结果给服务器
     onSelect?.(result);
-    setOpen(false);
   };
 
   const { t: i18n } = useTranslation("WaitRoom");
@@ -76,19 +66,11 @@ export const TpPopover: React.FC<
     onSelect?: (result: Tp) => void;
   }>
 > = ({ children, onSelect }) => {
-  const [open, setOpen] = useState(false);
+  const open = useSnapshot(roomStore).stage === RoomStage.TP_SELECTING;
   const { t: i18n } = useTranslation("Popover");
-  // 需要在mora的service之中，emit一个事件，让这个组件监听到，然后打开popover
-  useEffect(() => {
-    eventbus.once(Task.Tp, () => {
-      setOpen(true);
-    });
-  }, []);
 
   const onClick = (result: Tp) => {
-    result; // 这里send结果给服务器
     onSelect?.(result);
-    setOpen(false);
   };
 
   const map = {
