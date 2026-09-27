@@ -16,18 +16,26 @@
 }
 
 .inner {
-  transform: translateY(50%);
-  width: 60vw;
-  height: 100vh;
-  background: radial-gradient(#00814f, #1c0161);
-  background-size: contain;
-  background-repeat: repeat;
+  transform: translateY(38%);
+  width: 120vw;
+  height: 140vh;
+  background: radial-gradient(
+    ellipse at center,
+    #00814f99 0%,
+    #1c016180 32%,
+    transparent 72%
+  );
   transition:
     transform 0.5s,
     opacity 0.5s;
 }
 .opponent .inner {
-  background: radial-gradient(#810000, #54005f98);
-  transform: translateY(-50%);
+  background: radial-gradient(
+    ellipse at center,
+    #81000099 0%,
+    #54005f80 32%,
+    transparent 72%
+  );
+  transform: translateY(-38%);
   opacity: 0.8;
 }
