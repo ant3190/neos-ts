@@ -51,7 +51,7 @@ NEOS现在开启公测啦，详情请移步[萌卡社区帖子](https://ygobbs.c
 docker compose up --build -d
 ```
 
-打开 http://localhost:8080。更新代码后再次运行同一命令即可重建；停止服务使用 `docker compose down`。
+本机打开 http://localhost:18080，其他设备可通过 `http://服务器公网IP:18080` 访问。容器监听宿主机所有 IPv4 接口；公网访问还需要在主机防火墙和云服务商入站规则中放行 TCP 18080。更新代码后再次运行同一命令即可重建；停止服务使用 `docker compose down`。
 
 容器只提供前端静态文件。卡图、卡牌数据库和联机服务仍需要浏览器能访问项目配置的外部地址。
 

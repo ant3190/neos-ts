@@ -2,5 +2,5 @@ services:
   neos:
     build: .
     ports:
-      - "127.0.0.1:${NEOS_PORT:-8080}:80"
+      - "0.0.0.0:${NEOS_PORT:-18080}:80"
     restart: unless-stopped
