@@ -1,0 +1,12 @@
+.git
+node_modules
+dist
+build
+builds
+coverage
+test-results
+playwright-report
+.agent
+neos-protobuf
+*.log
+.env*

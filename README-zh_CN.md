@@ -43,6 +43,18 @@ NEOS现在开启公测啦，详情请移步[萌卡社区帖子](https://ygobbs.c
 ## 📦快速开始
 请移步[玩家向导](https://doc.neos.moe/docs/category/%E7%8E%A9%E5%AE%B6%E6%8C%87%E5%8D%97)
 
+### 本地部署（Docker）
+
+安装 Docker 和 Compose 后，在仓库目录运行：
+
+```bash
+docker compose up --build -d
+```
+
+打开 http://localhost:8080。更新代码后再次运行同一命令即可重建；停止服务使用 `docker compose down`。
+
+容器只提供前端静态文件。卡图、卡牌数据库和联机服务仍需要浏览器能访问项目配置的外部地址。
+
 ## 截图
 <p align="center">
   <img alt="" src="./screenshots/duel.png" width="512">
