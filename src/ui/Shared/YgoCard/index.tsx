@@ -4,6 +4,7 @@ import { CSSProperties, useState } from "react";
 import { getCardImgUrl } from "@/api";
 import { useConfig } from "@/config";
 
+import { isCardImageReady } from "./imageCache";
 import styles from "./index.module.scss";
 
 const { assetsPath } = useConfig();
@@ -37,7 +38,9 @@ export const YgoCard: React.FC<Props> = (props) => {
     onLoad,
   } = props;
   const src = getCardImgUrl(code, isBack);
-  const [loadedSrc, setLoadedSrc] = useState("");
+  const [loadedSrc, setLoadedSrc] = useState(() =>
+    isCardImageReady(src) ? src : "",
+  );
   const [loadError, setLoadError] = useState({
     src: "",
     attempts: 0,
@@ -49,7 +52,12 @@ export const YgoCard: React.FC<Props> = (props) => {
     attempts === 1
       ? `${src}${src.includes("?") ? "&" : "?"}retry=${loadError.retryKey}`
       : src;
-  const waitingForArt = urgent && !isBack && code !== 0 && loadedSrc !== src;
+  const waitingForArt =
+    urgent &&
+    !isBack &&
+    code !== 0 &&
+    loadedSrc !== src &&
+    !isCardImageReady(src);
 
   return (
     <div

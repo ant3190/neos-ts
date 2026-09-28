@@ -35,6 +35,7 @@ import {
   sideStore,
 } from "@/stores";
 import { Background, IconFont, Select, SpecialButton } from "@/ui/Shared";
+import { warmDeckImages } from "@/ui/Shared/YgoCard/imageCache";
 
 import { Chat } from "./Chat";
 import styles from "./index.module.scss";
@@ -64,6 +65,10 @@ export const Component: React.FC = () => {
   const me = room.getMePlayer();
   const op = room.getOpPlayer();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (deck) return warmDeckImages([...deck.main, ...deck.extra]);
+  }, [deck?.deckName]);
 
   const updateDeck = (deck: IDeck) => {
     sendUpdateDeck(container.conn, deck);

@@ -2,6 +2,7 @@ import { fetchCard, ygopro } from "@/api";
 import { Container } from "@/container";
 import { AudioActionType, playEffect } from "@/infra/audio";
 import { callCardFocus } from "@/ui/Duel/PlayMat/Card";
+import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
 import { fetchEsHintMeta } from "./util";
 
@@ -33,6 +34,7 @@ export default async (
     }
 
     const meta = fetchCard(chaining.code);
+    requestCardImage(chaining.code);
     // 这里不能设置`code`，因为存在一个场景：
     // 对方的`魔神仪-曼德拉护肤草`发动效果后，后端会发一次`MSG_SHUFFLE_HAND`，
     // 但传给前端的codes全是0，如果这里设置了`code`的话，

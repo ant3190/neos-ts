@@ -3,6 +3,7 @@ import { subscribeKey } from "valtio/utils";
 
 import { fetchCard } from "@/api";
 import { CardType } from "@/stores";
+import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
 // 自动从code推断出meta
 //
@@ -11,6 +12,7 @@ import { CardType } from "@/stores";
 export const genCard = (card: CardType) => {
   const t = proxy(card);
   subscribeKey(t, "code", async (code) => {
+    requestCardImage(code);
     const meta = fetchCard(code);
     t.meta = meta;
   });

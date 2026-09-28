@@ -3,6 +3,7 @@ import { Container } from "@/container";
 import { sleep } from "@/infra";
 import { AudioActionType, playEffect } from "@/infra/audio";
 import { callCardFocus, callCardMove } from "@/ui/Duel/PlayMat/Card";
+import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
 const { MZONE, SZONE } = ygopro.CardZone;
 const { FACEUP_ATTACK, FACEDOWN_ATTACK, FACEDOWN_DEFENSE, FACEDOWN } =
@@ -25,6 +26,7 @@ export default async (
   console.color("pink")(`confirmCards: ${cards}`);
 
   for (const [index, card] of cards.entries()) {
+    requestCardImage(card.code);
     const target = isDeckTop
       ? context.cardStore
           .at(ygopro.CardZone.DECK, confirmCards.player)

@@ -4,6 +4,7 @@ import { AudioActionType, playEffect } from "@/infra/audio";
 import { createLocalId } from "@/infra/localId";
 import { CardType } from "@/stores";
 import { callCardMove } from "@/ui/Duel/PlayMat/Card";
+import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
 import { REASON_DESTROY, REASON_MATERIAL, TYPE_TOKEN } from "../../common";
 import { genCard } from "../utils";
@@ -37,6 +38,7 @@ const overlayStack: ygopro.CardLocation[] = [];
 export default async (container: Container, move: MsgMove) => {
   const context = container.context;
   const code = move.code;
+  requestCardImage(code);
   const from = move.from;
   const to = move.to;
   const reason = move.reason;

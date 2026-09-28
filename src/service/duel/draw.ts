@@ -2,6 +2,7 @@ import { fetchCard, ygopro } from "@/api";
 import { Container } from "@/container";
 import { AudioActionType, playEffect } from "@/infra/audio";
 import { callCardMove } from "@/ui/Duel/PlayMat/Card";
+import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
 import { fetchEsHintMeta } from "./util";
 
@@ -27,6 +28,7 @@ export default async (
   for (const idx in newHands) {
     const card = newHands[Number(idx)];
     const code = draw.cards[idx];
+    requestCardImage(code);
     const meta = fetchCard(code);
     card.code = code;
     card.meta = meta;

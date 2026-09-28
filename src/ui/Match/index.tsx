@@ -22,6 +22,7 @@ import { useConfig } from "@/config";
 import { AudioActionType, changeScene } from "@/infra/audio";
 import { accountStore, deckStore, resetUniverse, roomStore } from "@/stores";
 import { Background, IconFont, ScrollableArea, Select } from "@/ui/Shared";
+import { warmDeckImages } from "@/ui/Shared/YgoCard/imageCache";
 
 import {
   CustomRoomContent,
@@ -47,8 +48,13 @@ export const loader: LoaderFunction = () => {
 export const Component: React.FC = () => {
   const { message, modal } = App.useApp();
   const server = `${serverList[0].ip}:${serverList[0].port}`;
-  const { decks } = deckStore;
+  const { decks } = useSnapshot(deckStore);
   const [deckName, setDeckName] = useState(decks.at(0)?.deckName ?? "");
+  const selectedDeck = deckStore.get(deckName) ?? deckStore.decks.at(0);
+  useEffect(() => {
+    if (selectedDeck)
+      return warmDeckImages([...selectedDeck.main, ...selectedDeck.extra]);
+  }, [selectedDeck?.deckName]);
   const user = accountStore.user;
   const { joined } = useSnapshot(roomStore);
   const [singleLoading, setSingleLoading] = useState(false); // 单人模式的loading状态

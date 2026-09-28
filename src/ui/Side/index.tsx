@@ -11,6 +11,7 @@ import { isExtraDeckCard } from "@/common";
 import { getUIContainer } from "@/container/compat";
 import { AudioActionType, changeScene } from "@/infra/audio";
 import { IDeck, roomStore, SideStage, sideStore } from "@/stores";
+import { warmDeckImages } from "@/ui/Shared/YgoCard/imageCache";
 
 import { CardDetail } from "../BuildDeck/CardDetail";
 import { Background, DeckZone, ScrollableArea, Type } from "../Shared";
@@ -67,6 +68,7 @@ export const Component: React.FC = () => {
     message.info("重置成功");
   };
   const onSummit = () => {
+    warmDeckImages([...deck.main, ...deck.extra]);
     sendUpdateDeck(container.conn, deck);
     sideStore.setSideDeck(deck);
   };
