@@ -5,6 +5,7 @@ import { cardStore } from "@/stores";
 
 import { Bg } from "../Bg";
 import { Card } from "../Card";
+import { HiddenCard } from "../Card/HiddenCard";
 import styles from "./index.module.scss";
 
 // 后面再改名
@@ -40,13 +41,16 @@ const Cards: React.FC = () => {
         const { zone, controller, sequence } = card.location;
         const stacked =
           zone === ygopro.CardZone.DECK || zone === ygopro.CardZone.EXTRA;
-        // A few cards retain the pile's visible depth. All other cards keep
-        // their game state and animation handler without painting an image.
+        // Only cards that can actually be seen mount springs and card images.
         const visible =
           zone !== ygopro.CardZone.TZONE &&
           (!stacked ||
             sequence >= (topSequences.get(`${controller}:${zone}`) ?? 0) - 2);
-        return <Card key={card.uuid} idx={i} visible={visible} />;
+        return visible ? (
+          <Card key={card.uuid} idx={i} />
+        ) : (
+          <HiddenCard key={card.uuid} idx={i} />
+        );
       })}
     </>
   );

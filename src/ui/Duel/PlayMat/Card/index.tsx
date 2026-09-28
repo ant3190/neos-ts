@@ -52,10 +52,7 @@ import type { SpringApiProps } from "./springs/types";
 
 const { HAND, GRAVE, REMOVED, EXTRA, MZONE, SZONE, TZONE } = ygopro.CardZone;
 
-const CardImpl: React.FC<{ idx: number; visible: boolean }> = ({
-  idx,
-  visible,
-}) => {
+const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
   const container = getUIContainer();
   const card = cardStore.inner[idx];
   const snap = useSnapshot(card);
@@ -79,7 +76,7 @@ const CardImpl: React.FC<{ idx: number; visible: boolean }> = ({
       }) satisfies SpringApiProps,
   );
 
-  // 每张卡都需要移动到初始位置
+  // Only mounted cards need an initial move.
   useEffect(() => {
     addToAnimation(() => move({ card, api }));
   }, []);
@@ -88,13 +85,20 @@ const CardImpl: React.FC<{ idx: number; visible: boolean }> = ({
   const [classFocus, setClassFocus] = useState(false);
 
   // >>> 动画 >>>
-  /** 动画序列的promise */
-  const animationQueue = useRef(new Promise<void>((rs) => rs()));
+  /** 一次动画失败也不能阻塞这张卡之后的所有操作。 */
+  const animationQueue = useRef(Promise.resolve());
 
-  const addToAnimation = (p: () => Promise<void>) =>
-    new Promise((rs) => {
-      animationQueue.current = animationQueue.current.then(p).then(rs);
-    });
+  const addToAnimation = (p: () => Promise<unknown>) => {
+    const next = animationQueue.current
+      .then(async () => {
+        await p();
+      })
+      .catch((error) => {
+        console.error("Card animation failed:", error);
+      });
+    animationQueue.current = next;
+    return next;
+  };
 
   const register = <T extends any[]>(
     task: Task,
@@ -411,38 +415,35 @@ const CardImpl: React.FC<{ idx: number; visible: boolean }> = ({
           "--focus-display": spring.focusDisplay,
           "--focus-opacity": spring.focusOpacity,
           opacity: spring.opacity,
-          visibility: visible ? "visible" : "hidden",
         } as any as CSSProperties
       }
       onClick={onClick}
     >
-      {visible && <div className={styles.focus} />}
-      {visible && <div className={styles.shadow} />}
-      {visible && (
-        <Dropdown
-          menu={dropdownMenu}
-          placement="top"
-          overlayClassName={classnames(styles.dropdown, {
-            [styles["dropdown-disabled"]]: dropdownMenuDisabled,
+      <div className={styles.focus} />
+      <div className={styles.shadow} />
+      <Dropdown
+        menu={dropdownMenu}
+        placement="top"
+        overlayClassName={classnames(styles.dropdown, {
+          [styles["dropdown-disabled"]]: dropdownMenuDisabled,
+        })}
+        arrow
+        trigger={["click"]}
+      >
+        <div
+          className={classnames(styles["img-wrap"], {
+            [styles.focusing]: classFocus,
           })}
-          arrow
-          trigger={["click"]}
         >
-          <div
-            className={classnames(styles["img-wrap"], {
-              [styles.focusing]: classFocus,
-            })}
-          >
-            <YgoCard
-              className={styles.cover}
-              code={snap.code === 0 ? snap.meta.id : snap.code}
-              disabled={disabled}
-            />
-            <YgoCard className={styles.back} isBack />
-          </div>
-        </Dropdown>
-      )}
-      {visible && snap.targeted && <div className={styles.streamer} />}
+          <YgoCard
+            className={styles.cover}
+            code={snap.code === 0 ? snap.meta.id : snap.code}
+            disabled={disabled}
+          />
+          <YgoCard className={styles.back} isBack />
+        </div>
+      </Dropdown>
+      {snap.targeted && <div className={styles.streamer} />}
     </animated.div>
   );
 };
