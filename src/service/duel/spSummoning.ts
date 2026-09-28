@@ -1,5 +1,6 @@
 import { ygopro } from "@/api";
 import { Container } from "@/container";
+import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
 import { fetchEsHintMeta } from "./util";
 
@@ -15,6 +16,7 @@ export default (
   // }
 
   const context = container.context;
+  requestCardImage(spSummoning.code);
   fetchEsHintMeta({
     context: context,
     originMsg: "「[?]」特殊召唤宣言时",

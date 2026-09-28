@@ -85,8 +85,31 @@ export function requestCardImage(code: number): void {
   load(url, "high");
 }
 
+/** Give a newly drawn or played card a brief chance to arrive with its artwork. */
+export async function waitForCardImage(code: number, maxWaitMs = 250) {
+  if (code <= 0 || typeof Image === "undefined") return;
+  requestCardImage(code);
+  const url = getCardImgUrl(code);
+  if (isCardImageReady(url)) return;
+  const image = loading.get(url);
+  if (!image || typeof image.decode !== "function") return;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const decoded = await Promise.race([
+    image.decode().then(
+      () => true,
+      () => false,
+    ),
+    new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(false), maxWaitMs);
+    }),
+  ]);
+  if (timer !== undefined) clearTimeout(timer);
+  if (decoded) remember(url, image);
+}
+
 export function isCardImageReady(url: string): boolean {
   const image = ready.get(url);
   if (image) remember(url, image);
-  return fetched.has(url);
+  return image !== undefined;
 }

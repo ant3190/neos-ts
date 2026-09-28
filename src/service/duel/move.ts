@@ -4,7 +4,10 @@ import { AudioActionType, playEffect } from "@/infra/audio";
 import { createLocalId } from "@/infra/localId";
 import { CardType } from "@/stores";
 import { callCardMove } from "@/ui/Duel/PlayMat/Card";
-import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
+import {
+  requestCardImage,
+  waitForCardImage,
+} from "@/ui/Shared/YgoCard/imageCache";
 
 import { REASON_DESTROY, REASON_MATERIAL, TYPE_TOKEN } from "../../common";
 import { genCard } from "../utils";
@@ -44,6 +47,15 @@ export default async (container: Container, move: MsgMove) => {
   const reason = move.reason;
   const fromEmpty = from.zone === EMPTY;
   const toEmpty = to.zone === EMPTY;
+
+  if (
+    code > 0 &&
+    ![DECK, EXTRA, TZONE, EMPTY].includes(to.zone) &&
+    (to.zone === HAND ||
+      ![FACEDOWN, FACEDOWN_ATTACK, FACEDOWN_DEFENSE].includes(to.position))
+  ) {
+    await waitForCardImage(code);
+  }
 
   const meta = fetchCard(code);
   if (meta.data.type !== undefined && (meta.data.type & TYPE_TOKEN) > 0) {

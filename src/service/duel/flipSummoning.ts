@@ -1,5 +1,6 @@
 import { ygopro } from "@/api";
 import { Container } from "@/container";
+import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
 import { fetchEsHintMeta } from "./util";
 
@@ -10,6 +11,7 @@ export default (
   // playEffect(AudioActionType.SOUND_FILP);
 
   const context = container.context;
+  requestCardImage(flipSummoning.code);
   fetchEsHintMeta({
     context: context,
     originMsg: "「[?]」反转召唤宣言时",

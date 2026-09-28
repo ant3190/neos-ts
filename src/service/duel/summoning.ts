@@ -1,5 +1,6 @@
 import { ygopro } from "@/api";
 import { Container } from "@/container";
+import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
 import { fetchEsHintMeta } from "./util";
 
@@ -13,6 +14,7 @@ export default (
   // playEffect(AudioActionType.SOUND_SUMMON);
 
   const context = container.context;
+  requestCardImage(summoning.code);
   fetchEsHintMeta({
     context: context,
     originMsg: "「[?]」通常召唤宣言时",

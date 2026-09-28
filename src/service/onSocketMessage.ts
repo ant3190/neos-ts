@@ -2,10 +2,12 @@
  * 长连接消息事件订阅处理逻辑
  *
  * */
+import { ygopro } from "@/api";
 import { adaptStoc } from "@/api/ocgcore/ocgAdapter/adapter";
 import { YgoProPacket } from "@/api/ocgcore/ocgAdapter/packet";
 import { Container } from "@/container";
 import { replayStore } from "@/stores";
+import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
 import handleGameMsg from "./duel/gameMsg";
 import handleTimeLimit from "./duel/timeLimit";
@@ -33,21 +35,68 @@ import { handleWaitingSide } from "./side/waitingSide";
 
 let animation: Promise<void> = Promise.resolve();
 
+interface DecodedPacket {
+  packet: YgoProPacket;
+  pb: ygopro.YgoStocMsg;
+}
+
+function prepareImages(packets: DecodedPacket[]) {
+  const codes = new Set<number>();
+  for (const { pb } of packets) {
+    if (pb.msg !== "stoc_game_msg") continue;
+    const msg = pb.stoc_game_msg;
+    switch (msg.gameMsg) {
+      case "draw":
+        msg.draw.cards.forEach((code) => codes.add(code));
+        break;
+      case "move":
+        codes.add(msg.move.code);
+        break;
+      case "summoning":
+        codes.add(msg.summoning.code);
+        break;
+      case "sp_summoning":
+        codes.add(msg.sp_summoning.code);
+        break;
+      case "flip_summoning":
+        codes.add(msg.flip_summoning.code);
+        break;
+      case "chaining":
+        codes.add(msg.chaining.code);
+        break;
+      case "confirm_cards":
+        msg.confirm_cards.cards.forEach((card) => codes.add(card.code));
+        break;
+      case "update_data":
+        msg.update_data.actions.forEach((action) => codes.add(action.code));
+        break;
+      case "swap":
+        codes.add(msg.swap.code1);
+        codes.add(msg.swap.code2);
+        break;
+    }
+  }
+  // A game frame can contain many updates; avoid competing with current art.
+  for (const code of [...codes].slice(0, 12)) requestCardImage(code);
+}
+
 export default async function handleSocketMessage(
   container: Container,
   e: MessageEvent,
 ) {
+  const decoded = YgoProPacket.deserialize(e.data).map((packet) => ({
+    packet,
+    pb: adaptStoc(packet),
+  }));
+  if (!replayStore.isReplay) prepareImages(decoded);
   // 确保按序执行
-  animation = animation.then(() => _handle(container, e));
+  animation = animation.then(() => _handle(container, decoded));
   await animation;
 }
 
 // FIXME: 下面的所有`handler`中访问`Store`的时候都应该通过`Container`进行访问
-async function _handle(container: Container, e: MessageEvent) {
-  const packets = YgoProPacket.deserialize(e.data);
-
-  for (const packet of packets) {
-    const pb = adaptStoc(packet);
+async function _handle(container: Container, decoded: DecodedPacket[]) {
+  for (const { packet, pb } of decoded) {
     const isReplayGameMsg = replayStore.isReplay && pb.msg === "stoc_game_msg";
     const replayGameMsg = isReplayGameMsg
       ? pb.stoc_game_msg.gameMsg
