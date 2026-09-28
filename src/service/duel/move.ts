@@ -1,8 +1,7 @@
-import { v4 as v4uuid } from "uuid";
-
 import { fetchCard, ygopro } from "@/api";
 import { Container } from "@/container";
 import { AudioActionType, playEffect } from "@/infra/audio";
+import { createLocalId } from "@/infra/localId";
 import { CardType } from "@/stores";
 import { callCardMove } from "@/ui/Duel/PlayMat/Card";
 
@@ -70,7 +69,7 @@ export default async (container: Container, move: MsgMove) => {
 
   if (fromEmpty) {
     target = genCard({
-      uuid: v4uuid(),
+      uuid: createLocalId(),
       code,
       location: to,
       counters: {},

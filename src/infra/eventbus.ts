@@ -1,5 +1,6 @@
 import { EventEmitter } from "eventemitter3";
-import { v4 as v4uuid } from "uuid";
+
+import { createLocalId } from "./localId";
 
 const eventEmitter = new EventEmitter();
 const cardHandlers = new Map<string, (...args: any[]) => Promise<boolean>>();
@@ -72,7 +73,7 @@ const call = (task: Task, ...args: any[]) => {
     });
   }
   return new Promise<void>((rs) => {
-    const taskId = v4uuid();
+    const taskId = createLocalId();
     const cb = (respTaskId: string) => {
       if (respTaskId === taskId) {
         eventEmitter.removeListener(getEnd(task), cb);

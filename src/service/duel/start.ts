@@ -1,10 +1,10 @@
 import { flatten } from "lodash-es";
-import { v4 as v4uuid } from "uuid";
 
 import { ygopro } from "@/api";
 import { useConfig } from "@/config";
 import { Container } from "@/container";
 import { sleep } from "@/infra";
+import { createLocalId } from "@/infra/localId";
 import { replayStore, RoomStage, SideStage } from "@/stores";
 import { replayStart } from "@/ui/Match/ReplayModal";
 
@@ -59,7 +59,7 @@ export default async (
     ].map((length, i) =>
       Array.from({ length }).map((_, sequence) =>
         genCard({
-          uuid: v4uuid(),
+          uuid: createLocalId(),
           code: 0,
           location: new ygopro.CardLocation({
             controller: i < 3 ? 0 : 1,
