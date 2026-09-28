@@ -76,9 +76,9 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       }) satisfies SpringApiProps,
   );
 
-  // Only mounted cards need an initial move.
+  // Mount at the actual location immediately; service messages can animate later moves.
   useEffect(() => {
-    addToAnimation(() => move({ card, api }));
+    addToAnimation(() => move({ card, api, options: { instant: true } }));
   }, []);
 
   const [glowing, setGrowing] = useState(false);
@@ -439,6 +439,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
             className={styles.cover}
             code={snap.code === 0 ? snap.meta.id : snap.code}
             disabled={disabled}
+            urgent
           />
           <YgoCard className={styles.back} isBack />
         </div>

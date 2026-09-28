@@ -19,7 +19,7 @@ const {
 const { HAND } = ygopro.CardZone;
 
 export const moveToHand: MoveFunc = async (props) => {
-  const { card, api } = props;
+  const { card, api, options } = props;
   const { sequence, controller } = card.location;
   // 手卡会有很复杂的计算...
   const hand_circle_center_x = 0;
@@ -56,7 +56,7 @@ export const moveToHand: MoveFunc = async (props) => {
     zIndex: sequence,
     // rx: -PLANE_ROTATE_X,
     config: {
-      duration: getDuration(),
+      duration: options?.instant ? 0 : getDuration(),
       clamp: true,
     },
   });

@@ -20,7 +20,7 @@ const {
 const { DECK, EXTRA } = ygopro.CardZone;
 
 export const moveToDeck: MoveFunc = async (props) => {
-  const { card, api } = props;
+  const { card, api, options } = props;
   // report
   const { location } = card;
   const { controller, zone, sequence } = location;
@@ -48,7 +48,7 @@ export const moveToDeck: MoveFunc = async (props) => {
     scale: DECK_CARD_HEIGHT / HAND_CARD_HEIGHT,
 
     config: {
-      duration: getDuration(),
+      duration: options?.instant ? 0 : getDuration(),
     },
   });
 };

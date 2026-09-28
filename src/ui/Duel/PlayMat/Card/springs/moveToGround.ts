@@ -108,7 +108,7 @@ export const moveToGround: MoveFunc = async (props) => {
       ry,
       rz,
       config: {
-        duration: getDuration(),
+        duration: options?.instant ? 0 : getDuration(),
         clamp: true,
         easing: easings.easeOutSine,
       },
@@ -122,7 +122,7 @@ export const moveToGround: MoveFunc = async (props) => {
     zIndex: is_overlay ? 1 : 3,
     config: {
       easing: easings.easeInQuad,
-      duration: 100,
+      duration: options?.instant ? 0 : 100,
       clamp: true,
     },
   });

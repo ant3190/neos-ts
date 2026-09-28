@@ -14,6 +14,7 @@ interface Props {
   code?: number;
   targeted?: boolean;
   disabled?: boolean;
+  urgent?: boolean;
   // cardName?: string;
   style?: CSSProperties;
   width?: number | string;
@@ -29,12 +30,14 @@ export const YgoCard: React.FC<Props> = (props) => {
     isBack = false,
     targeted = false,
     disabled = false,
+    urgent = false,
     width,
     style,
     onClick,
     onLoad,
   } = props;
   const src = getCardImgUrl(code, isBack);
+  const [loadedSrc, setLoadedSrc] = useState("");
   const [loadError, setLoadError] = useState({
     src: "",
     attempts: 0,
@@ -46,13 +49,23 @@ export const YgoCard: React.FC<Props> = (props) => {
     attempts === 1
       ? `${src}${src.includes("?") ? "&" : "?"}retry=${loadError.retryKey}`
       : src;
+  const waitingForArt = urgent && !isBack && code !== 0 && loadedSrc !== src;
 
   return (
     <div
       className={classNames(styles["ygo-card"], className)}
-      style={{ width, ...style }}
+      style={{
+        width,
+        ...(urgent && !isBack && code !== 0
+          ? { backgroundImage: `url("${getCardImgUrl(0, true)}")` }
+          : {}),
+        ...style,
+      }}
       onClick={onClick}
     >
+      {waitingForArt && !failed && (
+        <span className={styles.missing}>#{code}</span>
+      )}
       {failed ? (
         <span className={styles.missing}>
           {isBack || code === 0 ? "NEOS" : `#${code}`}
@@ -63,8 +76,14 @@ export const YgoCard: React.FC<Props> = (props) => {
           src={imageSrc}
           alt={isBack || code === 0 ? "" : `Card ${code}`}
           decoding="async"
+          loading={urgent ? "eager" : undefined}
+          {...(urgent ? { fetchpriority: "high" } : {})}
           draggable={false}
-          onLoad={onLoad}
+          onLoad={() => {
+            setLoadedSrc(src);
+            onLoad?.();
+          }}
+          style={{ opacity: waitingForArt ? 0 : 1 }}
           onError={() =>
             setLoadError({ src, attempts: attempts + 1, retryKey: Date.now() })
           }

@@ -10,6 +10,8 @@
   overflow: hidden; //超出的文本隐藏
   text-overflow: ellipsis; //溢出用省略号显示
   background-color: #313746;
+  background-size: cover;
+  background-position: center;
   text-align: center;
 }
 
@@ -25,6 +27,12 @@
   color: #d5dae2;
   font-size: clamp(10px, 0.9em, 15px);
   overflow-wrap: anywhere;
+  position: relative;
+  z-index: 1;
+  padding: 1px 3px;
+  border-radius: 2px;
+  background: rgb(0 0 0 / 72%);
+  line-height: 1.2;
 }
 
 .targeted {

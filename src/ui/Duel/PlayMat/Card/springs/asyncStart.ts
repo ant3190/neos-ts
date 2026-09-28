@@ -1,8 +1,18 @@
 import type { SpringConfig, SpringRef } from "@react-spring/web";
 
+// A stalled browser should not make each subsequent card wait again.
+let animationStalled = false;
+
 export const asyncStart = <T extends {}>(api: SpringRef<T>) => {
-  return (p: Partial<T> & { config?: SpringConfig }) =>
-    new Promise<void>((resolve) => {
+  return (p: Partial<T> & { config?: SpringConfig }) => {
+    const target = { ...p };
+    delete target.config;
+    if (animationStalled || p.config?.duration === 0) {
+      api.set(target as T);
+      return Promise.resolve();
+    }
+
+    return new Promise<void>((resolve) => {
       let finished = false;
       const finish = () => {
         if (finished) return;
@@ -10,12 +20,11 @@ export const asyncStart = <T extends {}>(api: SpringRef<T>) => {
         clearTimeout(timeout);
         resolve();
       };
-      // 如果浏览器暂停了动画帧，及时恢复对战流程并将卡片放到目标位置。
+      // 如果浏览器暂停了动画帧，之后的卡片直接显示在目标位置。
       const timeout = setTimeout(() => {
         if (finished) return;
         finished = true;
-        const target = { ...p };
-        delete target.config;
+        animationStalled = true;
         try {
           api.stop();
           api.set(target as T);
@@ -23,7 +32,7 @@ export const asyncStart = <T extends {}>(api: SpringRef<T>) => {
           console.error("Could not finish card animation:", error);
         }
         resolve();
-      }, 2500);
+      }, 900);
       try {
         api.start({ ...p, onResolve: finish });
       } catch (error) {
@@ -31,4 +40,5 @@ export const asyncStart = <T extends {}>(api: SpringRef<T>) => {
         throw error;
       }
     });
+  };
 };
