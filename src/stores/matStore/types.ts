@@ -18,6 +18,11 @@ export interface MatState {
 
   chains: ygopro.CardLocation[]; // 连锁的卡片位置
 
+  /** Keep each revealed effect visible even when its card moves or a marker overlaps. */
+  chainDetails: ChainDetail[];
+  chainActivation?: ChainDetail;
+  chainEventId: number;
+
   chainSetting: ChainSetting; // 连锁类型
 
   timeLimits: BothSide<number> & {
@@ -52,6 +57,15 @@ export interface MatState {
 
   turnCount: number;
   error: string;
+}
+
+export interface ChainDetail {
+  id: number;
+  index: number;
+  code: number;
+  controller: number;
+  zone: ygopro.CardZone;
+  resolved: boolean;
 }
 
 export interface InitInfo {

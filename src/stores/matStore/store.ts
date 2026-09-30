@@ -55,6 +55,9 @@ const initInfo: MatState["initInfo"] = proxy({
 
 const initialState: Omit<MatState, "reset"> = {
   chains: [],
+  chainDetails: [],
+  chainActivation: undefined,
+  chainEventId: 0,
   timeLimits: {
     // 时间限制
     me: -1,
@@ -100,6 +103,9 @@ const initialState: Omit<MatState, "reset"> = {
 
 export class MatStore implements MatState, NeosStore {
   chains = initialState.chains;
+  chainDetails = initialState.chainDetails;
+  chainActivation = initialState.chainActivation;
+  chainEventId = initialState.chainEventId;
   chainSetting = initialState.chainSetting;
   timeLimits = initialState.timeLimits;
   initInfo = initialState.initInfo;
@@ -119,6 +125,9 @@ export class MatStore implements MatState, NeosStore {
   isMe = initialState.isMe;
   reset(): void {
     this.chains = [];
+    this.chainDetails = [];
+    this.chainActivation = undefined;
+    this.chainEventId = 0;
     this.timeLimits.me = -1;
     this.timeLimits.op = -1;
     this.initInfo.me = defaultInitInfo;

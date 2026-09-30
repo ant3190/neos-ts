@@ -8,6 +8,8 @@ export default (
   console.info(`<ChainEnd>chain has been end`);
   const context = container.context;
 
+  context.matStore.chainDetails = [];
+
   while (true) {
     const chain = context.matStore.chains.pop();
     if (chain === undefined) {

@@ -24,6 +24,7 @@ import {
   YesNoModal,
 } from "./Message";
 import { ChatBox, HandChain, LifeBar, Mat, Menu, Underlying } from "./PlayMat";
+import { ChainDisplay } from "./PlayMat/ChainDisplay";
 
 export const loader: LoaderFunction = async () => {
   // 更新场景
@@ -87,6 +88,7 @@ export const Component: React.FC = () => {
       <EndModal />
       <ChatBox />
       <HandChain />
+      <ChainDisplay />
       <ActionHistory />
     </>
   );

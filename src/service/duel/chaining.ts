@@ -22,6 +22,19 @@ export default async (
 
   // 将`location`添加到连锁栈
   context.matStore.chains.push(location);
+  const detail = {
+    id: ++context.matStore.chainEventId,
+    index: context.matStore.chains.length,
+    code: chaining.code,
+    controller: location.controller,
+    zone: location.zone,
+    resolved: false,
+  };
+  context.matStore.chainDetails.push(detail);
+  context.matStore.chainActivation = detail;
+  const meta = fetchCard(chaining.code);
+  requestCardImage(chaining.code);
+  context.historyStore.putEffect(context, meta.id, location);
 
   const target = context.cardStore.find(location);
   if (target) {
@@ -33,8 +46,6 @@ export default async (
       console.warn(`<Chaining>block from ${location} is null`);
     }
 
-    const meta = fetchCard(chaining.code);
-    requestCardImage(chaining.code);
     // 这里不能设置`code`，因为存在一个场景：
     // 对方的`魔神仪-曼德拉护肤草`发动效果后，后端会发一次`MSG_SHUFFLE_HAND`，
     // 但传给前端的codes全是0，如果这里设置了`code`的话，
@@ -45,8 +56,6 @@ export default async (
     if (target.code === 0) {
       target.meta = meta;
     }
-
-    context.historyStore.putEffect(context, meta.id, location);
 
     // 发动效果动画
     await callCardFocus(target.uuid);

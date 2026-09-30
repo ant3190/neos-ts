@@ -15,6 +15,10 @@ export default async (
 ) => {
   console.info(`<ChainSolved>solved_index = ${chainSolved.solved_index}`);
   const context = container.context;
+  const detail = context.matStore.chainDetails.find(
+    (entry) => entry.index === chainSolved.solved_index,
+  );
+  if (detail) detail.resolved = true;
 
   const location = context.matStore.chains
     .splice(chainSolved.solved_index - 1, 1)

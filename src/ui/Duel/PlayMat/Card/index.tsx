@@ -125,8 +125,14 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
     );
 
     const unsubscribeFocus = register(Task.Focus, async () => {
-      setClassFocus(true);
-      await focus({ card, api });
+      await addToAnimation(async () => {
+        setClassFocus(true);
+        try {
+          await focus({ card, api });
+        } finally {
+          setClassFocus(false);
+        }
+      });
     });
 
     const unsubscribeAttack = register(

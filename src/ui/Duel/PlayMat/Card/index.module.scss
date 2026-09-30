@@ -98,7 +98,6 @@
     left: calc((var(--focus-scale) - 1) * -50%);
     top: calc((var(--focus-scale) - 1) * -50%);
     outline: 3px solid #ddd;
-    filter: blur(calc(2px * 1.3 * var(--focus-scale)));
     display: var(--focus-display);
     opacity: var(--focus-opacity);
   }
@@ -136,6 +135,14 @@
 .mat-card.shining {
   --shadow-color: #f4ff00;
   @extend .frame;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mat-card .img-wrap.focusing .cover,
+  .mat-card .streamer::before,
+  .frame {
+    animation: none;
+  }
 }
 
 @keyframes focus {

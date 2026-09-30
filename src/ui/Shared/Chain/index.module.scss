@@ -8,6 +8,12 @@
   pointer-events: none;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .chain img {
+    animation: none;
+  }
+}
+
 .op {
   transform: rotate(180deg);
 }
