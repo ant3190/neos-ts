@@ -41,43 +41,48 @@ interface DecodedPacket {
 }
 
 function prepareImages(packets: DecodedPacket[]) {
-  const codes = new Set<number>();
+  const revealed = new Set<number>();
+  const other = new Set<number>();
+  const add = (list: Set<number>, code: number) => {
+    if (code > 0) list.add(code);
+  };
   for (const { pb } of packets) {
     if (pb.msg !== "stoc_game_msg") continue;
     const msg = pb.stoc_game_msg;
     switch (msg.gameMsg) {
       case "draw":
-        msg.draw.cards.forEach((code) => codes.add(code));
+        msg.draw.cards.forEach((code) => add(revealed, code));
         break;
       case "move":
-        codes.add(msg.move.code);
+        add(revealed, msg.move.code);
         break;
       case "summoning":
-        codes.add(msg.summoning.code);
+        add(revealed, msg.summoning.code);
         break;
       case "sp_summoning":
-        codes.add(msg.sp_summoning.code);
+        add(revealed, msg.sp_summoning.code);
         break;
       case "flip_summoning":
-        codes.add(msg.flip_summoning.code);
+        add(revealed, msg.flip_summoning.code);
         break;
       case "chaining":
-        codes.add(msg.chaining.code);
+        add(revealed, msg.chaining.code);
         break;
       case "confirm_cards":
-        msg.confirm_cards.cards.forEach((card) => codes.add(card.code));
+        msg.confirm_cards.cards.forEach((card) => add(revealed, card.code));
         break;
       case "update_data":
-        msg.update_data.actions.forEach((action) => codes.add(action.code));
+        msg.update_data.actions.forEach((action) => add(other, action.code));
         break;
       case "swap":
-        codes.add(msg.swap.code1);
-        codes.add(msg.swap.code2);
+        add(other, msg.swap.code1);
+        add(other, msg.swap.code2);
         break;
     }
   }
-  // A game frame can contain many updates; avoid competing with current art.
-  for (const code of [...codes].slice(0, 12)) requestCardImage(code);
+  // Decode the cards visible in this frame before less urgent state updates.
+  for (const code of [...revealed, ...other].slice(0, 8))
+    requestCardImage(code);
 }
 
 export default async function handleSocketMessage(

@@ -1,11 +1,17 @@
 import { getCardImgUrl } from "@/api/cards";
 
 const MAX_WARM_IMAGES = 32;
-const MAX_BACKGROUND_REQUESTS = 4;
+const MAX_BACKGROUND_REQUESTS = 2;
+
+interface LoadingImage {
+  image: HTMLImageElement;
+  priority: "low" | "high";
+  cancel: () => void;
+}
 
 const ready = new Map<string, HTMLImageElement>();
 const fetched = new Set<string>();
-const loading = new Map<string, HTMLImageElement>();
+const loading = new Map<string, LoadingImage>();
 let pending: string[] = [];
 let generation = 0;
 
@@ -20,28 +26,46 @@ function load(url: string, priority: "low" | "high") {
   if (typeof Image === "undefined" || ready.has(url)) return;
   const existing = loading.get(url);
   if (existing) {
-    if (priority === "high") existing.setAttribute("fetchpriority", "high");
+    if (priority === "high") {
+      existing.priority = "high";
+      existing.image.setAttribute("fetchpriority", "high");
+    }
     return;
   }
   const image = new Image();
   image.setAttribute("fetchpriority", priority);
-  loading.set(url, image);
-  image.onload = () => {
-    // decode() warms the pixels as well as the browser's HTTP image cache.
-    (typeof image.decode === "function" ? image.decode() : Promise.resolve())
-      .then(
-        () => remember(url, image),
-        () => {},
-      )
-      .finally(() => {
-        loading.delete(url);
-        drain();
-      });
-  };
-  image.onerror = () => {
+  let finished = false;
+  const finish = (success: boolean, continueQueue = true) => {
+    if (finished) return;
+    finished = true;
+    if (success) remember(url, image);
     loading.delete(url);
-    drain();
+    if (continueQueue) drain();
   };
+  loading.set(url, {
+    image,
+    priority,
+    cancel: () => {
+      image.onload = null;
+      image.onerror = null;
+      image.removeAttribute("src");
+      finish(false, false);
+    },
+  });
+  image.onload = () => {
+    // Some browsers reject decode() even after a valid image has loaded.
+    (typeof image.decode === "function"
+      ? image.decode()
+      : Promise.resolve()
+    ).then(
+      () => finish(image.naturalWidth > 0),
+      () => {
+        if (image.complete && image.naturalWidth > 0) fetched.add(url);
+        finish(false);
+      },
+    );
+  };
+  image.onerror = () => finish(false);
   image.src = url;
 }
 
@@ -62,13 +86,10 @@ export function warmDeckImages(codes: readonly number[]): () => void {
     ),
   ];
   const selected = new Set(urls);
-  for (const [url, image] of loading) {
-    if (selected.has(url) || image.getAttribute("fetchpriority") === "high")
-      continue;
-    image.onload = null;
-    image.onerror = null;
-    image.removeAttribute("src");
-    loading.delete(url);
+  pending = [];
+  for (const [url, task] of loading) {
+    if (selected.has(url) || task.priority === "high") continue;
+    task.cancel();
   }
   pending = urls.filter((url) => !fetched.has(url));
   drain();
@@ -82,34 +103,20 @@ export function requestCardImage(code: number): void {
   if (code <= 0 || typeof Image === "undefined") return;
   const url = getCardImgUrl(code);
   pending = pending.filter((candidate) => candidate !== url);
+  if (
+    !ready.has(url) &&
+    !loading.has(url) &&
+    loading.size >= MAX_BACKGROUND_REQUESTS
+  ) {
+    // Free a connection occupied by deck warming for the card being revealed.
+    const background = [...loading].find(([, task]) => task.priority === "low");
+    if (background) {
+      background[1].cancel();
+      pending = [
+        background[0],
+        ...pending.filter((item) => item !== background[0]),
+      ];
+    }
+  }
   load(url, "high");
-}
-
-/** Give a newly drawn or played card a brief chance to arrive with its artwork. */
-export async function waitForCardImage(code: number, maxWaitMs = 250) {
-  if (code <= 0 || typeof Image === "undefined") return;
-  requestCardImage(code);
-  const url = getCardImgUrl(code);
-  if (isCardImageReady(url)) return;
-  const image = loading.get(url);
-  if (!image || typeof image.decode !== "function") return;
-
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const decoded = await Promise.race([
-    image.decode().then(
-      () => true,
-      () => false,
-    ),
-    new Promise<boolean>((resolve) => {
-      timer = setTimeout(() => resolve(false), maxWaitMs);
-    }),
-  ]);
-  if (timer !== undefined) clearTimeout(timer);
-  if (decoded) remember(url, image);
-}
-
-export function isCardImageReady(url: string): boolean {
-  const image = ready.get(url);
-  if (image) remember(url, image);
-  return image !== undefined;
 }

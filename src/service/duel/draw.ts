@@ -2,7 +2,7 @@ import { fetchCard, ygopro } from "@/api";
 import { Container } from "@/container";
 import { AudioActionType, playEffect } from "@/infra/audio";
 import { callCardMove } from "@/ui/Duel/PlayMat/Card";
-import { waitForCardImage } from "@/ui/Shared/YgoCard/imageCache";
+import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
 import { fetchEsHintMeta } from "./util";
 
@@ -25,8 +25,8 @@ export default async (
     .sort((a, b) => a.location.sequence - b.location.sequence)
     .slice(-drawLength);
 
-  // Load all revealed artworks together before showing the drawn cards.
-  await Promise.all(draw.cards.map((code) => waitForCardImage(code)));
+  // Start image loads without holding the duel message queue on network I/O.
+  draw.cards.forEach(requestCardImage);
 
   for (const idx in newHands) {
     const card = newHands[Number(idx)];

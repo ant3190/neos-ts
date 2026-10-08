@@ -444,6 +444,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
           <YgoCard
             className={styles.cover}
             code={snap.code === 0 ? snap.meta.id : snap.code}
+            name={snap.meta.text.name}
             disabled={disabled}
             urgent
           />

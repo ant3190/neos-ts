@@ -4,7 +4,6 @@ import { CSSProperties, useState } from "react";
 import { getCardImgUrl } from "@/api";
 import { useConfig } from "@/config";
 
-import { isCardImageReady } from "./imageCache";
 import styles from "./index.module.scss";
 
 const { assetsPath } = useConfig();
@@ -16,6 +15,7 @@ interface Props {
   targeted?: boolean;
   disabled?: boolean;
   urgent?: boolean;
+  name?: string;
   // cardName?: string;
   style?: CSSProperties;
   width?: number | string;
@@ -32,15 +32,14 @@ export const YgoCard: React.FC<Props> = (props) => {
     targeted = false,
     disabled = false,
     urgent = false,
+    name,
     width,
     style,
     onClick,
     onLoad,
   } = props;
   const src = getCardImgUrl(code, isBack);
-  const [loadedSrc, setLoadedSrc] = useState(() =>
-    isCardImageReady(src) ? src : "",
-  );
+  const [loadedSrc, setLoadedSrc] = useState("");
   const [loadError, setLoadError] = useState({
     src: "",
     attempts: 0,
@@ -52,31 +51,25 @@ export const YgoCard: React.FC<Props> = (props) => {
     attempts === 1
       ? `${src}${src.includes("?") ? "&" : "?"}retry=${loadError.retryKey}`
       : src;
-  const waitingForArt =
-    urgent &&
-    !isBack &&
-    code !== 0 &&
-    loadedSrc !== src &&
-    !isCardImageReady(src);
+  const knownFace = urgent && !isBack && code !== 0;
+  // The preload may finish before this particular DOM image is painted.
+  const artReady = !knownFace || loadedSrc === imageSrc;
+  const waitingForArt = knownFace && !artReady && !failed;
+  const caption = name?.trim() || "卡图加载中";
 
   return (
     <div
       className={classNames(styles["ygo-card"], className)}
       style={{
         width,
-        ...(urgent && !isBack && code !== 0
-          ? { backgroundImage: `url("${getCardImgUrl(0, true)}")` }
-          : {}),
         ...style,
       }}
       onClick={onClick}
     >
-      {waitingForArt && !failed && (
-        <span className={styles.missing}>#{code}</span>
-      )}
+      {waitingForArt && <span className={styles.pending}>{caption}</span>}
       {failed ? (
         <span className={styles.missing}>
-          {isBack || code === 0 ? "NEOS" : `#${code}`}
+          {isBack || code === 0 ? "NEOS" : name?.trim() || "卡图加载失败"}
         </span>
       ) : (
         <img
@@ -87,11 +80,21 @@ export const YgoCard: React.FC<Props> = (props) => {
           loading={urgent ? "eager" : undefined}
           {...(urgent ? { fetchpriority: "high" } : {})}
           draggable={false}
-          onLoad={() => {
-            setLoadedSrc(src);
-            onLoad?.();
+          onLoad={(event) => {
+            const image = event.currentTarget;
+            const currentSrc = imageSrc;
+            const show = () => {
+              if (!image.complete || image.naturalWidth === 0) return;
+              setLoadedSrc(currentSrc);
+              onLoad?.();
+            };
+            if (knownFace && typeof image.decode === "function") {
+              image.decode().then(show, show);
+            } else {
+              show();
+            }
           }}
-          style={{ opacity: waitingForArt ? 0 : 1 }}
+          style={{ opacity: artReady ? 1 : 0 }}
           onError={() =>
             setLoadError({ src, attempts: attempts + 1, retryKey: Date.now() })
           }

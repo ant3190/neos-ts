@@ -81,7 +81,12 @@ export const ChainDisplay: React.FC = () => {
           role="status"
           aria-live="polite"
         >
-          <YgoCard code={spotlight.code} className={styles.largeArt} urgent />
+          <YgoCard
+            code={spotlight.code}
+            name={name(spotlight.code)}
+            className={styles.largeArt}
+            urgent
+          />
           <div className={styles.spotlightText}>
             <span className={styles.kicker}>
               {english
@@ -122,7 +127,12 @@ export const ChainDisplay: React.FC = () => {
                 }: ${name(entry.code)}, ${label(entry)}`}
               >
                 <span className={styles.index}>{entry.index}</span>
-                <YgoCard code={entry.code} className={styles.smallArt} />
+                <YgoCard
+                  code={entry.code}
+                  name={name(entry.code)}
+                  className={styles.smallArt}
+                  urgent
+                />
                 <span className={styles.entryText}>
                   <strong>{name(entry.code)}</strong>
                   <small>

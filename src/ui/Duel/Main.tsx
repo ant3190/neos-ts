@@ -5,7 +5,8 @@ import { useSnapshot } from "valtio";
 import { ygopro } from "@/api";
 import { useEnv } from "@/hook";
 import { AudioActionType, changeScene } from "@/infra/audio";
-import { matStore, SideStage, sideStore } from "@/stores";
+import { matStore, replayStore, SideStage, sideStore } from "@/stores";
+import { warmDeckImages } from "@/ui/Shared/YgoCard/imageCache";
 
 import {
   ActionHistory,
@@ -41,6 +42,21 @@ export const Component: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { DEV } = useEnv();
   const RECORD = "record";
+
+  useEffect(() => {
+    if (
+      replayStore.isReplay ||
+      matStore.selfType === ygopro.StocTypeChange.SelfType.OBSERVER
+    )
+      return;
+    try {
+      const deck = sideStore.getSideDeck();
+      if (deck.main.length || deck.extra.length)
+        return warmDeckImages([...deck.main, ...deck.extra]);
+    } catch (error) {
+      console.warn("Unable to warm selected deck artwork", error);
+    }
+  }, []);
 
   useEffect(() => {
     if (!DEV) return;

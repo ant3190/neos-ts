@@ -23,6 +23,20 @@
   object-fit: contain;
 }
 
+.pending {
+  position: relative;
+  z-index: 1;
+  max-width: 90%;
+  color: #e9edf1;
+  font-size: clamp(9px, 0.9em, 13px);
+  line-height: 1.25;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
 .missing {
   color: #d5dae2;
   font-size: clamp(10px, 0.9em, 15px);
