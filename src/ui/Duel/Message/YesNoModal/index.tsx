@@ -66,3 +66,10 @@ export const displayYesNoModal = async (msg: string) => {
   await new Promise<void>((resolve) => (rs = resolve)); // 等待在组件内resolve
   localStore.isOpen = false;
 };
+
+export const resetYesNoModal = () => {
+  localStore.isOpen = false;
+  localStore.msg = undefined;
+  rs();
+  rs = () => {};
+};

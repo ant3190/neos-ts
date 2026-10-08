@@ -1,6 +1,6 @@
 import { SearchOutlined } from "@ant-design/icons";
 import { Avatar, Button, Checkbox, Input, List } from "antd";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { proxy, useSnapshot } from "valtio";
 
 import {
@@ -37,6 +37,14 @@ export const AnnounceModal: React.FC = () => {
   const [cardList, setCardList] = useState<CardMeta[]>([]);
   const [selected, setSelected] = useState<number | undefined>(undefined);
   const container = getUIContainer();
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchWord("");
+      setCardList([]);
+      setSelected(undefined);
+    }
+  }, [isOpen]);
 
   const handleSearch = () => {
     const result = searchCards({
@@ -141,4 +149,11 @@ export const displayAnnounceModal = async (opcodes: number[]) => {
   await new Promise((resolve) => (rs = resolve));
   store.isOpen = false;
   store.opcodes = [];
+};
+
+export const resetAnnounceModal = () => {
+  store.isOpen = false;
+  store.opcodes = [];
+  rs();
+  rs = () => {};
 };

@@ -137,3 +137,10 @@ export const displaySortCardModal = async (options: SortOption[]) => {
   localStore.isOpen = false;
   localStore.options = [];
 };
+
+export const resetSortCardModal = () => {
+  localStore.isOpen = false;
+  localStore.options = [];
+  rs();
+  rs = () => {};
+};

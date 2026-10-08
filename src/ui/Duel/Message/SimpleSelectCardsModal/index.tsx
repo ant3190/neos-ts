@@ -45,3 +45,10 @@ export const displaySimpleSelectCardsModal = async (
   localStore.isOpen = false;
   return res;
 };
+
+export const resetSimpleSelectCardsModal = () => {
+  localStore.isOpen = false;
+  localStore.selectables = [];
+  rs([]);
+  rs = () => {};
+};

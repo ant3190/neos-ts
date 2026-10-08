@@ -105,14 +105,12 @@ test("loads and changes decks, then shows the correct hands during guessing", as
     roomStore.getOpPlayer()!.moraResult = 2;
     roomStore.stage = RoomStage.HAND_SELECTING;
   });
-  await expect(page.getByTestId("waitroom-player-me").locator("use")).toHaveAttribute(
-    "xlink:href",
-    "#icon-hand-scissors",
-  );
-  await expect(page.getByTestId("waitroom-player-op").locator("use")).toHaveAttribute(
-    "xlink:href",
-    "#icon-hand-rock",
-  );
+  await expect(
+    page.getByTestId("waitroom-player-me").locator("use"),
+  ).toHaveAttribute("xlink:href", "#icon-hand-scissors");
+  await expect(
+    page.getByTestId("waitroom-player-op").locator("use"),
+  ).toHaveAttribute("xlink:href", "#icon-hand-rock");
 
   await page.evaluate(async () => {
     const { roomStore, RoomStage } = await import("/src/stores/index.ts");
@@ -127,4 +125,80 @@ test("loads and changes decks, then shows the correct hands during guessing", as
       }),
     )
     .toBe(true);
+});
+
+test("single player can choose a deck before the bot starts the duel", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.waitForFunction(async () => {
+    const { initStore } = await import("/src/stores/index.ts");
+    return initStore.decks;
+  });
+
+  await page.evaluate(async () => {
+    const { initUIContainer } = await import("/src/container/compat.ts");
+    const { deckStore, roomStore } = await import("/src/stores/index.ts");
+    const packets: number[][] = [];
+    (window as any).__waitroomPackets = packets;
+    initUIContainer({
+      ws: { send: (packet: Uint8Array) => packets.push([...packet]) },
+    } as any);
+    deckStore.decks = [
+      { deckName: "First", main: [12345], extra: [], side: [] },
+      { deckName: "Chosen", main: [67890], extra: [], side: [] },
+    ];
+    roomStore.singlePlayer = true;
+    roomStore.players = [{ name: "Me", isMe: true, state: 3 }];
+    roomStore.isHost = true;
+    history.pushState({}, "", "/waitroom");
+    dispatchEvent(new PopStateEvent("popstate"));
+  });
+
+  const select = page.getByTestId("waitroom-deck-select");
+  await expect(select).not.toHaveClass(/ant-select-disabled/);
+  await select.click();
+  await page
+    .locator(".ant-select-dropdown:visible .ant-select-item-option", {
+      hasText: "Chosen",
+    })
+    .click();
+  await expect(select).toContainText("Chosen");
+
+  await page.getByTestId("waitroom-ready-toggle").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const packets: number[][] = (window as any).__waitroomPackets;
+        const deckPacket = packets.findLast((packet) => packet[2] === 2);
+        return [
+          deckPacket
+            ? new DataView(new Uint8Array(deckPacket).buffer).getUint32(
+                11,
+                true,
+              )
+            : 0,
+          packets.some((packet) => packet[2] === 34),
+          packets.some((packet) => packet[2] === 22),
+          packets.some((packet) => packet[2] === 37),
+        ];
+      }),
+    )
+    .toEqual([67890, true, true, false]);
+
+  await page.evaluate(async () => {
+    const { roomStore } = await import("/src/stores/index.ts");
+    roomStore.players[0]!.state = 2;
+    roomStore.players[1] = { name: "Bot", isMe: false, state: 2 };
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as any).__waitroomPackets.filter(
+            (packet: number[]) => packet[2] === 37,
+          ).length,
+      ),
+    )
+    .toBe(1);
 });

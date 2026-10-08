@@ -246,13 +246,24 @@ export const Component: React.FC = () => {
   // 单人模式
   const onAIMatch = async () => {
     setSingleLoading(true);
-
-    // 初始化，然后等待后端通知成功加入房间后跳转页面
-    await connectSrvpro({
-      ip: server,
-      player: user?.username ?? "Guest",
-      passWd: "AI",
-    });
+    try {
+      // A private room stays in the waiting stage until a deck is chosen and
+      // the player is ready; the old AI room began guessing immediately.
+      await connectSrvpro({
+        ip: server,
+        player: user?.username ?? "Guest",
+        singlePlayer: true,
+        preferredDeckName: selectedDeck?.deckName,
+        passWd: `NS,NC,TIME0#neos-solo-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}`,
+      });
+    } catch (error) {
+      setSingleLoading(false);
+      message.error(
+        error instanceof Error ? error.message : "单人模式连接失败",
+      );
+    }
   };
 
   // 自定义房间

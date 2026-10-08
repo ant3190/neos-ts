@@ -41,6 +41,8 @@ export class RoomStore implements NeosStore {
   observerCount: number = 0; // 观战者数量
   isHost: boolean = false; // 当前玩家是否是房主
   selfType: SelfType = 0; // 当前玩家的类型
+  singlePlayer: boolean = false;
+  preferredDeckName?: string;
   stage: RoomStage = RoomStage.WAITING;
   errorMsg?: string = undefined; // 错误信息
 
@@ -56,6 +58,9 @@ export class RoomStore implements NeosStore {
     this.players = [];
     this.observerCount = 0;
     this.isHost = false;
+    this.selfType = SelfType.UNKNOWN;
+    this.singlePlayer = false;
+    this.preferredDeckName = undefined;
     this.stage = RoomStage.WAITING;
     this.errorMsg = undefined;
   }

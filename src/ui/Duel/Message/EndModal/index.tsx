@@ -8,6 +8,7 @@ import { getUIContainer } from "@/container/compat";
 import { replayStore, resetDuel } from "@/stores";
 
 import { NeosModal } from "../NeosModal";
+import { resetDuelDialogs } from "../reset";
 import styles from "./index.module.scss";
 
 interface EndProps {
@@ -31,6 +32,7 @@ export const EndModal: React.FC = () => {
   const navigate = useNavigate();
 
   const onReturn = () => {
+    resetDuelDialogs();
     resetDuel();
     rs();
 
@@ -100,4 +102,11 @@ export const displayEndModal = async (isWin: boolean, reason?: string) => {
   localStore.isOpen = false;
   localStore.isWin = false;
   localStore.reason = undefined;
+};
+
+export const resetEndModal = () => {
+  localStore.isOpen = false;
+  localStore.reason = undefined;
+  rs();
+  rs = () => {};
 };

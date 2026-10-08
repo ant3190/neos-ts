@@ -283,6 +283,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
                 card,
               })),
           });
+          if (!option.length) return;
           tmpCard = option[0].card! as any; // 一定会有的，有输入则定有输出
         }
         // 选择发动哪个效果
@@ -503,7 +504,12 @@ const handleEffectActivation = (
         response: effect.response,
       };
     });
-    displayOptionModal(fetchStrings(Region.System, 556), options, 1); // 主动发动效果，所以不需要await，但是以后可能要留心
+    displayOptionModal(
+      fetchStrings(Region.System, 556),
+      options,
+      1,
+      effectInteractivies[0].responseSource === "battle" ? "battle" : "idle",
+    );
   }
 };
 

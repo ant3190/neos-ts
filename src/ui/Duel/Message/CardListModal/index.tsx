@@ -78,3 +78,9 @@ export const displayCardListModal = ({
   zone && (store.zone = zone);
   controller !== undefined && (store.controller = controller);
 };
+
+export const closeCardListModal = () => {
+  store.isOpen = false;
+  store.isZone = true;
+  store.monster = {} as CardType;
+};

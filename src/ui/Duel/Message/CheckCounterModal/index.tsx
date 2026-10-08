@@ -104,3 +104,12 @@ export const displayCheckCounterModal = async (
   localStore.min = undefined;
   localStore.counterType = undefined;
 };
+
+export const resetCheckCounterModal = () => {
+  localStore.isOpen = false;
+  localStore.options = [];
+  localStore.min = undefined;
+  localStore.counterType = undefined;
+  rs();
+  rs = () => {};
+};

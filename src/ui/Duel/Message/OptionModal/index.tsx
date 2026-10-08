@@ -9,6 +9,7 @@ import {
   fetchStrings,
   getCardStr,
   Region,
+  sendSelectBattleCmdResponse,
   sendSelectIdleCmdResponse,
   sendSelectOptionResponse,
 } from "@/api";
@@ -19,12 +20,14 @@ import { NeosModal } from "../NeosModal";
 import styles from "./index.module.scss";
 
 type Options = { info: string; response: number }[];
+type ResponseKind = "option" | "idle" | "battle";
 
 const defaultStore = {
   title: "",
   isOpen: false,
   min: 1,
   options: [] satisfies Options as Options,
+  responseKind: "option" as ResponseKind,
 };
 const store = proxy(defaultStore);
 
@@ -40,23 +43,38 @@ export const OptionModal = () => {
   const maxPage = Math.ceil(options.length / MAX_NUM_PER_PAGE);
   const [selecteds, setSelecteds] = useState<number[][]>([]);
   const grouped = chunk(options, MAX_NUM_PER_PAGE);
+  const sendResponse = (response: number) => {
+    switch (store.responseKind) {
+      case "idle":
+        sendSelectIdleCmdResponse(container.conn, response);
+        break;
+      case "battle":
+        sendSelectBattleCmdResponse(container.conn, response);
+        break;
+      default:
+        sendSelectOptionResponse(container.conn, response);
+    }
+  };
 
   const onSummit = () => {
+    if (!store.isOpen) return;
     const responses = selecteds.flat();
     if (responses.length > 0) {
       const response = responses.reduce((res, current) => res | current, 0); // 多个选择求或
-      sendSelectOptionResponse(container.conn, response);
+      sendResponse(response);
       rs();
     }
   };
 
   useEffect(() => {
     setSelecteds(Array.from({ length: maxPage }).map((_) => []));
+    setPage(0);
   }, [options]);
 
   const onQuickSelect = (response: number) => {
+    if (!store.isOpen) return;
     if (store.min === 1) {
-      sendSelectOptionResponse(container.conn, response);
+      sendResponse(response);
       rs();
     }
   };
@@ -140,13 +158,23 @@ export const displayOptionModal = async (
   title: string,
   options: Options,
   min: number,
+  responseKind: ResponseKind = "option",
 ) => {
   store.title = title;
   store.options = options;
   store.min = min;
+  store.responseKind = responseKind;
   store.isOpen = true;
   await new Promise((resolve) => (rs = resolve));
   store.isOpen = false;
+};
+
+export const resetOptionModal = () => {
+  store.isOpen = false;
+  store.options = [];
+  store.responseKind = "option";
+  rs();
+  rs = () => {};
 };
 
 export const handleEffectActivation = async (
@@ -176,6 +204,11 @@ export const handleEffectActivation = async (
         response: effect.response,
       };
     });
-    await displayOptionModal(fetchStrings(Region.System, 556), options, 1); // 主动发动效果，所以不需要await，但是以后可能要留心
+    await displayOptionModal(
+      fetchStrings(Region.System, 556),
+      options,
+      1,
+      "idle",
+    );
   }
 };

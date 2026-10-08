@@ -3,6 +3,9 @@ import { getUIContainer, initUIContainer } from "@/container/compat";
 import { WebSocketStream } from "@/infra";
 import { initReplaySocket, initSocket } from "@/middleware/socket";
 import { pollSocketLooper } from "@/service/executor";
+import { roomStore } from "@/stores";
+import { resetEndModal } from "@/ui/Duel/Message/EndModal";
+import { resetDuelDialogs } from "@/ui/Duel/Message/reset";
 
 import { initSqlite } from "../Layout/utils";
 
@@ -13,6 +16,8 @@ export const connectSrvpro = async (params: {
   passWd: string;
   replay?: boolean;
   replayData?: ArrayBuffer;
+  singlePlayer?: boolean;
+  preferredDeckName?: string;
   customOnConnected?: (conn: WebSocketStream) => void;
 }) => {
   // 初始化sqlite
@@ -24,6 +29,9 @@ export const connectSrvpro = async (params: {
   // 初始化超先行配置
   await initSuperPrerelease();
 
+  roomStore.singlePlayer = params.singlePlayer ?? false;
+  roomStore.preferredDeckName = params.preferredDeckName;
+
   if (params.replay && params.replayData) {
     // initialize replay from local yrp3d data
     const conn = initReplaySocket({
@@ -32,6 +40,8 @@ export const connectSrvpro = async (params: {
 
     // initialize the UI Container
     initUIContainer(conn);
+    resetEndModal();
+    resetDuelDialogs();
 
     // execute the event looper
     pollSocketLooper(getUIContainer());
@@ -41,6 +51,8 @@ export const connectSrvpro = async (params: {
 
     // initialize the UI Contaner
     initUIContainer(conn);
+    resetEndModal();
+    resetDuelDialogs();
 
     // execute the event looper
 

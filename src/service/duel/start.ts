@@ -6,6 +6,7 @@ import { Container } from "@/container";
 import { sleep } from "@/infra";
 import { createLocalId } from "@/infra/localId";
 import { replayStore, RoomStage, SideStage } from "@/stores";
+import { resetDuelDialogs } from "@/ui/Duel/Message/reset";
 import { replayStart } from "@/ui/Match/ReplayModal";
 
 import { genCard } from "../utils";
@@ -16,6 +17,7 @@ export default async (
   start: ygopro.StocGameMessage.MsgStart,
 ) => {
   const context = container.context;
+  resetDuelDialogs();
   // 先初始化`matStore`
   context.matStore.selfType = start.playerType;
 

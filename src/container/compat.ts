@@ -39,3 +39,7 @@ export function getUIContainer(): Container {
     throw Error("UI Container not initialized !!");
   }
 }
+
+export function isCurrentUIContainer(container: Container): boolean {
+  return CONTAINERS.get(UI_KEY) === container;
+}

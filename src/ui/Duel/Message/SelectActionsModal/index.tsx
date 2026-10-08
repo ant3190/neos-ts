@@ -37,6 +37,7 @@ export const SelectActionsModal: React.FC = () => {
   const snap = useSnapshot(localStore);
 
   const onSubmit = (options: Snapshot<Option[]>) => {
+    if (!localStore.isOpen) return;
     const values = options.map((option) => option.response!);
     if (localStore.isChain) {
       sendSelectSingleResponse(container.conn, values[0]);
@@ -47,11 +48,13 @@ export const SelectActionsModal: React.FC = () => {
   };
 
   const onFinish = () => {
+    if (!localStore.isOpen) return;
     sendSelectSingleResponse(container.conn, FINISH_RESPONSE);
     rs();
   };
 
   const onCancel = () => {
+    if (!localStore.isOpen) return;
     sendSelectSingleResponse(container.conn, CANCEL_RESPONSE);
     rs();
   };
@@ -88,4 +91,10 @@ const resetSelectActionsModal = () => {
     // @ts-ignore
     localStore[key] = defaultProps[key];
   });
+};
+
+export const cancelSelectActionsModal = () => {
+  resetSelectActionsModal();
+  rs();
+  rs = () => {};
 };

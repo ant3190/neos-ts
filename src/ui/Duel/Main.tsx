@@ -24,6 +24,7 @@ import {
   SortCardModal,
   YesNoModal,
 } from "./Message";
+import { resetDuelDialogs } from "./Message/reset";
 import { ChatBox, HandChain, LifeBar, Mat, Menu, Underlying } from "./PlayMat";
 import { ChainDisplay } from "./PlayMat/ChainDisplay";
 
@@ -42,6 +43,8 @@ export const Component: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { DEV } = useEnv();
   const RECORD = "record";
+
+  useEffect(() => () => resetDuelDialogs(), []);
 
   useEffect(() => {
     if (

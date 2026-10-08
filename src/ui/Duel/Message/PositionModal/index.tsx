@@ -158,3 +158,10 @@ export const displayPositionModal = async (
   localStore.isOpen = false;
   localStore.positions = [];
 };
+
+export const resetPositionModal = () => {
+  localStore.isOpen = false;
+  localStore.positions = [];
+  rs();
+  rs = () => {};
+};

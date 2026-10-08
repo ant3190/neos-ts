@@ -1,6 +1,7 @@
 import { CheckCircleFilled, LoadingOutlined } from "@ant-design/icons";
 
 import {
+  sendChat,
   sendHandResult,
   sendHsNotReady,
   sendHsReady,
@@ -15,7 +16,7 @@ import PlayerState = ygopro.StocHsPlayerChange.State;
 import SelfType = ygopro.StocTypeChange.SelfType;
 import { App, Avatar, Button, Skeleton, Space } from "antd";
 import classNames from "classnames";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LoaderFunction, useNavigate } from "react-router-dom";
 import { useSnapshot } from "valtio";
@@ -56,7 +57,9 @@ export const Component: React.FC = () => {
   const { user } = useSnapshot(accountStore);
   const [collapsed, setCollapsed] = useState(false);
   const { decks } = useSnapshot(deckStore);
-  const [selectedDeckName, setSelectedDeckName] = useState<string>();
+  const [selectedDeckName, setSelectedDeckName] = useState<string | undefined>(
+    () => roomStore.preferredDeckName,
+  );
   const deck =
     deckStore.get(selectedDeckName ?? "") ??
     deckStore.get(decks[0]?.deckName ?? "");
@@ -65,6 +68,8 @@ export const Component: React.FC = () => {
   const me = room.getMePlayer();
   const op = room.getOpPlayer();
   const navigate = useNavigate();
+  const startedSingleDuel = useRef(false);
+  const requestedSingleBot = useRef(false);
 
   useEffect(() => {
     if (deck) return warmDeckImages([...deck.main, ...deck.extra]);
@@ -79,8 +84,9 @@ export const Component: React.FC = () => {
   const onDeckSelected = (deckName: string) => {
     const newDeck = deckStore.get(deckName);
     if (newDeck) {
-      sendHsNotReady(container.conn);
+      if (me?.state === PlayerState.READY) sendHsNotReady(container.conn);
       setSelectedDeckName(deckName);
+      roomStore.preferredDeckName = deckName;
     } else {
       message.error(`Deck ${deckName} not found`);
     }
@@ -91,6 +97,14 @@ export const Component: React.FC = () => {
       if (deck) {
         updateDeck(deck);
         sendHsReady(container.conn);
+        if (
+          roomStore.singlePlayer &&
+          !roomStore.getOpPlayer() &&
+          !requestedSingleBot.current
+        ) {
+          requestedSingleBot.current = true;
+          sendChat(container.conn, "/ai 蓝子");
+        }
       } else {
         message.error("请先选择卡组");
       }
@@ -105,6 +119,19 @@ export const Component: React.FC = () => {
     // 否则娱乐匹配准备会有问题（原因不明）
     if (deck) updateDeck(deck);
   }, [deck?.deckName, container.conn]);
+  useEffect(() => {
+    if (!room.singlePlayer || room.stage !== RoomStage.WAITING) return;
+    const bothReady =
+      room.isHost &&
+      me?.state === PlayerState.READY &&
+      op?.state === PlayerState.READY;
+    if (!bothReady) {
+      startedSingleDuel.current = false;
+    } else if (!startedSingleDuel.current) {
+      startedSingleDuel.current = true;
+      sendHsStart(container.conn);
+    }
+  }, [room.singlePlayer, room.stage, room.isHost, me?.state, op?.state]);
   useEffect(() => {
     if (room.stage === RoomStage.DUEL_START) {
       // 决斗开始，跳转决斗页面

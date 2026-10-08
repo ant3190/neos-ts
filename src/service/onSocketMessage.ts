@@ -6,6 +6,7 @@ import { ygopro } from "@/api";
 import { adaptStoc } from "@/api/ocgcore/ocgAdapter/adapter";
 import { YgoProPacket } from "@/api/ocgcore/ocgAdapter/packet";
 import { Container } from "@/container";
+import { isCurrentUIContainer } from "@/container/compat";
 import { replayStore } from "@/stores";
 import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
@@ -33,7 +34,7 @@ import { handleWaitingSide } from "./side/waitingSide";
  *
  * */
 
-let animation: Promise<void> = Promise.resolve();
+const animations = new WeakMap<Container, Promise<void>>();
 
 interface DecodedPacket {
   packet: YgoProPacket;
@@ -89,19 +90,24 @@ export default async function handleSocketMessage(
   container: Container,
   e: MessageEvent,
 ) {
+  if (!isCurrentUIContainer(container)) return;
   const decoded = YgoProPacket.deserialize(e.data).map((packet) => ({
     packet,
     pb: adaptStoc(packet),
   }));
   if (!replayStore.isReplay) prepareImages(decoded);
   // 确保按序执行
-  animation = animation.then(() => _handle(container, decoded));
+  const animation = (animations.get(container) ?? Promise.resolve())
+    .catch((error) => console.error("Duel message failed:", error))
+    .then(() => _handle(container, decoded));
+  animations.set(container, animation);
   await animation;
 }
 
 // FIXME: 下面的所有`handler`中访问`Store`的时候都应该通过`Container`进行访问
 async function _handle(container: Container, decoded: DecodedPacket[]) {
   for (const { packet, pb } of decoded) {
+    if (!isCurrentUIContainer(container)) return;
     const isReplayGameMsg = replayStore.isReplay && pb.msg === "stoc_game_msg";
     const replayGameMsg = isReplayGameMsg
       ? pb.stoc_game_msg.gameMsg
@@ -109,6 +115,7 @@ async function _handle(container: Container, decoded: DecodedPacket[]) {
 
     if (isReplayGameMsg) {
       await replayStore.waitForAdvance(replayGameMsg);
+      if (!isCurrentUIContainer(container)) return;
     }
 
     switch (pb.msg) {
