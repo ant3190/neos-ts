@@ -254,9 +254,12 @@ export const Component: React.FC = () => {
         player: user?.username ?? "Guest",
         singlePlayer: true,
         preferredDeckName: selectedDeck?.deckName,
-        passWd: `NS,NC,TIME0#neos-solo-${Date.now()}-${Math.random()
+        // JOIN_GAME permits 20 UTF-16 characters, including the terminator.
+        // Keep the random room ID on the wire and let the server shuffle.
+        passWd: `NC,TIME0#${Math.random()
           .toString(36)
-          .slice(2, 8)}`,
+          .slice(2, 12)
+          .padEnd(10, "0")}`,
       });
     } catch (error) {
       setSingleLoading(false);

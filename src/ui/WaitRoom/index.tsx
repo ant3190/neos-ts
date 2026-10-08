@@ -67,6 +67,8 @@ export const Component: React.FC = () => {
   const { errorMsg } = room;
   const me = room.getMePlayer();
   const op = room.getOpPlayer();
+  const hasMe = me !== undefined;
+  const hasOpponent = op !== undefined;
   const navigate = useNavigate();
   const startedSingleDuel = useRef(false);
   const requestedSingleBot = useRef(false);
@@ -97,16 +99,6 @@ export const Component: React.FC = () => {
       if (deck) {
         updateDeck(deck);
         sendHsReady(container.conn);
-        if (
-          roomStore.singlePlayer &&
-          !roomStore.getOpPlayer() &&
-          !requestedSingleBot.current
-        ) {
-          requestedSingleBot.current = true;
-          // SRVPro matches supplied AI names exactly. Let the server choose a
-          // currently available public bot instead of hard-coding a nickname.
-          sendChat(container.conn, "/ai");
-        }
       } else {
         message.error("请先选择卡组");
       }
@@ -121,6 +113,33 @@ export const Component: React.FC = () => {
     // 否则娱乐匹配准备会有问题（原因不明）
     if (deck) updateDeck(deck);
   }, [deck?.deckName, container.conn]);
+  useEffect(() => {
+    if (
+      !room.singlePlayer ||
+      !room.joined ||
+      !room.isHost ||
+      !hasMe ||
+      room.stage !== RoomStage.WAITING
+    )
+      return;
+    if (hasOpponent) {
+      // A new bot may be needed if this opponent later leaves the room.
+      requestedSingleBot.current = false;
+    } else if (!requestedSingleBot.current) {
+      requestedSingleBot.current = true;
+      // Request only after the server confirms our room and host identity.
+      // An unnamed request selects an available public AI on the server.
+      sendChat(container.conn, "/ai");
+    }
+  }, [
+    room.singlePlayer,
+    room.joined,
+    room.isHost,
+    room.stage,
+    hasMe,
+    hasOpponent,
+    container.conn,
+  ]);
   useEffect(() => {
     if (!room.singlePlayer || room.stage !== RoomStage.WAITING) return;
     const bothReady =

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type WebSocketRoute } from "@playwright/test";
 
 import { installOfflineDuelResources } from "./helpers/offlineDuel";
 
@@ -155,6 +155,7 @@ test("single player can choose a deck before the bot starts the duel", async ({
       { deckName: "Chosen", main: [67890], extra: [], side: [] },
     ];
     roomStore.singlePlayer = true;
+    roomStore.joined = true;
     roomStore.players = [{ name: "Me", isMe: true, state: 3 }];
     roomStore.isHost = true;
     history.pushState({}, "", "/waitroom");
@@ -171,10 +172,20 @@ test("single player can choose a deck before the bot starts the duel", async ({
     .click();
   await expect(select).toContainText("Chosen");
 
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as any).__waitroomPackets.filter(
+            (packet: number[]) => packet[2] === 22,
+          ).length,
+      ),
+    )
+    .toBe(1);
   expect(
     await page.evaluate(() =>
       (window as any).__waitroomPackets.some(
-        (packet: number[]) => packet[2] === 22,
+        (packet: number[]) => packet[2] === 34 || packet[2] === 37,
       ),
     ),
   ).toBe(false);
@@ -220,4 +231,100 @@ test("single player can choose a deck before the bot starts the duel", async ({
       ),
     )
     .toBe(1);
+});
+
+test("single mode preserves shuffle and room identity on the wire, then adds AI after host confirmation", async ({
+  page,
+}) => {
+  await page.route(/test-release-v2\.json/, (route) =>
+    route.fulfill({ contentType: "application/json", body: "[]" }),
+  );
+  const sessions: { socket: WebSocketRoute; packets: Buffer[] }[] = [];
+  const frame = (type: number, data = Buffer.alloc(0)) => {
+    const packet = Buffer.alloc(3 + data.length);
+    packet.writeUInt16LE(1 + data.length);
+    packet[2] = type;
+    data.copy(packet, 3);
+    return packet;
+  };
+  const enter = (name: string, position: number) => {
+    const data = Buffer.alloc(41);
+    data.write(name, 0, 38, "utf16le");
+    data[40] = position;
+    return frame(32, data);
+  };
+  await page.routeWebSocket(
+    /wss:\/\/koishi\.momobako\.com:7211\/?$/,
+    (socket) => {
+      const session = { socket, packets: [] as Buffer[] };
+      sessions.push(session);
+      socket.onMessage((message) => {
+        if (typeof message === "string") return;
+        session.packets.push(message);
+        if (message[2] === 18) socket.send(frame(18));
+        if (message[2] === 22) {
+          expect(
+            message.subarray(3).toString("utf16le").replace(/\0.*$/, ""),
+          ).toBe("/ai");
+          socket.send(enter("Bot", 1));
+          socket.send(frame(33, Buffer.from([0x19])));
+        }
+        if (message[2] === 34) socket.send(frame(33, Buffer.from([0x09])));
+      });
+    },
+  );
+  const passwords: string[] = [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.goto("/match");
+    await page.waitForFunction(async () => {
+      const { initStore } = await import("/src/stores/index.ts");
+      return initStore.decks;
+    });
+    await page.evaluate(async () => {
+      const { deckStore } = await import("/src/stores/index.ts");
+      deckStore.decks = [
+        { deckName: "Test", main: [46986414], extra: [], side: [] },
+      ];
+    });
+    await page.getByText(/^(单人模式|Single Player Mode)$/).click();
+    await expect(page).toHaveURL(/\/waitroom$/);
+    const session = sessions[attempt];
+    const join = session.packets.find((packet) => packet[2] === 18)!;
+    const passwordBytes = join.subarray(11, 51);
+    const password = passwordBytes.toString("utf16le").replace(/\0.*$/, "");
+    expect(password.length).toBeLessThan(20);
+    expect(
+      passwordBytes.subarray(password.length * 2, password.length * 2 + 2),
+    ).toEqual(Buffer.from([0, 0]));
+    const [rules, roomId] = password.split("#");
+    expect(rules.split(",")).not.toContain("NS");
+    expect(rules.split(",")).not.toContain("NOSHUFFLE");
+    expect(roomId.length).toBeGreaterThanOrEqual(8);
+    passwords.push(password);
+    await expect(page.getByTestId("waitroom-deck-select")).toBeVisible();
+    expect(session.packets.some((packet) => packet[2] === 22)).toBe(false);
+
+    session.socket.send(enter("Me", 0));
+    session.socket.send(frame(19, Buffer.from([0x10])));
+    await expect(page.getByTestId("waitroom-player-op")).toHaveAttribute(
+      "data-player-name",
+      "Bot",
+    );
+    await expect(page.getByTestId("waitroom-deck-select")).not.toHaveClass(
+      /ant-select-disabled/,
+    );
+    expect(session.packets.filter((packet) => packet[2] === 22)).toHaveLength(
+      1,
+    );
+    expect(session.packets.some((packet) => packet[2] === 37)).toBe(false);
+    await page.getByTestId("waitroom-ready-toggle").click();
+    await expect
+      .poll(() => session.packets.filter((packet) => packet[2] === 37).length)
+      .toBe(1);
+    expect(session.packets.filter((packet) => packet[2] === 22)).toHaveLength(
+      1,
+    );
+    session.socket.close();
+  }
+  expect(passwords[0]).not.toBe(passwords[1]);
 });
