@@ -6,6 +6,8 @@ import { ygopro } from "@/api";
 import { cardStore, CardType } from "@/stores";
 import { YgoCard } from "@/ui/Shared";
 
+import { ActionFrame } from "../../PlayMat/ActionFrame";
+import { getActionHighlight } from "../../utils/actionHighlight";
 import { showCardModal } from "../CardModal";
 
 const CARD_WIDTH = "6.25rem";
@@ -25,17 +27,21 @@ const store = proxy(defaultStore);
 
 export const CardListModal = () => {
   const { zone, monster, isOpen, isZone, controller } = useSnapshot(store);
-  let cardList: CardType[] = [];
-
-  if (isZone) {
-    cardList = cardStore.at(zone, controller);
-  } else {
-    // 看超量素材
-    cardList = cardStore.findOverlay(
-      monster.location.zone,
-      monster.location.controller,
-      monster.location.sequence,
-    );
+  const { inner } = useSnapshot(cardStore);
+  const cardList: (typeof inner)[number][] = [];
+  if (isOpen) {
+    for (const card of inner) {
+      const { location } = card;
+      const matches = isZone
+        ? location.zone === zone &&
+          location.controller === controller &&
+          !location.is_overlay
+        : location.zone === monster.location.zone &&
+          location.controller === monster.location.controller &&
+          location.sequence === monster.location.sequence &&
+          location.is_overlay;
+      if (matches) cardList.push(card);
+    }
   }
 
   const handleOkOrCancel = () => {
@@ -53,13 +59,24 @@ export const CardListModal = () => {
     >
       <Space direction="vertical">
         {cardList.map((card) => (
-          <YgoCard
-            code={card.code}
+          <div
             key={card.uuid}
-            targeted={card.targeted}
-            width={CARD_WIDTH}
-            onClick={() => showCardModal(card)}
-          />
+            style={{ position: "relative" }}
+            data-card-code={card.code}
+            data-action-highlight={
+              getActionHighlight(card.idleInteractivities) ?? "none"
+            }
+          >
+            <YgoCard
+              code={card.code}
+              targeted={card.targeted}
+              width={CARD_WIDTH}
+              onClick={() => showCardModal(card)}
+            />
+            <ActionFrame
+              highlight={getActionHighlight(card.idleInteractivities)}
+            />
+          </div>
         ))}
       </Space>
     </Drawer>

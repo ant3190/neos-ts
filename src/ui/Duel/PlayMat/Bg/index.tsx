@@ -13,6 +13,11 @@ import {
 } from "@/stores";
 import { BgChain, type ChainMarker, type ChainProps } from "@/ui/Shared";
 
+import {
+  type ActionHighlight,
+  getActionHighlight,
+} from "../../utils/actionHighlight";
+import { ActionFrame } from "../ActionFrame";
 import styles from "./index.module.scss";
 
 const { MZONE, SZONE, EXTRA, GRAVE, REMOVED } = ygopro.CardZone;
@@ -36,26 +41,27 @@ const BgBlock: React.FC<
   React.HTMLProps<HTMLDivElement> & {
     disabled?: boolean;
     highlight?: boolean;
-    glowing?: boolean;
+    actionHighlight?: ActionHighlight;
     chains: ChainProps;
   }
 > = ({
   disabled = false,
   highlight = false,
-  glowing = false,
+  actionHighlight,
   className,
   chains,
   ...rest
 }) => (
   <div
     {...rest}
+    data-action-highlight={actionHighlight ?? "none"}
     className={classnames(styles.block, className, {
       [styles.highlight]: highlight,
-      [styles.glowing]: glowing,
     })}
   >
     {<DisabledCross disabled={disabled} />}
     {<BgChain {...chains} />}
+    <ActionFrame highlight={actionHighlight} />
   </div>
 );
 
@@ -145,23 +151,31 @@ const BgRow: React.FC<{
 };
 
 const BgOtherBlocks: React.FC<{ op?: boolean }> = ({ op }) => {
-  useSnapshot(cardStore);
+  const { inner } = useSnapshot(cardStore);
   const container = getUIContainer();
   const controller = getController(op);
-  const judgeGlowing = (zone: ygopro.CardZone) =>
-    !!cardStore
-      .at(zone, controller)
-      .reduce((sum, c) => (sum += c.idleInteractivities.length), 0);
-  const glowingExtra = judgeGlowing(EXTRA);
-  const glowingGraveyard = judgeGlowing(GRAVE);
-  const glowingBanish = judgeGlowing(REMOVED);
+  const cardsByZone = new Map<ygopro.CardZone, (typeof inner)[number][]>();
+  for (const card of inner) {
+    const { zone, controller: owner, is_overlay } = card.location;
+    if (owner !== controller || is_overlay) continue;
+    const cards = cardsByZone.get(zone) ?? [];
+    cards.push(card);
+    cardsByZone.set(zone, cards);
+  }
+  const zoneCards = (zone: ygopro.CardZone) => cardsByZone.get(zone) ?? [];
+  const zoneHighlight = (zone: ygopro.CardZone) =>
+    op
+      ? undefined
+      : getActionHighlight(
+          zoneCards(zone).flatMap((c) => c.idleInteractivities),
+        );
   const snap = useSnapshot(placeStore.inner);
   const field = op ? snap[SZONE].op[5] : snap[SZONE].me[5];
   const grave = op ? snap[GRAVE].op : snap[GRAVE].me;
   const removed = op ? snap[REMOVED].op : snap[REMOVED].me;
   const extra = op ? snap[EXTRA].op : snap[EXTRA].me;
 
-  const getN = (zone: ygopro.CardZone) => cardStore.at(zone, controller).length;
+  const getN = (zone: ygopro.CardZone) => zoneCards(zone).length;
 
   const genChains = (states: Snapshot<BlockState[]>, zone: ygopro.CardZone) => {
     const chains: ChainMarker[] = states.flatMap((state, sequence) =>
@@ -185,7 +199,7 @@ const BgOtherBlocks: React.FC<{ op?: boolean }> = ({ op }) => {
         data-controller={controller}
         data-place-selectable={false}
         className={styles.banish}
-        glowing={!op && glowingBanish}
+        actionHighlight={zoneHighlight(REMOVED)}
         chains={{
           chains: genChains(removed, REMOVED),
           op,
@@ -199,7 +213,7 @@ const BgOtherBlocks: React.FC<{ op?: boolean }> = ({ op }) => {
         data-controller={controller}
         data-place-selectable={false}
         className={styles.graveyard}
-        glowing={!op && glowingGraveyard}
+        actionHighlight={zoneHighlight(GRAVE)}
         chains={{
           chains: genChains(grave, GRAVE),
           op,
@@ -241,7 +255,7 @@ const BgOtherBlocks: React.FC<{ op?: boolean }> = ({ op }) => {
         data-controller={controller}
         data-place-selectable={false}
         className={classnames(styles.deck, styles["extra-deck"])}
-        glowing={!op && glowingExtra}
+        actionHighlight={zoneHighlight(EXTRA)}
         chains={{
           chains: genChains(extra, EXTRA),
           op,

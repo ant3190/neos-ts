@@ -10,7 +10,9 @@ import { fetchStrings } from "@/api";
 import { CardType, isMe, matStore } from "@/stores";
 import { ScrollableArea, YgoCard } from "@/ui/Shared";
 
+import { ActionFrame } from "../../PlayMat/ActionFrame";
 import { groupBy } from "../../utils";
+import type { ActionHighlight } from "../../utils/actionHighlight";
 import { showCardModal } from "../CardModal";
 import { NeosModal } from "../NeosModal";
 import styles from "./index.module.scss";
@@ -222,16 +224,27 @@ export const SelectCardsModal: React.FC<SelectCardsModalProps> = ({
                           data-card-zone-value={card.location?.zone}
                           data-card-sequence={card.location?.sequence}
                           data-card-response={card.response}
+                          data-action-highlight={
+                            isChain ? "gold" : card.actionHighlight ?? "none"
+                          }
                           onDoubleClick={() => onQuickSelect(card as Option)}
                         >
                           <CheckCard
                             cover={
-                              <YgoCard
-                                code={card.meta.id}
-                                targeted={card.targeted}
-                                disabled={card.disabled}
-                                className={styles.card}
-                              />
+                              <>
+                                <YgoCard
+                                  code={card.meta.id}
+                                  targeted={card.targeted}
+                                  disabled={card.disabled}
+                                  className={styles.card}
+                                />
+                                <ActionFrame
+                                  highlight={
+                                    isChain ? "gold" : card.actionHighlight
+                                  }
+                                  className={styles["action-frame"]}
+                                />
+                              </>
                             }
                             className={classnames(styles["check-card"], {
                               [styles.opponent]:
@@ -320,6 +333,7 @@ export interface Option {
   response?: number;
   targeted?: boolean;
   disabled?: boolean;
+  actionHighlight?: ActionHighlight;
   // 便于直接返回这个信息
   //
   // 尽量不要用这个字段

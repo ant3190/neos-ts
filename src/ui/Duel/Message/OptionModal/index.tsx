@@ -16,6 +16,7 @@ import {
 import { Container } from "@/container";
 import { getUIContainer } from "@/container/compat";
 
+import { clearAllIdleInteractivities } from "../../utils";
 import { NeosModal } from "../NeosModal";
 import styles from "./index.module.scss";
 
@@ -47,9 +48,11 @@ export const OptionModal = () => {
     switch (store.responseKind) {
       case "idle":
         sendSelectIdleCmdResponse(container.conn, response);
+        clearAllIdleInteractivities();
         break;
       case "battle":
         sendSelectBattleCmdResponse(container.conn, response);
+        clearAllIdleInteractivities();
         break;
       default:
         sendSelectOptionResponse(container.conn, response);

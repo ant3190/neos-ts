@@ -40,6 +40,8 @@ import {
   interactTypeToIcon,
   interactTypeToString,
 } from "../../utils";
+import { getActionHighlight } from "../../utils/actionHighlight";
+import { ActionFrame } from "../ActionFrame";
 import styles from "./index.module.scss";
 import {
   attack,
@@ -50,7 +52,7 @@ import {
 } from "./springs";
 import type { SpringApiProps } from "./springs/types";
 
-const { HAND, GRAVE, REMOVED, EXTRA, MZONE, SZONE, TZONE } = ygopro.CardZone;
+const { HAND, GRAVE, REMOVED, EXTRA, MZONE, SZONE } = ygopro.CardZone;
 
 const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
   const container = getUIContainer();
@@ -81,7 +83,6 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
     addToAnimation(() => move({ card, api, options: { instant: true } }));
   }, []);
 
-  const [glowing, setGrowing] = useState(false);
   const [classFocus, setClassFocus] = useState(false);
 
   // >>> 动画 >>>
@@ -151,14 +152,6 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
   // <<< 动画 <<<
 
   // >>> 效果 >>>
-  const idleInteractivities = snap.idleInteractivities;
-  useEffect(() => {
-    setGrowing(
-      !!idleInteractivities.length &&
-        [MZONE, SZONE, HAND, TZONE].includes(card.location.zone),
-    );
-  }, [idleInteractivities]);
-
   const [dropdownMenu, setDropdownMenu] = useState({
     items: [] as DropdownItem[],
   });
@@ -230,6 +223,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
                 meta: card.meta,
                 location: card.location,
                 response: getNonEffectInteractivity(action, card).response,
+                actionHighlight: getActionHighlight([{ interactType: action }]),
                 card,
               })),
             });
@@ -280,6 +274,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
               .map((card) => ({
                 meta: card.meta,
                 location: card.location,
+                actionHighlight: "gold",
                 card,
               })),
           });
@@ -359,6 +354,10 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
   // <<< 效果 <<<
 
   const location = snap.location;
+  // Stacked zones use one aggregate frame in Bg, including buried cards.
+  const actionHighlight = [MZONE, SZONE, HAND].includes(location.zone)
+    ? getActionHighlight(snap.idleInteractivities)
+    : undefined;
   const disabled = isCardDisabled(snap as CardType);
   const idleActions = snap.idleInteractivities
     .map(({ interactType }) => InteractType[interactType])
@@ -399,13 +398,12 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       data-card-targeted={snap.targeted}
       data-card-disabled={disabled}
       data-card-idle-actions={idleActions}
+      data-card-action-highlight={actionHighlight ?? "none"}
       data-card-idle-responses={idleActionResponses}
       data-card-idle-response-sources={idleActionSources}
       data-card-attack-directable={attackInteractivity?.directAttackAble}
       className={classnames(styles["mat-card"], {
-        /* 有可操作选项或者已被选中*/
-        [styles.glowing]: glowing || snap.selectInfo.selected,
-        [styles.shining]: snap.selectInfo.selectable, // 可以被选中
+        [styles.selected]: snap.selectInfo.selected,
       })}
       style={
         {
@@ -427,7 +425,6 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       onClick={onClick}
     >
       <div className={styles.focus} />
-      <div className={styles.shadow} />
       <Dropdown
         menu={dropdownMenu}
         placement="top"
@@ -450,6 +447,13 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
             urgent
           />
           <YgoCard className={styles.back} isBack />
+          <ActionFrame
+            highlight={actionHighlight}
+            className={styles["action-frame"]}
+          />
+          {(snap.selectInfo.selectable || snap.selectInfo.selected) && (
+            <div aria-hidden="true" className={styles["selection-frame"]} />
+          )}
         </div>
       </Dropdown>
       {snap.targeted && <div className={styles.streamer} />}
@@ -492,6 +496,7 @@ const handleEffectActivation = (
         effectInteractivies[0].response,
       );
     }
+    clearAllIdleInteractivities();
   } else {
     // optionsModal
     const options = effectInteractivies.map((effect) => {

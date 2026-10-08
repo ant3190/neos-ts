@@ -40,18 +40,23 @@
 }
 
 .check-card {
+  position: relative;
   width: 6.25rem;
   aspect-ratio: var(--card-ratio);
   margin-inline-end: 0;
   margin-block-end: 0;
   flex-shrink: 0;
-  
+
   &.opponent {
     &::before {
       background-color: #dc003433;
       box-shadow: 0 0 0 2px #d22d2d inset;
     }
   }
+}
+
+.action-frame {
+  inset: 0;
 }
 
 .card {

@@ -1,0 +1,39 @@
+.frame {
+  position: absolute;
+  inset: -2px;
+  z-index: 2;
+  pointer-events: none;
+  border: 2px solid var(--action-color);
+  border-radius: 3px;
+  box-shadow:
+    0 0 3px var(--action-color),
+    0 0 10px var(--action-glow);
+  // Keep the shadow static: only opacity changes between frames.
+  animation: breathe 1.8s ease-in-out infinite;
+}
+
+.gold {
+  --action-color: #ffe29a;
+  --action-glow: #ffbd3d99;
+}
+
+.blue {
+  --action-color: #89dbff;
+  --action-glow: #249bff99;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame {
+    animation: none;
+  }
+}
