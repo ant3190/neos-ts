@@ -1,6 +1,7 @@
 import { fetchCard, ygopro } from "@/api";
 import { Container } from "@/container";
 import { AudioActionType, playEffect } from "@/infra/audio";
+import { rememberCardOrigin } from "@/ui/Duel/animation/origins";
 import { callCardMove } from "@/ui/Duel/PlayMat/Card";
 import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
@@ -32,6 +33,10 @@ export default async (
     const card = newHands[Number(idx)];
     const code = draw.cards[idx];
     const meta = fetchCard(code);
+    rememberCardOrigin(
+      card.uuid,
+      new ygopro.CardLocation(card.location.toObject()),
+    );
     card.code = code;
     card.meta = meta;
     card.location.zone = ygopro.CardZone.HAND;

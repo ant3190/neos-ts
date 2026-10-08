@@ -39,7 +39,13 @@ export const moveToOutside: MoveFunc = async (props) => {
     z: 0,
     scale: CARD_HEIGHT_O / HAND_CARD_HEIGHT,
     rz: isMe(controller) ? 0 : 180,
-    ry: [ygopro.CardPosition.FACEDOWN].includes(position) ? 180 : 0,
+    ry: [
+      ygopro.CardPosition.FACEDOWN,
+      ygopro.CardPosition.FACEDOWN_ATTACK,
+      ygopro.CardPosition.FACEDOWN_DEFENSE,
+    ].includes(position)
+      ? 180
+      : 0,
     subZ: 100,
     zIndex: sequence,
     config: {

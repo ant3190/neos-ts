@@ -6,6 +6,7 @@ import { ygopro } from "@/api";
 import { cardStore, CardType } from "@/stores";
 import { YgoCard } from "@/ui/Shared";
 
+import { openCardActions } from "../../interaction/CardActions";
 import { ActionFrame } from "../../PlayMat/ActionFrame";
 import { getActionHighlight } from "../../utils/actionHighlight";
 import { showCardModal } from "../CardModal";
@@ -62,6 +63,13 @@ export const CardListModal = () => {
           <div
             key={card.uuid}
             style={{ position: "relative" }}
+            onClick={(event) => {
+              showCardModal(card);
+              const live = cardStore.inner.find(
+                (entry) => entry.uuid === card.uuid,
+              );
+              if (live && isZone) openCardActions([live], event.currentTarget);
+            }}
             data-card-code={card.code}
             data-action-highlight={
               getActionHighlight(card.idleInteractivities) ?? "none"
@@ -71,7 +79,6 @@ export const CardListModal = () => {
               code={card.code}
               targeted={card.targeted}
               width={CARD_WIDTH}
-              onClick={() => showCardModal(card)}
             />
             <ActionFrame
               highlight={getActionHighlight(card.idleInteractivities)}

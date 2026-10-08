@@ -8,7 +8,6 @@ import { YgoCard } from "@/ui/Shared";
 
 import styles from "./index.module.scss";
 
-const SHOW_ACTIVATION_MS = 1100;
 const zoneNames: Record<number, string> = {
   [ygopro.CardZone.HAND]: "手牌",
   [ygopro.CardZone.MZONE]: "怪兽区",
@@ -21,25 +20,24 @@ const zoneNames: Record<number, string> = {
 
 export const ChainDisplay: React.FC = () => {
   const snap = useSnapshot(matStore);
-  const { chainDetails } = snap;
-  const activationId = snap.chainActivation?.id;
-  const [spotlight, setSpotlight] = useState<ChainDetail>();
+  const [chainDetails, setChainDetails] = useState<ChainDetail[]>([]);
   const entriesRef = useRef<HTMLDivElement>(null);
   const english = /^(en|br|pt|fr|es)/i.test(
     localStorage.getItem("language") ?? "",
   );
 
   useEffect(() => {
-    const activation = matStore.chainActivation;
-    if (!activation) {
-      setSpotlight(undefined);
+    if (matStore.chainEventId === 0) {
+      setChainDetails([]);
       return;
     }
-    // The reveal outlives the field marker, including a chain that ends at once.
-    setSpotlight({ ...activation });
-    const timer = setTimeout(() => setSpotlight(undefined), SHOW_ACTIVATION_MS);
+    if (matStore.chainDetails.length) {
+      setChainDetails(matStore.chainDetails.map((entry) => ({ ...entry })));
+      return;
+    }
+    const timer = setTimeout(() => setChainDetails([]), 1400);
     return () => clearTimeout(timer);
-  }, [activationId]);
+  }, [snap.chainDetails, snap.chainEventId]);
 
   useEffect(() => {
     const list = entriesRef.current;
@@ -49,7 +47,7 @@ export const ChainDisplay: React.FC = () => {
       list.scrollTop = list.scrollHeight;
   }, [chainDetails.length]);
 
-  if (!spotlight && chainDetails.length === 0) return null;
+  if (chainDetails.length === 0) return null;
 
   const label = (entry: ChainDetail) => {
     const side = matStore.isMe(entry.controller)
@@ -69,36 +67,6 @@ export const ChainDisplay: React.FC = () => {
 
   return (
     <div className={styles.layer}>
-      {spotlight && (
-        <div
-          key={spotlight.id}
-          className={`${styles.spotlight} ${
-            matStore.isMe(spotlight.controller) ? "" : styles.opponent
-          }`}
-          data-testid="duel-chain-activation"
-          data-chain-code={spotlight.code}
-          data-chain-index={spotlight.index}
-          role="status"
-          aria-live="polite"
-        >
-          <YgoCard
-            code={spotlight.code}
-            name={name(spotlight.code)}
-            className={styles.largeArt}
-            urgent
-          />
-          <div className={styles.spotlightText}>
-            <span className={styles.kicker}>
-              {english
-                ? `CHAIN ${spotlight.index} · ACTIVATED`
-                : `连锁 ${spotlight.index} · 发动`}
-            </span>
-            <strong>{name(spotlight.code)}</strong>
-            <span className={styles.source}>{label(spotlight)}</span>
-          </div>
-        </div>
-      )}
-
       {chainDetails.length > 0 && (
         <section
           className={styles.stack}
@@ -115,12 +83,18 @@ export const ChainDisplay: React.FC = () => {
                 type="button"
                 key={entry.id}
                 className={`${styles.entry} ${
-                  entry.resolved ? styles.resolved : ""
+                  entry.resolved
+                    ? styles.resolved
+                    : entry.resolving
+                    ? styles.resolving
+                    : ""
                 } ${matStore.isMe(entry.controller) ? "" : styles.opponent}`}
                 data-testid="duel-chain-entry"
                 data-chain-index={entry.index}
                 data-chain-code={entry.code}
                 data-chain-resolved={entry.resolved}
+                data-chain-negated={entry.negated}
+                data-chain-resolving={entry.resolving}
                 onClick={() => showCardModal({ meta: fetchCard(entry.code) })}
                 aria-label={`${english ? "Chain" : "连锁"} ${
                   entry.index
@@ -137,12 +111,12 @@ export const ChainDisplay: React.FC = () => {
                   <strong>{name(entry.code)}</strong>
                   <small>
                     {label(entry)} ·{" "}
-                    {entry.resolved
-                      ? english
-                        ? "Resolved"
-                        : "已处理"
-                      : english
-                      ? "Pending"
+                    {entry.negated
+                      ? "已无效"
+                      : entry.resolving
+                      ? "结算中"
+                      : entry.resolved
+                      ? "已处理"
                       : "待处理"}
                   </small>
                 </span>

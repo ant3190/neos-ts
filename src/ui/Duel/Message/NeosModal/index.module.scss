@@ -1,40 +1,57 @@
 .modal {
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: 0 !important;
-  bottom: 0 !important;
-  top: -webkit-fill-available;
-  margin: auto;
-  height: fit-content;
-  transition: 0.2s;
-}
-
-.mini {
-  top: 100% !important;
-  bottom: 0 !important;
-  transform: translateY(calc(50% - 66px));
-  .ant-modal-body {
-    animation: fadeout 0.1s forwards;
+  :global(.ant-modal-body) {
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  :global(.ant-modal-content) {
+    color: #e7f1f7;
+    background: #0b1a28f7;
+    border: 1px solid #819eae80;
+    box-shadow: 0 12px 40px #0008;
+    padding: 18px 20px;
+  }
+  :global(.ant-modal-header) {
+    background: transparent;
+  }
+  :global(.ant-modal-title) {
+    color: #ecf5ff;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  :global(.ant-modal-close) {
+    color: #b9d5e5;
+  }
+  :global(.ant-btn) {
+    min-height: 40px;
+  }
+  :global(.ant-btn-default) {
+    background: #112b40;
+    color: #e6f3fb;
+    border-color: #7799ad;
+  }
+  :global(.ant-btn-primary) {
+    background: #16749c;
+  }
+  :global(.ant-btn-primary:disabled) {
+    color: #8097a5;
+    background: #203543;
+    border-color: #435b6a;
+  }
+  :global(.ant-modal-footer) {
+    padding-top: 12px;
+    border-top: 1px solid #7896a744;
   }
 }
-
-.hidden {
-  visibility: hidden;
+.mini {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  margin: 0;
+  transform: translate(-50%, calc(100% - 68px));
 }
-
 .wrap {
   pointer-events: none;
 }
-
-@keyframes fadeout {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
+.wrap .modal {
+  pointer-events: auto;
 }

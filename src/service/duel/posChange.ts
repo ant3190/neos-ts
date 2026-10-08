@@ -14,7 +14,7 @@ export default async (container: Container, posChange: MsgPosChange) => {
     target.location.position = posChange.cur_position;
 
     // TODO: 暂时用`Move`动画，后续可以单独实现一个改变表示形式的动画
-    await callCardMove(target.uuid);
+    await callCardMove(target.uuid, { positionOnly: true });
   } else {
     console.warn(`<PosChange>target from ${posChange.card_info} is null`);
   }

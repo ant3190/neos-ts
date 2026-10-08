@@ -1,0 +1,415 @@
+.layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 110;
+  overflow: hidden;
+  color: #fff;
+  font-family: var(--theme-font);
+}
+.aim {
+  position: absolute;
+  inset: 0;
+  font-size: 15px;
+  font-weight: bold;
+}
+.aim line {
+  animation: aim 1.2s ease-in-out infinite;
+}
+.cue {
+  position: absolute;
+  color: var(--tone);
+  animation: cueFade var(--duration) ease-out both;
+}
+.anchored {
+  width: var(--size);
+  height: var(--size);
+  margin-left: calc(var(--size) / -2);
+  margin-top: calc(var(--size) / -2);
+}
+.ring,
+.innerRing {
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--tone);
+  border-radius: 50%;
+  animation: ring var(--duration) ease-out both;
+}
+.innerRing {
+  inset: 14%;
+  border-width: 1px;
+  animation-delay: 65ms;
+}
+.ray {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 22px;
+  background: var(--tone);
+  transform-origin: 0 0;
+  animation: spark var(--duration) ease-out both;
+}
+.caption {
+  position: absolute;
+  top: 105%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  text-shadow: 0 1px 3px #000;
+}
+.banner {
+  top: 20%;
+  left: 50%;
+  width: min(620px, 80vw);
+  height: 54px;
+  margin-left: max(-310px, -40vw);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #081520e6 25%,
+    #081520e6 75%,
+    transparent
+  );
+}
+.banner .caption {
+  position: static;
+  display: block;
+  transform: none;
+  text-align: center;
+  font-size: clamp(16px, 2.2vw, 26px);
+  letter-spacing: 0.12em;
+  line-height: 54px;
+}
+.turn {
+  top: 14%;
+}
+.result {
+  top: 40%;
+  height: 80px;
+  .caption {
+    font-size: clamp(28px, 5vw, 54px);
+    line-height: 80px;
+  }
+}
+.life .caption {
+  top: 0;
+  font-size: clamp(24px, 3vw, 40px);
+}
+.set .ring,
+.position .ring {
+  border-radius: 8px;
+}
+.destroy .ring {
+  border-style: dashed;
+}
+.grave .ring,
+.material .ring,
+.release .ring {
+  animation-name: sink;
+}
+.banish .innerRing {
+  border-style: dashed;
+}
+.link .ring {
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+.fusion .innerRing {
+  border-style: dashed;
+}
+.xyz .ring {
+  border-width: 5px;
+}
+.synchro .ring {
+  border-width: 1px;
+}
+.impact .ring {
+  border-width: 6px;
+  animation-delay: 140ms;
+}
+.reveal {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(390px, 65vw);
+  margin-left: max(-195px, -32.5vw);
+  animation: reveal var(--duration) ease-out both;
+}
+.revealCards {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+.current,
+.previous {
+  position: relative;
+  border: 2px solid var(--tone);
+  box-shadow: 0 8px 20px #0009;
+  transform: rotate(-5deg);
+}
+.previous {
+  transform: rotate(5deg) scale(0.92);
+}
+.opponent .current {
+  transform: rotate(5deg);
+}
+.art {
+  width: clamp(75px, 10vw, 135px) !important;
+}
+.current b,
+.previous b {
+  position: absolute;
+  bottom: 5px;
+  left: -12px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  background: #07151df0;
+  border: 2px solid var(--tone);
+  border-radius: 50%;
+  color: var(--tone);
+  font-size: 27px;
+  font-style: italic;
+}
+.chainWord {
+  color: var(--tone);
+  font-size: 32px;
+  letter-spacing: 0.25em;
+  font-style: italic;
+  text-shadow: 0 2px 5px #000;
+}
+.chainJoin {
+  font-size: 30px;
+  color: var(--tone);
+}
+.revealText {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  width: 100%;
+  padding: 8px 12px;
+  background: #08131feb;
+  border-left: 3px solid var(--tone);
+  box-sizing: border-box;
+  text-align: center;
+}
+.revealText small {
+  color: var(--tone);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.revealText strong {
+  margin: 4px 0;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.revealText span {
+  font-size: 12px;
+  color: #c8d5e0;
+}
+.negate .art {
+  filter: grayscale(1);
+}
+.invalid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 80px;
+  color: #ff9c93;
+}
+@keyframes ring {
+  0% {
+    opacity: 0;
+    transform: scale(0.45);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+@keyframes sink {
+  0% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.15);
+  }
+}
+@keyframes spark {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--angle)) translateY(-15px) scale(0.5);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--angle)) translateY(-80px) scale(0.2);
+  }
+}
+@keyframes cueFade {
+  0% {
+    opacity: 0;
+  }
+  18%,
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.8);
+  }
+  19%,
+  78% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+}
+@keyframes aim {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.layer[data-duel-animation-quality="lite"] {
+  .innerRing,
+  .ray {
+    display: none;
+  }
+  .reveal {
+    animation-name: cueFade;
+  }
+  .aim line {
+    animation: none;
+  }
+}
+.layer[data-duel-animation-quality="off"] {
+  .ring,
+  .innerRing,
+  .ray {
+    display: none;
+  }
+  .reveal,
+  .cue,
+  .aim line {
+    animation: none;
+  }
+}
+@media (max-height: 550px) {
+  .reveal {
+    top: 12%;
+    flex-direction: row;
+    width: min(460px, 72vw);
+    margin-left: max(-230px, -36vw);
+  }
+  .art {
+    width: 65px !important;
+  }
+  .chainWord {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .cue,
+  .ring,
+  .innerRing,
+  .ray,
+  .aim line {
+    animation: none;
+  }
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: #040d182e;
+  animation: cueFade var(--duration) ease-out both;
+}
+
+.linkGate {
+  position: absolute;
+  inset: -30%;
+  width: 160%;
+  height: 160%;
+  color: var(--tone);
+  animation: gate var(--duration) ease-out both;
+}
+@keyframes gate {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(-30deg);
+  }
+  30% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.2) rotate(0);
+  }
+}
+.materials {
+  position: absolute;
+  left: 50%;
+  top: 15%;
+  width: 0;
+  height: 0;
+}
+.materialArt {
+  position: absolute;
+  width: 48px !important;
+  margin-left: -24px;
+  animation: materialGather var(--duration) ease-in-out both;
+}
+@keyframes materialGather {
+  0% {
+    opacity: 0;
+    transform: translate(var(--material-x), var(--material-y)) scale(0.8);
+  }
+  20% {
+    opacity: 0.95;
+    transform: translate(var(--material-x), var(--material-y)) scale(1);
+  }
+  65%,
+  100% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.15);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .linkGate,
+  .materialArt {
+    animation: none;
+  }
+}

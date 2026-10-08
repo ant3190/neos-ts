@@ -8,6 +8,8 @@ import { Container } from "@/container";
 type UpdateAction = MsgUpdateData.Action & {
   clear?: boolean;
   updatesPosition?: boolean;
+  updatesEquip?: boolean;
+  updatesTargets?: boolean;
 };
 
 export default async (container: Container, updateData: MsgUpdateData) => {
@@ -38,6 +40,9 @@ export default async (container: Container, updateData: MsgUpdateData) => {
           }
 
           const meta = target.meta;
+          if (updateAction.updatesEquip) target.equipTarget = action.equip_card;
+          if (updateAction.updatesTargets)
+            target.effectTargets = action.target_cards;
           if (updateAction.updatesPosition && action.location !== undefined) {
             if (target.location.position !== action.location.position) {
               // Currently only update position

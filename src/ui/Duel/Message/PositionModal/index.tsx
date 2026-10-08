@@ -1,21 +1,25 @@
 // 表示形式选择弹窗
-import { Button } from "antd";
 import React from "react";
 import { proxy, useSnapshot } from "valtio";
 
 import { sendSelectPositionResponse, ygopro } from "@/api";
 import { getUIContainer } from "@/container/compat";
+import { YgoCard } from "@/ui/Shared";
 
 import { NeosModal } from "../NeosModal";
+import { PromptSession } from "../session";
 import styles from "./index.module.scss";
 
 interface PositionModalProps {
   isOpen: boolean;
   positions: ygopro.CardPosition[];
+  code?: number;
+  promptId?: number;
 }
 const defaultProps = { isOpen: false, positions: [] };
 
-const localStore = proxy<PositionModalProps>(defaultProps);
+const localStore = proxy<PositionModalProps>({ ...defaultProps });
+const session = new PromptSession<void>();
 
 // Define a type for translations with an index signature (I18N)
 interface Translations {
@@ -93,31 +97,55 @@ const translations: Translations = {
 
 export const PositionModal = () => {
   const container = getUIContainer();
-  const { isOpen, positions } = useSnapshot(localStore);
+  const { isOpen, positions, code } = useSnapshot(localStore);
 
+  const promptId = localStore.promptId;
   const onSummit = (position: ygopro.CardPosition) => {
+    if (!localStore.isOpen || promptId !== localStore.promptId) return;
+    localStore.isOpen = false;
     sendSelectPositionResponse(container.conn, position);
-    rs();
+    session.settle();
   };
 
   return (
     <NeosModal
-      title={translations[language].Title}
+      title={(translations[language] ?? translations.cn).Title}
       open={isOpen}
       centered
       footer={<></>}
     >
       <div className={styles.container} data-testid="duel-position-modal">
         {positions.map((position, idx) => (
-          <Button
+          <button
+            type="button"
+            className={styles.option}
             key={idx}
             data-testid="duel-position-option"
             data-position={ygopro.CardPosition[position]}
             data-position-value={position}
             onClick={() => onSummit(position)}
           >
-            {cardPosition(position)}
-          </Button>
+            <div className={styles.art}>
+              <YgoCard
+                code={code}
+                isBack={[
+                  ygopro.CardPosition.FACEDOWN_ATTACK,
+                  ygopro.CardPosition.FACEDOWN_DEFENSE,
+                ].includes(position)}
+                width="5rem"
+                urgent
+                style={{
+                  transform: [
+                    ygopro.CardPosition.FACEUP_DEFENSE,
+                    ygopro.CardPosition.FACEDOWN_DEFENSE,
+                  ].includes(position)
+                    ? "rotate(-90deg)"
+                    : "none",
+                }}
+              />
+            </div>
+            <span>{cardPosition(position)}</span>
+          </button>
         ))}
       </div>
     </NeosModal>
@@ -126,7 +154,7 @@ export const PositionModal = () => {
 
 // Function to get card position based on language
 function cardPosition(position: ygopro.CardPosition): string {
-  const messages = translations[language];
+  const messages = translations[language] ?? translations.cn;
 
   switch (position) {
     case ygopro.CardPosition.FACEUP_ATTACK: {
@@ -147,21 +175,23 @@ function cardPosition(position: ygopro.CardPosition): string {
   }
 }
 
-let rs: (arg?: any) => void = () => {};
-
 export const displayPositionModal = async (
   positions: ygopro.CardPosition[],
+  code?: number,
 ) => {
+  const pending = session.begin();
   localStore.positions = positions;
+  localStore.code = code;
+  localStore.promptId = pending.id;
   localStore.isOpen = true;
-  await new Promise<void>((resolve) => (rs = resolve));
-  localStore.isOpen = false;
-  localStore.positions = [];
+  await pending.promise;
+  if (session.current(pending.id)) {
+    localStore.isOpen = false;
+    localStore.positions = [];
+  }
 };
-
 export const resetPositionModal = () => {
   localStore.isOpen = false;
   localStore.positions = [];
-  rs();
-  rs = () => {};
+  session.reset();
 };

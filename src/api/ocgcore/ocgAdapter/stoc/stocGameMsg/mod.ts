@@ -21,6 +21,10 @@ import MsgHintAdapter from "./hint";
 import MsgNewPhaseAdapter from "./newPhase";
 import MsgNewTurnAdapter from "./newTurn";
 import PENETRATE from "./penetrate";
+import {
+  attachPresentationMessage,
+  readPresentationMessage,
+} from "./presentation";
 import MsgRecover from "./recover";
 import MsgReloadFieldAdapter from "./reloadField";
 import MsgRemoveCounter from "./removeCounter";
@@ -263,8 +267,12 @@ export default class GameMsgAdapter implements StocAdapter {
       }
     }
 
-    return new ygopro.YgoStocMsg({
+    const message = new ygopro.YgoStocMsg({
       stoc_game_msg: new ygopro.StocGameMessage(gameMsg),
     });
+    const presentation = readPresentationMessage(func, gameData);
+    if (presentation)
+      attachPresentationMessage(message.stoc_game_msg, presentation);
+    return message;
   }
 }

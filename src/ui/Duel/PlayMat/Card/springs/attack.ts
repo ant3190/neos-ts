@@ -49,7 +49,8 @@ export const attack: AttackFunc = async (props) => {
 
   // 先浮空
   await asyncStart(api)({
-    z: 200,
+    z: 80,
+    config: { duration: 70 },
   });
   // 后撤半个卡位，并调整倾斜角
   await asyncStart(api)({
@@ -57,6 +58,7 @@ export const attack: AttackFunc = async (props) => {
       current.y +
       (BLOCK_HEIGHT_M / 2) * (isMe(card.location.controller) ? 1 : -1),
     rz,
+    config: { duration: 80 },
   });
   // 加速前冲
   await asyncStart(api)({
@@ -64,6 +66,7 @@ export const attack: AttackFunc = async (props) => {
     y,
     config: {
       easing: easings.easeInOutSine,
+      duration: 130,
     },
   });
   // 减速归位
@@ -74,6 +77,7 @@ export const attack: AttackFunc = async (props) => {
     rz: current.rz,
     config: {
       easing: easings.easeInOutQuad,
+      duration: 180,
     },
   });
 };

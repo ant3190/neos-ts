@@ -13,6 +13,9 @@ import {
 } from "@/stores";
 import { BgChain, type ChainMarker, type ChainProps } from "@/ui/Shared";
 
+import { registerZoneElement } from "../../animation/runtime";
+import { openCardActions } from "../../interaction/CardActions";
+import { displayCardListModal } from "../../Message";
 import {
   type ActionHighlight,
   getActionHighlight,
@@ -54,6 +57,15 @@ const BgBlock: React.FC<
 }) => (
   <div
     {...rest}
+    ref={(node) => {
+      const attrs = rest as Record<string, unknown>;
+      const controller = attrs["data-controller"];
+      const zone =
+        attrs["data-zone-value"] ??
+        (attrs["data-zone"] === "DECK" ? ygopro.CardZone.DECK : undefined);
+      if (controller !== undefined && zone !== undefined)
+        registerZoneElement(`${controller}:${zone}`, node);
+    }}
     data-action-highlight={actionHighlight ?? "none"}
     className={classnames(styles.block, className, {
       [styles.highlight]: highlight,
@@ -199,6 +211,13 @@ const BgOtherBlocks: React.FC<{ op?: boolean }> = ({ op }) => {
         data-controller={controller}
         data-place-selectable={false}
         className={styles.banish}
+        onClick={(event) => {
+          displayCardListModal({ isZone: true, zone: REMOVED, controller });
+          openCardActions(
+            cardStore.at(REMOVED, controller),
+            event.currentTarget,
+          );
+        }}
         actionHighlight={zoneHighlight(REMOVED)}
         chains={{
           chains: genChains(removed, REMOVED),
@@ -213,6 +232,10 @@ const BgOtherBlocks: React.FC<{ op?: boolean }> = ({ op }) => {
         data-controller={controller}
         data-place-selectable={false}
         className={styles.graveyard}
+        onClick={(event) => {
+          displayCardListModal({ isZone: true, zone: GRAVE, controller });
+          openCardActions(cardStore.at(GRAVE, controller), event.currentTarget);
+        }}
         actionHighlight={zoneHighlight(GRAVE)}
         chains={{
           chains: genChains(grave, GRAVE),
@@ -255,6 +278,10 @@ const BgOtherBlocks: React.FC<{ op?: boolean }> = ({ op }) => {
         data-controller={controller}
         data-place-selectable={false}
         className={classnames(styles.deck, styles["extra-deck"])}
+        onClick={(event) => {
+          displayCardListModal({ isZone: true, zone: EXTRA, controller });
+          openCardActions(cardStore.at(EXTRA, controller), event.currentTarget);
+        }}
         actionHighlight={zoneHighlight(EXTRA)}
         chains={{
           chains: genChains(extra, EXTRA),

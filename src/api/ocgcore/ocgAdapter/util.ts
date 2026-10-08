@@ -438,6 +438,11 @@ export function readUpdateAction(
   (
     action as MsgUpdateData.Action & { updatesPosition?: boolean }
   ).updatesPosition = updatesPosition;
+  (action as MsgUpdateData.Action & { updatesEquip?: boolean }).updatesEquip =
+    (flag & QUERY_EQUIP_CARD) !== 0;
+  (
+    action as MsgUpdateData.Action & { updatesTargets?: boolean }
+  ).updatesTargets = (flag & QUERY_TARGET_CARD) !== 0;
 
   return action;
 }

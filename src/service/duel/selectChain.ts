@@ -16,7 +16,9 @@ export default async (container: Container, selectChain: MsgSelectChain) => {
   const chainSetting = context.matStore.chainSetting;
 
   // 计算强制发动的卡片数量
-  const forceCount = chains.filter((chain) => (chain as any).forced).length;
+  const forceCount = selectChain.forced
+    ? Math.max(1, chains.filter((chain) => (chain as any).forced).length)
+    : 0;
 
   if (chainSetting === ChainSetting.CHAIN_IGNORE && forceCount === 0) {
     // 如果玩家配置了忽略连锁，且没有强制发动的卡，直接回应后端并返回
@@ -107,13 +109,9 @@ export default async (container: Container, selectChain: MsgSelectChain) => {
       });
       break;
     }
-    case 3: {
-      // 一张强制发动的卡，直接回应
-      sendSelectSingleResponse(conn, chains[0].response);
-      break;
-    }
+    case 3:
     case 4: {
-      // 多张强制发动的卡，弹窗选择
+      // MDPro3 keeps even a single forced effect visible until confirmed.
       fetchSelectHintMeta({
         selectHintData: 203,
       });

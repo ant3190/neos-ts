@@ -1,7 +1,5 @@
-import { CheckCard } from "@ant-design/pro-components";
-import { Button, Segmented } from "antd";
-import { chunk } from "lodash-es";
-import React, { useEffect, useState } from "react";
+import { Button } from "antd";
+import { useEffect, useState } from "react";
 import { proxy, useSnapshot } from "valtio";
 
 import {
@@ -13,205 +11,191 @@ import {
   sendSelectIdleCmdResponse,
   sendSelectOptionResponse,
 } from "@/api";
-import { Container } from "@/container";
+import { type Container } from "@/container";
 import { getUIContainer } from "@/container/compat";
+import { YgoCard } from "@/ui/Shared";
 
 import { clearAllIdleInteractivities } from "../../utils";
 import { NeosModal } from "../NeosModal";
+import { PromptSession } from "../session";
 import styles from "./index.module.scss";
 
 type Options = { info: string; response: number }[];
 type ResponseKind = "option" | "idle" | "battle";
-
-const defaultStore = {
+const store = proxy({
   title: "",
   isOpen: false,
   min: 1,
-  options: [] satisfies Options as Options,
+  options: [] as Options,
   responseKind: "option" as ResponseKind,
-};
-const store = proxy(defaultStore);
+  preview: undefined as CardMeta | undefined,
+  promptId: 0,
+});
+const session = new PromptSession<number | undefined>();
+let customResponse: ((response: number) => boolean) | undefined;
 
-// 一页最多4个选项
-const MAX_NUM_PER_PAGE = 4;
-
-export const OptionModal = () => {
+export function OptionModal() {
   const container = getUIContainer();
-  const snap = useSnapshot(store);
-  const { title, isOpen, min, options } = snap;
-  // options可能太多，因此分页展示
-  const [page, setPage] = useState(0);
-  const maxPage = Math.ceil(options.length / MAX_NUM_PER_PAGE);
-  const [selecteds, setSelecteds] = useState<number[][]>([]);
-  const grouped = chunk(options, MAX_NUM_PER_PAGE);
-  const sendResponse = (response: number) => {
-    switch (store.responseKind) {
-      case "idle":
-        sendSelectIdleCmdResponse(container.conn, response);
-        clearAllIdleInteractivities();
-        break;
-      case "battle":
+  const { title, isOpen, min, options, responseKind, preview } =
+    useSnapshot(store);
+  const renderedPromptId = store.promptId;
+  const [selected, setSelected] = useState<number[]>([]);
+  useEffect(() => setSelected([]), [options, isOpen]);
+  const submit = (values: number[]) => {
+    if (
+      !store.isOpen ||
+      renderedPromptId !== store.promptId ||
+      values.length !== store.min
+    )
+      return;
+    const response = values.reduce((result, value) => result | value, 0);
+    const handler = customResponse;
+    store.isOpen = false;
+    if (handler) handler(response);
+    else if (store.responseKind === "option")
+      sendSelectOptionResponse(container.conn, response);
+    else {
+      clearAllIdleInteractivities();
+      if (store.responseKind === "battle")
         sendSelectBattleCmdResponse(container.conn, response);
-        clearAllIdleInteractivities();
-        break;
-      default:
-        sendSelectOptionResponse(container.conn, response);
+      else sendSelectIdleCmdResponse(container.conn, response);
     }
+    session.settle(response);
   };
-
-  const onSummit = () => {
-    if (!store.isOpen) return;
-    const responses = selecteds.flat();
-    if (responses.length > 0) {
-      const response = responses.reduce((res, current) => res | current, 0); // 多个选择求或
-      sendResponse(response);
-      rs();
-    }
+  const cancel = () => {
+    if (!store.isOpen || renderedPromptId !== store.promptId) return;
+    store.isOpen = false;
+    session.settle(undefined);
   };
-
-  useEffect(() => {
-    setSelecteds(Array.from({ length: maxPage }).map((_) => []));
-    setPage(0);
-  }, [options]);
-
-  const onQuickSelect = (response: number) => {
-    if (!store.isOpen) return;
-    if (store.min === 1) {
-      sendResponse(response);
-      rs();
-    }
-  };
-
   return (
     <NeosModal
       title={title}
       open={isOpen}
       footer={
-        <Button
-          data-testid="duel-option-submit"
-          disabled={selecteds.flat().length !== min}
-          onClick={onSummit}
-        >
-          确定
-        </Button>
+        <>
+          {responseKind !== "option" && (
+            <Button onClick={cancel} data-testid="duel-option-cancel">
+              放弃发动
+            </Button>
+          )}
+          <Button
+            type="primary"
+            data-testid="duel-option-submit"
+            disabled={selected.length !== min}
+            onClick={() => submit(selected)}
+          >
+            确定
+          </Button>
+        </>
       }
     >
-      <div data-testid="duel-option-modal" data-option-min={min}>
-        <Selector page={page} maxPage={maxPage} onChange={setPage as any} />
-        {grouped.map(
-          (options, i) =>
-            i === page && (
-              <div className={styles.container} key={i}>
-                <CheckCard.Group
-                  bordered
-                  multiple
-                  value={selecteds[i]}
-                  className={styles["check-card-group"]}
-                  onChange={(values: any) => {
-                    const v = selecteds.map((x, i) =>
-                      i === page ? values : x,
-                    );
-                    setSelecteds(v);
-                  }}
-                >
-                  {options.map((option, idx) => (
-                    <div
-                      key={idx}
-                      data-testid="duel-option-item"
-                      data-option-response={option.response}
-                      data-option-text={option.info}
-                      onDoubleClick={() => onQuickSelect(option.response)}
-                    >
-                      <CheckCard
-                        className={styles["check-card"]}
-                        description={option.info}
-                        value={option.response}
-                      />
-                    </div>
-                  ))}
-                </CheckCard.Group>
-              </div>
-            ),
+      <div
+        className={styles.container}
+        data-testid="duel-option-modal"
+        data-option-min={min}
+      >
+        {preview && (
+          <div className={styles.preview}>
+            <YgoCard code={preview.id} width="5rem" urgent />
+            <strong>{preview.text.name}</strong>
+          </div>
         )}
+        <div className={styles.options} role="group" aria-label="效果选择">
+          {options.map((option, index) => (
+            <button
+              type="button"
+              key={`${option.response}:${index}`}
+              className={
+                selected.includes(option.response) ? styles.selected : ""
+              }
+              aria-pressed={selected.includes(option.response)}
+              data-testid="duel-option-item"
+              data-option-response={option.response}
+              data-option-text={option.info}
+              onClick={() =>
+                setSelected((values) =>
+                  values.includes(option.response)
+                    ? values.filter((value) => value !== option.response)
+                    : store.min === 1
+                    ? [option.response]
+                    : values.length < store.min
+                    ? [...values, option.response]
+                    : values,
+                )
+              }
+              onDoubleClick={() => {
+                if (store.min === 1) submit([option.response]);
+              }}
+            >
+              <b>{index + 1}</b>
+              <span>{option.info}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </NeosModal>
   );
-};
+}
 
-/* 选择区域 */
-const Selector: React.FC<{
-  page: number;
-  maxPage: number;
-  onChange: (value: number) => void;
-}> = ({ page, maxPage, onChange }) =>
-  maxPage > 1 ? (
-    <Segmented
-      block
-      options={Array.from({ length: maxPage }).map((_, idx) => idx)}
-      style={{ margin: "0.625rem 0" }}
-      value={page}
-      onChange={onChange as any}
-    ></Segmented>
-  ) : (
-    <></>
-  );
-
-let rs: (v?: any) => void = () => {};
-export const displayOptionModal = async (
+export async function displayOptionModal(
   title: string,
   options: Options,
   min: number,
   responseKind: ResponseKind = "option",
-) => {
+  extra: {
+    preview?: CardMeta;
+    onResponse?: (response: number) => boolean;
+  } = {},
+) {
+  const pending = session.begin(undefined);
+  store.promptId = pending.id;
   store.title = title;
   store.options = options;
   store.min = min;
   store.responseKind = responseKind;
+  store.preview = extra.preview;
+  customResponse = extra.onResponse;
   store.isOpen = true;
-  await new Promise((resolve) => (rs = resolve));
-  store.isOpen = false;
-};
-
-export const resetOptionModal = () => {
+  const result = await pending.promise;
+  if (session.current(pending.id)) {
+    store.isOpen = false;
+    customResponse = undefined;
+  }
+  return result;
+}
+export function resetOptionModal() {
   store.isOpen = false;
   store.options = [];
-  store.responseKind = "option";
-  rs();
-  rs = () => {};
-};
+  store.preview = undefined;
+  customResponse = undefined;
+  session.reset(undefined);
+}
 
-export const handleEffectActivation = async (
+/** Kept for callers outside the card action toolbar. */
+export async function handleEffectActivation(
   container: Container,
   meta: CardMeta,
-  effectInteractivies: {
-    desc: string;
+  actions: {
     response: number;
-    effectCode: number | undefined;
+    effectCode: number;
+    responseSource?: "idle" | "battle";
   }[],
-) => {
-  if (!effectInteractivies.length) {
-    return;
-  }
-  if (effectInteractivies.length === 1) {
-    // 如果只有一个效果，点击直接触发
-    sendSelectIdleCmdResponse(container.conn, effectInteractivies[0].response);
-  } else {
-    // optionsModal
-    const options = effectInteractivies.map((effect) => {
-      const effectMsg =
-        meta && effect.effectCode
-          ? getCardStr(meta, effect.effectCode & 0xf) ?? "[:?]"
-          : "[:?]";
-      return {
-        info: effectMsg,
-        response: effect.response,
-      };
-    });
+) {
+  if (!actions.length) return;
+  if (actions.length === 1) {
+    clearAllIdleInteractivities();
+    if (actions[0].responseSource === "battle")
+      sendSelectBattleCmdResponse(container.conn, actions[0].response);
+    else sendSelectIdleCmdResponse(container.conn, actions[0].response);
+  } else
     await displayOptionModal(
       fetchStrings(Region.System, 556),
-      options,
+      actions.map((effect) => ({
+        info: getCardStr(meta, effect.effectCode & 0xf) ?? "效果",
+        response: effect.response,
+      })),
       1,
-      "idle",
+      actions[0].responseSource ?? "idle",
+      { preview: meta },
     );
-  }
-};
+}

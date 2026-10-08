@@ -32,6 +32,7 @@ type OptionsToFunc<Options> = (props: {
 
 export interface MoveOptions {
   fromZone?: ygopro.CardZone;
+  positionOnly?: boolean;
   instant?: boolean;
 }
 export type MoveFunc = OptionsToFunc<MoveOptions>;

@@ -26,6 +26,8 @@ export interface CardType {
     response?: number; // 被选择时发送给服务器的值
   };
   status: number; // Current status, STATUS_DISABLED, etc.
+  equipTarget?: ygopro.CardLocation;
+  effectTargets?: ygopro.CardLocation[];
 }
 
 export class CardStore implements NeosStore {

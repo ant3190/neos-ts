@@ -1,45 +1,25 @@
 import { animated, to, useSpring } from "@react-spring/web";
-import { Dropdown, type MenuProps } from "antd";
 import classnames from "classnames";
 import React, { type CSSProperties, useEffect, useRef, useState } from "react";
 import { useSnapshot } from "valtio";
 
-import {
-  type CardMeta,
-  Region,
-  sendSelectBattleCmdResponse,
-  sendSelectMultiResponse,
-} from "@/api";
-import {
-  fetchStrings,
-  getCardStr,
-  sendSelectIdleCmdResponse,
-  ygopro,
-} from "@/api";
-import { Container } from "@/container";
+import { sendSelectMultiResponse, ygopro } from "@/api";
 import { getUIContainer } from "@/container/compat";
 import { eventbus, Task } from "@/infra";
-import {
-  cardStore,
-  CardType,
-  Interactivity,
-  InteractType,
-  isCardDisabled,
-} from "@/stores";
+import { cardStore, CardType, InteractType, isCardDisabled } from "@/stores";
 import { showCardModal as displayCardModal } from "@/ui/Duel/Message/CardModal";
 import { YgoCard } from "@/ui/Shared";
 
+import { consumeCardOrigin } from "../../animation/origins";
+import { inspectCardRelations } from "../../animation/present";
+import { registerCardElement } from "../../animation/runtime";
 import {
-  displayCardListModal,
-  displayOptionModal,
-  displaySimpleSelectCardsModal,
-} from "../../Message";
-import {
-  clearAllIdleInteractivities,
-  clearSelectInfo,
-  interactTypeToIcon,
-  interactTypeToString,
-} from "../../utils";
+  openCardActions,
+  useCardActionActive,
+} from "../../interaction/CardActions";
+import { trySelectFieldCard } from "../../interaction/fieldSelection";
+import { displayCardListModal } from "../../Message";
+import { clearSelectInfo } from "../../utils";
 import { getActionHighlight } from "../../utils/actionHighlight";
 import { ActionFrame } from "../ActionFrame";
 import styles from "./index.module.scss";
@@ -58,6 +38,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
   const container = getUIContainer();
   const card = cardStore.inner[idx];
   const snap = useSnapshot(card);
+  const activeAction = useCardActionActive(card.uuid);
 
   const [spring, api] = useSpring<SpringApiProps>(
     () =>
@@ -78,9 +59,19 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       }) satisfies SpringApiProps,
   );
 
-  // Mount at the actual location immediately; service messages can animate later moves.
+  // A promoted deck card retains its source; other mounts settle at their actual location.
   useEffect(() => {
-    addToAnimation(() => move({ card, api, options: { instant: true } }));
+    const origin = consumeCardOrigin(card.uuid);
+    addToAnimation(async () => {
+      if (origin) {
+        await move({
+          card: { ...card, location: origin },
+          api,
+          options: { instant: true },
+        });
+        await move({ card, api, options: { fromZone: origin.zone } });
+      } else await move({ card, api, options: { instant: true } });
+    });
   }, []);
 
   const [classFocus, setClassFocus] = useState(false);
@@ -121,6 +112,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
     const unsubscribeMove = register(
       Task.Move,
       async (options?: MoveOptions) => {
+        consumeCardOrigin(card.uuid);
         await addToAnimation(() => move({ card, api, options }));
       },
     );
@@ -151,165 +143,21 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
 
   // <<< 动画 <<<
 
-  // >>> 效果 >>>
-  const [dropdownMenu, setDropdownMenu] = useState({
-    items: [] as DropdownItem[],
-  });
-
-  // 是否禁用下拉菜单
-  const [dropdownMenuDisabled, setDropdownMenuDisabled] = useState(false);
-
-  // 发动效果
-  // 1. 下拉菜单里面选择[召唤 / 特殊召唤 /.../效果发动]
-  // 2. 如果是非效果发动，那么直接选择哪张卡(单张卡直接选择那张)
-  // 3. 如果是效果发动，那么选择哪张卡，然后选择效果
-  const handleDropdownMenu = (cards: CardType[], isField: boolean) => {
-    const map = new Map<Interactivity<number>["interactType"], CardType[]>();
-    cards.forEach((card) => {
-      card.idleInteractivities.forEach(({ interactType }) => {
-        if (!map.has(interactType)) {
-          map.set(interactType, []);
-        }
-        map.get(interactType)?.push(card);
-      });
-    });
-
-    if (!map.size) {
-      setDropdownMenuDisabled(true);
-      return;
-    } else {
-      setDropdownMenuDisabled(false);
-    }
-    const actions = [...map.entries()];
-    const nonEffectActions = actions.filter(
-      ([action]) => action !== InteractType.ACTIVATE,
-    );
-    const getNonEffectInteractivity = (action: InteractType, card: CardType) =>
-      card.idleInteractivities.find((item) => item.interactType === action)!;
-    const sendInteractionResponse = (interactivity: Interactivity<number>) => {
-      if (interactivity.responseSource === "battle") {
-        sendSelectBattleCmdResponse(container.conn, interactivity.response);
-      } else {
-        sendSelectIdleCmdResponse(container.conn, interactivity.response);
-      }
-    };
-    const nonEffectItem: DropdownItem[] = nonEffectActions.map(
-      ([action, cards], key) => ({
-        key,
-        "data-testid": `duel-action-${InteractType[action].toLowerCase()}`,
-        "data-action-type": InteractType[action],
-        "data-action-card-count": cards.length,
-        "data-action-response":
-          cards.length === 1
-            ? getNonEffectInteractivity(action, cards[0]).response
-            : undefined,
-        "data-action-response-source":
-          cards.length === 1
-            ? getNonEffectInteractivity(action, cards[0]).responseSource
-            : undefined,
-        label: interactTypeToString(action),
-        icon: interactTypeToIcon(action),
-        onClick: async () => {
-          if (!isField) {
-            // 单卡: 直接召唤/特殊召唤/...
-            const card = cards[0];
-            sendInteractionResponse(getNonEffectInteractivity(action, card));
-            clearAllIdleInteractivities();
-          } else {
-            // 场地: 选择卡片
-            // TODO: hint
-            const option = await displaySimpleSelectCardsModal({
-              selectables: cards.map((card) => ({
-                meta: card.meta,
-                location: card.location,
-                response: getNonEffectInteractivity(action, card).response,
-                actionHighlight: getActionHighlight([{ interactType: action }]),
-                card,
-              })),
-            });
-            if (option.length > 0) {
-              sendInteractionResponse(
-                getNonEffectInteractivity(action, option[0].card as CardType),
-              );
-              clearAllIdleInteractivities();
-            }
-          }
-        },
-      }),
-    );
-    const hasEffect =
-      cards.reduce(
-        (prev, acc) => [
-          ...prev,
-          ...acc.idleInteractivities.filter(
-            ({ interactType }) => interactType === InteractType.ACTIVATE,
-          ),
-        ],
-        [] as Interactivity<number>[],
-      ).length > 0;
-    const effectItem: DropdownItem = {
-      key: nonEffectItem.length,
-      "data-testid": "duel-action-activate",
-      "data-action-type": InteractType[InteractType.ACTIVATE],
-      label: interactTypeToString(InteractType.ACTIVATE),
-      icon: interactTypeToIcon(InteractType.ACTIVATE),
-      onClick: async () => {
-        let tmpCard: CardType;
-        if (!isField) {
-          // 单卡: 直接发动这个卡的效果
-          tmpCard = cards[0];
-        } else {
-          // 场地: 选择卡片
-          // TODO: hint
-          const option = await displaySimpleSelectCardsModal({
-            selectables: cards
-              // 过滤掉不能发效果的卡
-              .filter(
-                (card) =>
-                  card.idleInteractivities.find(
-                    ({ interactType }) =>
-                      interactType === InteractType.ACTIVATE,
-                  ) !== undefined,
-              )
-              .map((card) => ({
-                meta: card.meta,
-                location: card.location,
-                actionHighlight: "gold",
-                card,
-              })),
-          });
-          if (!option.length) return;
-          tmpCard = option[0].card! as any; // 一定会有的，有输入则定有输出
-        }
-        // 选择发动哪个效果
-        handleEffectActivation(
-          container,
-          tmpCard.idleInteractivities
-            .filter(
-              ({ interactType }) => interactType === InteractType.ACTIVATE,
-            )
-            .map((x) => ({
-              desc: interactTypeToString(x.interactType),
-              response: x.response,
-              responseSource: x.responseSource,
-              effectCode: x.activateIndex,
-            })),
-          tmpCard.meta,
-        );
-      },
-    };
-    setDropdownMenu({
-      items: [...nonEffectItem, ...(hasEffect ? [effectItem] : [])],
-    });
-  };
+  const element = useRef<HTMLDivElement | null>(null);
 
   const onClick = () => {
+    inspectCardRelations(card);
+    if (trySelectFieldCard(card.uuid)) {
+      displayCardModal(card);
+      return;
+    }
     const onCardClick = (card: CardType) => {
       const selectInfo = card.selectInfo;
       if (selectInfo.selectable || selectInfo.selected) {
         if (selectInfo.response !== undefined) {
           sendSelectMultiResponse(container.conn, [selectInfo.response]);
           clearSelectInfo();
+          return;
         } else {
           console.error("card is selectable but the response is undefined!");
         }
@@ -318,7 +166,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       // 中央弹窗展示选中卡牌信息
       // TODO: 同一张卡片，是否重复点击会关闭CardModal？
       displayCardModal(card);
-      handleDropdownMenu([card], false);
+      if (element.current) openCardActions([card], element.current);
 
       // 侧边栏展示超量素材信息
       const overlayMaterials = cardStore.findOverlay(
@@ -340,9 +188,9 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
         zone: card.location.zone,
         controller: card.location.controller,
       });
-      // 收集这个zone的所有交互，并且在下拉菜单之中显示
+      // Collect this pile’s commands for its nearby action buttons.
       const cards = cardStore.at(card.location.zone, card.location.controller);
-      handleDropdownMenu(cards, true);
+      if (element.current) openCardActions(cards, element.current);
     };
 
     if ([MZONE, SZONE, HAND].includes(card.location.zone)) {
@@ -380,6 +228,26 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
 
   return (
     <animated.div
+      ref={(node) => {
+        element.current = node;
+        registerCardElement(card.uuid, node);
+      }}
+      role="button"
+      tabIndex={
+        snap.selectInfo.selectable ||
+        snap.selectInfo.selected ||
+        snap.idleInteractivities.length
+          ? 0
+          : -1
+      }
+      aria-label={snap.meta.text.name || "卡片"}
+      aria-pressed={snap.selectInfo.selected}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick();
+        }
+      }}
       data-testid="duel-card"
       data-card-uuid={snap.uuid}
       data-card-code={snap.code}
@@ -397,6 +265,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       data-card-selected={snap.selectInfo.selected}
       data-card-targeted={snap.targeted}
       data-card-disabled={disabled}
+      data-card-is-me={container.context.matStore.isMe(location.controller)}
       data-card-idle-actions={idleActions}
       data-card-action-highlight={actionHighlight ?? "none"}
       data-card-idle-responses={idleActionResponses}
@@ -404,6 +273,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       data-card-attack-directable={attackInteractivity?.directAttackAble}
       className={classnames(styles["mat-card"], {
         [styles.selected]: snap.selectInfo.selected,
+        [styles.actionsActive]: activeAction,
       })}
       style={
         {
@@ -415,6 +285,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
           "--z": spring.z,
           "--sub-z": spring.subZ.to([0, 50, 100], [0, 200, 0]), // 中间高，两边低
           "--ry": spring.ry,
+          "--hand-angle": spring.rz,
           zIndex: spring.zIndex,
           "--focus-scale": spring.focusScale,
           "--focus-display": spring.focusDisplay,
@@ -425,100 +296,33 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       onClick={onClick}
     >
       <div className={styles.focus} />
-      <Dropdown
-        menu={dropdownMenu}
-        placement="top"
-        overlayClassName={classnames(styles.dropdown, {
-          [styles["dropdown-disabled"]]: dropdownMenuDisabled,
+      <div
+        className={classnames(styles["img-wrap"], {
+          [styles.focusing]: classFocus,
         })}
-        arrow
-        trigger={["click"]}
       >
-        <div
-          className={classnames(styles["img-wrap"], {
-            [styles.focusing]: classFocus,
-          })}
-        >
-          <YgoCard
-            className={styles.cover}
-            code={snap.code === 0 ? snap.meta.id : snap.code}
-            name={snap.meta.text.name}
-            disabled={disabled}
-            urgent
-          />
-          <YgoCard className={styles.back} isBack />
-          <ActionFrame
-            highlight={actionHighlight}
-            className={styles["action-frame"]}
-          />
-          {(snap.selectInfo.selectable || snap.selectInfo.selected) && (
-            <div aria-hidden="true" className={styles["selection-frame"]} />
-          )}
-        </div>
-      </Dropdown>
-      {snap.targeted && <div className={styles.streamer} />}
+        <YgoCard
+          className={styles.cover}
+          code={snap.code === 0 ? snap.meta.id : snap.code}
+          name={snap.meta.text.name}
+          disabled={disabled}
+          urgent
+        />
+        <YgoCard className={styles.back} isBack />
+        <ActionFrame
+          highlight={actionHighlight}
+          className={styles["action-frame"]}
+        />
+        {(snap.selectInfo.selectable || snap.selectInfo.selected) && (
+          <div aria-hidden="true" className={styles["selection-frame"]} />
+        )}
+      </div>
+      {snap.targeted && <div className={styles.targeted} />}
     </animated.div>
   );
 };
 
 export const Card = React.memo(CardImpl);
-
-// >>> 下拉菜单：点击动作 >>>
-interface Interactivy {
-  desc: string;
-  response: number;
-  responseSource?: "idle" | "battle";
-  effectCode: number | undefined;
-}
-
-type DropdownItem = NonNullable<MenuProps["items"]>[number] & {
-  onClick: () => void;
-  "data-testid"?: string;
-  "data-action-type"?: string;
-};
-
-const handleEffectActivation = (
-  container: Container,
-  effectInteractivies: Interactivy[],
-  meta?: CardMeta,
-) => {
-  if (!effectInteractivies.length) return;
-  else if (effectInteractivies.length === 1) {
-    // 如果只有一个效果，点击直接触发
-    if (effectInteractivies[0].responseSource === "battle") {
-      sendSelectBattleCmdResponse(
-        container.conn,
-        effectInteractivies[0].response,
-      );
-    } else {
-      sendSelectIdleCmdResponse(
-        container.conn,
-        effectInteractivies[0].response,
-      );
-    }
-    clearAllIdleInteractivities();
-  } else {
-    // optionsModal
-    const options = effectInteractivies.map((effect) => {
-      const effectMsg =
-        meta && effect.effectCode
-          ? getCardStr(meta, effect.effectCode & 0xf) ?? "[:?]"
-          : "[:?]";
-      return {
-        info: effectMsg,
-        response: effect.response,
-      };
-    });
-    displayOptionModal(
-      fetchStrings(Region.System, 556),
-      options,
-      1,
-      effectInteractivies[0].responseSource === "battle" ? "battle" : "idle",
-    );
-  }
-};
-
-// <<< 下拉菜单 <<<
 
 const call =
   <Options,>(task: Task) =>

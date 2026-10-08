@@ -3,11 +3,13 @@ import { INTERNAL_Snapshot as Snapshot, proxy, useSnapshot } from "valtio";
 import { sendSelectMultiResponse, sendSelectSingleResponse } from "@/api";
 import { getUIContainer } from "@/container/compat";
 
+import { resetFieldSelection } from "../../interaction/fieldSelection";
 import {
   type Option,
   SelectCardsModal,
   type SelectCardsModalProps,
 } from "../SelectCardsModal";
+import { PromptSession } from "../session";
 
 const CANCEL_RESPONSE = -1;
 const FINISH_RESPONSE = -1;
@@ -18,6 +20,7 @@ const defaultProps: Omit<
 > & { isChain: boolean } = {
   isOpen: false,
   isChain: false,
+  fieldSelection: false,
   min: 0, // 最少选择多少卡
   max: 0, // 最多选择多少卡
   single: false, // 是否只能单选
@@ -30,33 +33,42 @@ const defaultProps: Omit<
   overflow: false, // 选择等级时候，是否可以溢出
 };
 
-const localStore = proxy(defaultProps);
+const localStore = proxy({ ...defaultProps, promptId: 0 });
+const session = new PromptSession<void>();
 
 export const SelectActionsModal: React.FC = () => {
   const container = getUIContainer();
   const snap = useSnapshot(localStore);
+  const renderedPromptId = localStore.promptId;
 
   const onSubmit = (options: Snapshot<Option[]>) => {
-    if (!localStore.isOpen) return;
+    if (!localStore.isOpen || renderedPromptId !== localStore.promptId) return;
     const values = options.map((option) => option.response!);
+    if (!values.length || values.some((value) => value === undefined)) return;
+    localStore.isOpen = false;
+    resetFieldSelection();
     if (localStore.isChain) {
       sendSelectSingleResponse(container.conn, values[0]);
     } else {
       sendSelectMultiResponse(container.conn, values);
     }
-    rs();
+    session.settle();
   };
 
   const onFinish = () => {
-    if (!localStore.isOpen) return;
+    if (!localStore.isOpen || renderedPromptId !== localStore.promptId) return;
+    localStore.isOpen = false;
+    resetFieldSelection();
     sendSelectSingleResponse(container.conn, FINISH_RESPONSE);
-    rs();
+    session.settle();
   };
 
   const onCancel = () => {
-    if (!localStore.isOpen) return;
+    if (!localStore.isOpen || renderedPromptId !== localStore.promptId) return;
+    localStore.isOpen = false;
+    resetFieldSelection();
     sendSelectSingleResponse(container.conn, CANCEL_RESPONSE);
-    rs();
+    session.settle();
   };
 
   return (
@@ -71,30 +83,28 @@ export const SelectActionsModal: React.FC = () => {
   );
 };
 
-let rs: (v?: any) => void = () => {};
-
 export const displaySelectActionsModal = async (
-  args: Partial<Omit<typeof defaultProps, "isOpen">>,
+  args: Partial<Omit<typeof defaultProps, "isOpen">> & {
+    fieldSelection?: boolean;
+  },
 ) => {
-  resetSelectActionsModal(); // 先重置为初始状态
-  Object.entries(args).forEach(([key, value]) => {
-    // @ts-ignore
-    localStore[key] = value;
-  });
+  const pending = session.begin();
+  Object.assign(
+    localStore,
+    defaultProps,
+    { selecteds: [], selectables: [], mustSelects: [], fieldSelection: false },
+    args,
+  );
+  localStore.promptId = pending.id;
   localStore.isOpen = true;
-  await new Promise<void>((resolve) => (rs = resolve)); // 等待在组件内resolve
-  localStore.isOpen = false;
-};
-
-const resetSelectActionsModal = () => {
-  Object.keys(defaultProps).forEach((key) => {
-    // @ts-ignore
-    localStore[key] = defaultProps[key];
-  });
+  await pending.promise;
+  if (session.current(pending.id)) localStore.isOpen = false;
 };
 
 export const cancelSelectActionsModal = () => {
-  resetSelectActionsModal();
-  rs();
-  rs = () => {};
+  localStore.isOpen = false;
+  localStore.selectables = [];
+  localStore.selecteds = [];
+  localStore.mustSelects = [];
+  session.reset();
 };

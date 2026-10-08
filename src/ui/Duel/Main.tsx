@@ -8,6 +8,8 @@ import { AudioActionType, changeScene } from "@/infra/audio";
 import { matStore, replayStore, SideStage, sideStore } from "@/stores";
 import { warmDeckImages } from "@/ui/Shared/YgoCard/imageCache";
 
+import { DuelEffects } from "./animation/Effects";
+import { CardActions } from "./interaction/CardActions";
 import {
   ActionHistory,
   Alert,
@@ -94,6 +96,8 @@ export const Component: React.FC = () => {
       <Menu />
       <LifeBar />
       <Mat />
+      <DuelEffects />
+      <CardActions />
       <CardModal />
       <CardListModal />
       <HintNotification />

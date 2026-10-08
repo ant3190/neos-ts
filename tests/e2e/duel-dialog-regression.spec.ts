@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { installOfflineDuelResources } from "./helpers/offlineDuel";
 
 test("old duel prompts close and effect choices send the correct response", async ({
   page,
 }) => {
+  await installOfflineDuelResources(page);
   await page.goto("/");
   await page.waitForFunction(async () => {
     const { initStore } = await import("/src/stores/index.ts");
@@ -25,7 +27,11 @@ test("old duel prompts close and effect choices send the correct response", asyn
     const { displayOptionModal } = await import(
       "/src/ui/Duel/Message/OptionModal/index.tsx"
     );
-    void displayOptionModal("Previous duel", [{ info: "Old effect", response: 9 }], 1);
+    void displayOptionModal(
+      "Previous duel",
+      [{ info: "Old effect", response: 9 }],
+      1,
+    );
   });
   await expect(page.getByTestId("duel-option-modal")).toBeVisible();
 
@@ -55,10 +61,6 @@ test("old duel prompts close and effect choices send the correct response", asyn
   });
   await page.getByTestId("duel-option-item").dblclick();
   await expect
-    .poll(() =>
-      page.evaluate(() => (window as any).__dialogPackets.at(-1)),
-    )
-    .toEqual(
-      await page.evaluate(() => (window as any).__expectedIdlePacket),
-    );
+    .poll(() => page.evaluate(() => (window as any).__dialogPackets.at(-1)))
+    .toEqual(await page.evaluate(() => (window as any).__expectedIdlePacket));
 });

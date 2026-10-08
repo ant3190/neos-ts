@@ -18,6 +18,10 @@ export default async (
 ) => {
   const context = container.context;
   resetDuelDialogs();
+  context.matStore.chains = [];
+  context.matStore.chainDetails = [];
+  context.matStore.chainActivation = undefined;
+  context.matStore.chainEventId = 0;
   // 先初始化`matStore`
   context.matStore.selfType = start.playerType;
 

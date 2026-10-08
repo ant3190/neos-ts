@@ -43,6 +43,7 @@ import { useTranslation } from "react-i18next";
 
 import { getUIContainer } from "@/container/compat";
 
+import { AnimationQualityControl } from "../../animation/Quality";
 import { displayActionHistory } from "../../Message";
 import { clearAllIdleInteractivities, clearSelectInfo } from "../../utils";
 import { openChatBox } from "../ChatBox";
@@ -378,6 +379,7 @@ export const Menu = () => {
     <div className={styles["menu-container"]}>
       <SelectManager />
       <ReplayControl />
+      <AnimationQualityControl />
       <DropdownWithTitle
         title={i18n("SelectPhase")}
         menu={{ items: phaseSwitchItems }}

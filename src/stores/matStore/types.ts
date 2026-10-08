@@ -66,6 +66,8 @@ export interface ChainDetail {
   controller: number;
   zone: ygopro.CardZone;
   resolved: boolean;
+  resolving?: boolean;
+  negated?: boolean;
 }
 
 export interface InitInfo {

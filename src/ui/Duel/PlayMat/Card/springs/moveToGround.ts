@@ -104,7 +104,7 @@ export const moveToGround: MoveFunc = async (props) => {
       x,
       y,
       scale: height / HAND_CARD_HEIGHT,
-      z: is_overlay ? 120 : 200,
+      z: options?.positionOnly ? 0 : is_overlay ? 120 : 100,
       ry,
       rz,
       config: {

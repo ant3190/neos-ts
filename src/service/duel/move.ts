@@ -3,6 +3,7 @@ import { Container } from "@/container";
 import { AudioActionType, playEffect } from "@/infra/audio";
 import { createLocalId } from "@/infra/localId";
 import { CardType } from "@/stores";
+import { rememberCardOrigin } from "@/ui/Duel/animation/origins";
 import { callCardMove } from "@/ui/Duel/PlayMat/Card";
 import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
@@ -193,7 +194,10 @@ export default async (container: Container, move: MsgMove) => {
   }
 
   // 更新信息
+  if (!fromEmpty)
+    rememberCardOrigin(target.uuid, new ygopro.CardLocation(from.toObject()));
   target.code = code;
+  if (code !== 0) target.meta = meta;
   target.location = to;
   if (fromEmpty) {
     context.cardStore.inner.push(target);

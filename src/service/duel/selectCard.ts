@@ -13,7 +13,7 @@ export default async (container: Container, selectCard: MsgSelectCard) => {
 
   // TODO: handle release_param
 
-  if (!cancelable && cards.length === 1) {
+  if (!cancelable && cards.length === 1 && min === 1) {
     // auto send
     sendSelectMultiResponse(conn, [cards[0].response]);
     return;
@@ -24,6 +24,16 @@ export default async (container: Container, selectCard: MsgSelectCard) => {
     cards,
   );
   await displaySelectActionsModal({
+    fieldSelection:
+      cards.length > 0 &&
+      cards.every(
+        (card) =>
+          [ygopro.CardZone.MZONE, ygopro.CardZone.SZONE].includes(
+            card.location.zone,
+          ) &&
+          !card.location.is_overlay &&
+          !!context.cardStore.find(card.location),
+      ),
     cancelable,
     min,
     max,

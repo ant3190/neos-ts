@@ -1,13 +1,22 @@
 import type { SpringConfig, SpringRef } from "@react-spring/web";
 
+import { animationQuality } from "../../../animation/runtime";
+
 // A stalled browser should not make each subsequent card wait again.
 let animationStalled = false;
+export const resetAnimationStall = () => {
+  animationStalled = false;
+};
 
 export const asyncStart = <T extends {}>(api: SpringRef<T>) => {
   return (p: Partial<T> & { config?: SpringConfig }) => {
     const target = { ...p };
     delete target.config;
-    if (animationStalled || p.config?.duration === 0) {
+    if (
+      animationStalled ||
+      animationQuality() === "off" ||
+      p.config?.duration === 0
+    ) {
       api.set(target as T);
       return Promise.resolve();
     }
@@ -34,7 +43,17 @@ export const asyncStart = <T extends {}>(api: SpringRef<T>) => {
         resolve();
       }, 900);
       try {
-        api.start({ ...p, onResolve: finish });
+        api.start({
+          ...p,
+          config:
+            animationQuality() === "lite"
+              ? {
+                  ...p.config,
+                  duration: Math.min(p.config?.duration ?? 150, 150),
+                }
+              : p.config,
+          onResolve: finish,
+        });
       } catch (error) {
         clearTimeout(timeout);
         throw error;

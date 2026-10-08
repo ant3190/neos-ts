@@ -1,6 +1,7 @@
 import { ygopro } from "@/api";
 import { Container } from "@/container";
 import { replayStore } from "@/stores";
+import { presentGameMessage } from "@/ui/Duel/animation/present";
 import { showWaiting } from "@/ui/Duel/Message";
 
 import onAnnounce from "./announce";
@@ -82,6 +83,12 @@ export default async function handleGameMsg(
   pb: ygopro.YgoStocMsg,
 ): Promise<void> {
   const msg = pb.stoc_game_msg;
+  try {
+    if (presentGameMessage(container, msg)) return;
+  } catch (error) {
+    // Optional presentation must never interrupt the duel rules/message stream.
+    console.warn("Duel presentation failed", error);
+  }
 
   if (ActiveList.includes(msg.gameMsg)) {
     showWaiting(false);

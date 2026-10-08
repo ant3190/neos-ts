@@ -73,53 +73,39 @@
     }
   }
 
-  // 卡片被选中后的流光特效
-  // ref: https://github.com/Mr-majifu/Animated-Profile-Card02/blob/master/style.css
-  .streamer {
+  .targeted {
     position: absolute;
-    inset: 0;
-    background: #000;
-    overflow: hidden;
+    inset: -5px;
+    pointer-events: none;
+    border: 2px solid #8fe7ff;
+    border-radius: 5px;
+    box-shadow: 0 0 8px #7adbff80;
+    animation: targetPulse 1.3s ease-in-out infinite;
+    transform: translateZ(2px);
   }
-  .streamer::before {
-    content: "";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 400%;
-    height: 80%;
-    background: linear-gradient(
-      transparent,
-      #45f3ff,
-      #45f3ff,
-      #45f3ff,
-      transparent
-    );
-    animation: stream 2s linear infinite;
+  &:focus-visible {
+    outline: 2px solid #e6f5ff;
+    outline-offset: 5px;
   }
-  .streamer::after {
-    content: "";
-    position: absolute;
-    /* https://developer.mozilla.org/en-US/docs/Web/CSS/inset */
-    inset: 3px;
-    background: #292929;
+  &[data-card-zone="HAND"][data-card-controller] .img-wrap {
+    transition: transform 100ms ease-out;
   }
-  @keyframes stream {
-    0% {
-      transform: translate(-50%, -50%) rotate(0deg);
-    }
-    100% {
-      transform: translate(-50%, -50%) rotate(360deg);
-    }
+  &[data-card-zone="HAND"][data-card-is-me="true"]:hover {
+    z-index: 50 !important;
   }
-
+  &[data-card-zone="HAND"][data-card-is-me="true"]:hover .img-wrap {
+    transform: translateY(-22px)
+      translateZ(calc((var(--z) + var(--sub-z)) * 1px + 0.1px))
+      rotateY(calc(var(--ry) * 1deg));
+  }
   .focus {
     position: absolute;
-    width: calc(100% * var(--focus-scale));
-    height: calc(100% * var(--focus-scale));
-    left: calc((var(--focus-scale) - 1) * -50%);
-    top: calc((var(--focus-scale) - 1) * -50%);
-    outline: 3px solid #ddd;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: scale(var(--focus-scale));
+    pointer-events: none;
+    outline: 2px solid #ffdfa0;
     display: var(--focus-display);
     opacity: var(--focus-opacity);
   }
@@ -127,30 +113,37 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mat-card .img-wrap.focusing .cover,
-  .mat-card .streamer::before {
+  .mat-card .targeted {
     animation: none;
   }
 }
 
 @keyframes focus {
-  0% {
-    filter: brightness(1) contrast(1);
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes targetPulse {
+  0%,
+  100% {
+    opacity: 0.7;
   }
   50% {
-    filter: brightness(1.5) contrast(1.1);
-  }
-  100% {
-    filter: brightness(1) contrast(1);
+    opacity: 1;
   }
 }
 
-.dropdown {
-  :global(.ant-dropdown-menu) {
-    background-color: #333;
-  }
-  text-align: center;
+.mat-card.actionsActive .action-frame {
+  animation: none;
+  opacity: 1;
+  border-width: 3px;
 }
-
-.dropdown-disabled {
-  display: none;
+.mat-card.actionsActive[data-card-zone="HAND"][data-card-is-me="true"]
+  .img-wrap {
+  transform: translateY(-28px)
+    translateZ(calc((var(--z) + var(--sub-z)) * 1px + 0.1px))
+    rotateZ(calc(var(--hand-angle) * -1deg)) rotateY(calc(var(--ry) * 1deg));
 }
