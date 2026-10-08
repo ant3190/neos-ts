@@ -103,7 +103,9 @@ export const Component: React.FC = () => {
           !requestedSingleBot.current
         ) {
           requestedSingleBot.current = true;
-          sendChat(container.conn, "/ai 蓝子");
+          // SRVPro matches supplied AI names exactly. Let the server choose a
+          // currently available public bot instead of hard-coding a nickname.
+          sendChat(container.conn, "/ai");
         }
       } else {
         message.error("请先选择卡组");

@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+import { installOfflineDuelResources } from "./helpers/offlineDuel";
+
+test.beforeEach(async ({ page }) => {
+  await installOfflineDuelResources(page);
+});
+
 test("loads and changes decks, then shows the correct hands during guessing", async ({
   page,
 }) => {
@@ -165,12 +171,21 @@ test("single player can choose a deck before the bot starts the duel", async ({
     .click();
   await expect(select).toContainText("Chosen");
 
+  expect(
+    await page.evaluate(() =>
+      (window as any).__waitroomPackets.some(
+        (packet: number[]) => packet[2] === 22,
+      ),
+    ),
+  ).toBe(false);
+
   await page.getByTestId("waitroom-ready-toggle").click();
   await expect
     .poll(() =>
       page.evaluate(() => {
         const packets: number[][] = (window as any).__waitroomPackets;
         const deckPacket = packets.findLast((packet) => packet[2] === 2);
+        const chatPacket = packets.findLast((packet) => packet[2] === 22);
         return [
           deckPacket
             ? new DataView(new Uint8Array(deckPacket).buffer).getUint32(
@@ -179,12 +194,16 @@ test("single player can choose a deck before the bot starts the duel", async ({
               )
             : 0,
           packets.some((packet) => packet[2] === 34),
-          packets.some((packet) => packet[2] === 22),
+          chatPacket
+            ? new TextDecoder("utf-16le")
+                .decode(new Uint8Array(chatPacket.slice(3)))
+                .replace(/\0.*$/, "")
+            : "",
           packets.some((packet) => packet[2] === 37),
         ];
       }),
     )
-    .toEqual([67890, true, true, false]);
+    .toEqual([67890, true, "/ai", false]);
 
   await page.evaluate(async () => {
     const { roomStore } = await import("/src/stores/index.ts");
