@@ -1,9 +1,27 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { ygopro } from "../src/api/ocgcore/idl/ocgcore";
 import HandResultPacket from "../src/api/ocgcore/ocgAdapter/ctos/ctosHandResult";
 import UpdateDeckPacket from "../src/api/ocgcore/ocgAdapter/ctos/ctosUpdateDeck";
-import { ygopro } from "../src/api/ocgcore/idl/ocgcore";
+import { createSinglePlayerRoomPassword } from "../src/ui/Match/singlePlayer";
+
+test("single-player room passwords fit JOIN_GAME and request no banlist with shuffle enabled", () => {
+  const passwords = new Set<string>();
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const password = createSinglePlayerRoomPassword();
+    assert.ok(password.length < 20);
+    const [rules, roomId] = password.split("#");
+    // Match SRVPro's independent no-banlist and no-deck-check rule parsing.
+    assert.match(rules, /(^|,)(NOLFLIST|NF)(,|$)/);
+    assert.match(rules, /(^|,)(NOCHECK|NC)(,|$)/);
+    assert.match(rules, /(^|,)(TIME|TM|TI)0(,|$)/);
+    assert.doesNotMatch(rules, /(^|,)(NOSHUFFLE|NS|AI)(,|$)/);
+    assert.equal(roomId.length, 9);
+    passwords.add(password);
+  }
+  assert.equal(passwords.size, 100);
+});
 
 test("the hand choices produce the YGOPro server's scissors, rock, paper bytes", () => {
   for (const [hand, expected] of [

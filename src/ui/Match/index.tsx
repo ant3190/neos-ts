@@ -32,6 +32,7 @@ import {
 import styles from "./index.module.scss";
 import { MatchModal, matchStore } from "./MatchModal";
 import { ReplayModal, replayOpen } from "./ReplayModal";
+import { createSinglePlayerRoomPassword } from "./singlePlayer";
 import { connectSrvpro } from "./util";
 import { WatchContent, watchStore } from "./WatchContent";
 
@@ -247,19 +248,13 @@ export const Component: React.FC = () => {
   const onAIMatch = async () => {
     setSingleLoading(true);
     try {
-      // A private room stays in the waiting stage until a deck is chosen and
-      // the player is ready; the old AI room began guessing immediately.
+      // Create an ordinary room. Add the AI only after the player clicks Start.
       await connectSrvpro({
         ip: server,
         player: user?.username ?? "Guest",
         singlePlayer: true,
         preferredDeckName: selectedDeck?.deckName,
-        // JOIN_GAME permits 20 UTF-16 characters, including the terminator.
-        // Keep the random room ID on the wire and let the server shuffle.
-        passWd: `NC,TIME0#${Math.random()
-          .toString(36)
-          .slice(2, 12)
-          .padEnd(10, "0")}`,
+        passWd: createSinglePlayerRoomPassword(),
       });
     } catch (error) {
       setSingleLoading(false);

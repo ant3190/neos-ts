@@ -1,4 +1,4 @@
-import { expect, test, type WebSocketRoute } from "@playwright/test";
+import { expect, type Page, test, type WebSocketRoute } from "@playwright/test";
 
 import { installOfflineDuelResources } from "./helpers/offlineDuel";
 
@@ -133,15 +133,12 @@ test("loads and changes decks, then shows the correct hands during guessing", as
     .toBe(true);
 });
 
-test("single player can choose a deck before the bot starts the duel", async ({
-  page,
-}) => {
+async function seedSingleRoom(page: Page) {
   await page.goto("/");
   await page.waitForFunction(async () => {
     const { initStore } = await import("/src/stores/index.ts");
     return initStore.decks;
   });
-
   await page.evaluate(async () => {
     const { initUIContainer } = await import("/src/container/compat.ts");
     const { deckStore, roomStore } = await import("/src/stores/index.ts");
@@ -151,8 +148,8 @@ test("single player can choose a deck before the bot starts the duel", async ({
       ws: { send: (packet: Uint8Array) => packets.push([...packet]) },
     } as any);
     deckStore.decks = [
-      { deckName: "First", main: [12345], extra: [], side: [] },
-      { deckName: "Chosen", main: [67890], extra: [], side: [] },
+      { deckName: "First", main: [46986414], extra: [], side: [] },
+      { deckName: "Chosen", main: [100000001], extra: [], side: [] },
     ];
     roomStore.singlePlayer = true;
     roomStore.joined = true;
@@ -161,85 +158,218 @@ test("single player can choose a deck before the bot starts the duel", async ({
     history.pushState({}, "", "/waitroom");
     dispatchEvent(new PopStateEvent("popstate"));
   });
+  await expect(page.getByTestId("waitroom-start")).toBeVisible();
+}
 
-  const select = page.getByTestId("waitroom-deck-select");
-  await expect(select).not.toHaveClass(/ant-select-disabled/);
-  await select.click();
+async function chooseDeck(page: Page, name: string) {
+  await page.getByTestId("waitroom-deck-select").click();
   await page
     .locator(".ant-select-dropdown:visible .ant-select-item-option", {
-      hasText: "Chosen",
+      hasText: name,
     })
     .click();
-  await expect(select).toContainText("Chosen");
+  await expect(page.getByTestId("waitroom-deck-select")).toContainText(name);
+}
 
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          (window as any).__waitroomPackets.filter(
-            (packet: number[]) => packet[2] === 22,
-          ).length,
-      ),
-    )
-    .toBe(1);
-  expect(
-    await page.evaluate(() =>
-      (window as any).__waitroomPackets.some(
-        (packet: number[]) => packet[2] === 34 || packet[2] === 37,
-      ),
-    ),
-  ).toBe(false);
+async function packetTypes(page: Page) {
+  return page.evaluate(() =>
+    (window as any).__waitroomPackets.map((packet: number[]) => packet[2]),
+  );
+}
 
-  await page.getByTestId("waitroom-ready-toggle").click();
-  await expect
-    .poll(() =>
-      page.evaluate(() => {
-        const packets: number[][] = (window as any).__waitroomPackets;
-        const deckPacket = packets.findLast((packet) => packet[2] === 2);
-        const chatPacket = packets.findLast((packet) => packet[2] === 22);
-        return [
-          deckPacket
-            ? new DataView(new Uint8Array(deckPacket).buffer).getUint32(
-                11,
-                true,
-              )
-            : 0,
-          packets.some((packet) => packet[2] === 34),
-          chatPacket
-            ? new TextDecoder("utf-16le")
-                .decode(new Uint8Array(chatPacket.slice(3)))
-                .replace(/\0.*$/, "")
-            : "",
-          packets.some((packet) => packet[2] === 37),
-        ];
-      }),
-    )
-    .toEqual([67890, true, "/ai", false]);
+test("single player uploads the chosen deck and adds AI only after explicit Start and ready confirmation", async ({
+  page,
+}) => {
+  await seedSingleRoom(page);
+  await expect(page.getByTestId("waitroom-deck-select")).not.toHaveClass(
+    /ant-select-disabled/,
+  );
+  await chooseDeck(page, "Chosen");
+  // Entering the lobby or selecting a deck must not upload it, summon AI, or ready/start.
+  expect(await packetTypes(page)).toEqual([]);
+  await expect(page.getByTestId("waitroom-start")).toHaveAttribute(
+    "aria-disabled",
+    "false",
+  );
+  await expect(page.getByTestId("waitroom-ready-toggle")).toHaveCount(0);
+
+  await page.getByTestId("waitroom-start").click();
+  await expect.poll(() => packetTypes(page)).toEqual([2, 34]);
+  const submitted = await page.evaluate(() => {
+    const packet: number[] = (window as any).__waitroomPackets[0];
+    return new DataView(new Uint8Array(packet).buffer).getUint32(11, true);
+  });
+  expect(submitted).toBe(100000001);
+  await expect(page.getByTestId("waitroom-start")).toHaveAttribute(
+    "aria-busy",
+    "true",
+  );
 
   await page.evaluate(async () => {
     const { roomStore } = await import("/src/stores/index.ts");
-    roomStore.players[0]!.state = 2;
+    roomStore.getMePlayer()!.state = 2;
+  });
+  await expect.poll(() => packetTypes(page)).toEqual([2, 34, 22]);
+  expect(
+    await page.evaluate(() => {
+      const packets: number[][] = (window as any).__waitroomPackets;
+      return new TextDecoder("utf-16le")
+        .decode(new Uint8Array(packets[2].slice(3)))
+        .replace(/\0.*$/, "");
+    }),
+  ).toBe("/ai");
+  await page.evaluate(async () => {
+    const { roomStore } = await import("/src/stores/index.ts");
     roomStore.players[1] = { name: "Bot", isMe: false, state: 2 };
   });
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          (window as any).__waitroomPackets.filter(
-            (packet: number[]) => packet[2] === 37,
-          ).length,
-      ),
-    )
-    .toBe(1);
+  await expect.poll(() => packetTypes(page)).toEqual([2, 34, 22, 37]);
+  // A repeated ready notification cannot submit a second start.
+  await page.evaluate(async () => {
+    const { roomStore } = await import("/src/stores/index.ts");
+    roomStore.players[1]!.name = "Bot ready";
+  });
+  expect(await packetTypes(page)).toEqual([2, 34, 22, 37]);
 });
 
-test("single mode preserves shuffle and room identity on the wire, then adds AI after host confirmation", async ({
+test("changing decks cancels a pending AI start and late bot readiness cannot lock the selection", async ({
+  page,
+}) => {
+  await seedSingleRoom(page);
+  await page.getByTestId("waitroom-start").click();
+  await page.evaluate(async () => {
+    const { roomStore } = await import("/src/stores/index.ts");
+    roomStore.getMePlayer()!.state = 2;
+  });
+  await expect.poll(() => packetTypes(page)).toEqual([2, 34, 22]);
+  await chooseDeck(page, "Chosen");
+  await expect.poll(() => packetTypes(page)).toEqual([2, 34, 22, 35]);
+  await expect(page.getByTestId("waitroom-start")).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
+  await page.evaluate(async () => {
+    const { roomStore } = await import("/src/stores/index.ts");
+    roomStore.players[1] = { name: "Late Bot", isMe: false, state: 2 };
+    roomStore.getMePlayer()!.state = 2;
+  });
+  await expect(page.getByTestId("waitroom-player-op")).toHaveAttribute(
+    "data-player-name",
+    "Late Bot",
+  );
+  expect(await packetTypes(page)).toEqual([2, 34, 22, 35]);
+  await expect(page.getByTestId("waitroom-deck-select")).not.toHaveClass(
+    /ant-select-disabled/,
+  );
+
+  await page.getByTestId("waitroom-start").click();
+  await expect
+    .poll(() => packetTypes(page))
+    .toEqual([2, 34, 22, 35, 35, 2, 34]);
+  await page.evaluate(async () => {
+    const { roomStore } = await import("/src/stores/index.ts");
+    roomStore.getMePlayer()!.state = 2;
+  });
+  await expect
+    .poll(() => packetTypes(page))
+    .toEqual([2, 34, 22, 35, 35, 2, 34, 37]);
+  expect(
+    await page.evaluate(() => {
+      const packets: number[][] = (window as any).__waitroomPackets;
+      const packet = packets.findLast((p) => p[2] === 2)!;
+      return new DataView(new Uint8Array(packet).buffer).getUint32(11, true);
+    }),
+  ).toBe(100000001);
+});
+
+test("start errors unlock the lobby and allow selecting another deck", async ({
+  page,
+}) => {
+  await seedSingleRoom(page);
+  await page.getByTestId("waitroom-start").click();
+  await page.evaluate(async () => {
+    const { roomStore } = await import("/src/stores/index.ts");
+    roomStore.errorMsg = "服务器无法识别此卡";
+  });
+  await expect(page.getByTestId("waitroom-start")).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
+  await expect.poll(() => packetTypes(page)).toEqual([2, 34, 35]);
+  await chooseDeck(page, "Chosen");
+  await page.getByTestId("waitroom-start").click();
+  await expect.poll(() => packetTypes(page)).toEqual([2, 34, 35, 2, 34]);
+});
+
+test("an unavailable AI times out without locking the deck or preventing a retry", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await seedSingleRoom(page);
+  await page.getByTestId("waitroom-start").click();
+  await page.evaluate(async () => {
+    const { roomStore } = await import("/src/stores/index.ts");
+    roomStore.getMePlayer()!.state = 2;
+  });
+  await expect.poll(() => packetTypes(page)).toEqual([2, 34, 22]);
+  await page.clock.fastForward(30001);
+  await expect(page.getByTestId("waitroom-start")).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
+  await expect.poll(() => packetTypes(page)).toEqual([2, 34, 22, 35]);
+  await chooseDeck(page, "Chosen");
+  await page.getByTestId("waitroom-start").click();
+  await page.evaluate(async () => {
+    const { roomStore } = await import("/src/stores/index.ts");
+    roomStore.getMePlayer()!.state = 2;
+  });
+  await expect
+    .poll(() => packetTypes(page))
+    .toEqual([2, 34, 22, 35, 2, 34, 22]);
+  await page.getByTestId("waitroom-ready-toggle").click();
+  await expect(page.getByTestId("waitroom-start")).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
+});
+
+test("single-player Start stays disabled until a deck and host identity are available", async ({
+  page,
+}) => {
+  await seedSingleRoom(page);
+  for (const missing of ["deck", "host", "joined", "player"]) {
+    await page.evaluate(async (missing) => {
+      const { deckStore, roomStore } = await import("/src/stores/index.ts");
+      deckStore.decks =
+        missing === "deck"
+          ? []
+          : [{ deckName: "Test", main: [46986414], extra: [], side: [] }];
+      roomStore.isHost = missing !== "host";
+      roomStore.joined = missing !== "joined";
+      roomStore.players =
+        missing === "player" ? [] : [{ name: "Me", isMe: true, state: 3 }];
+    }, missing);
+    const start = page.getByTestId("waitroom-start");
+    await expect(start).toHaveAttribute("aria-disabled", "true");
+    // Dispatch directly to check the handler, since the shared button is a span.
+    await start.dispatchEvent("click");
+    await start.dispatchEvent("keydown", { key: "Enter" });
+    expect(await packetTypes(page)).toEqual([]);
+  }
+});
+
+test("single mode creates a shuffled no-banlist room, waits for Start, and reaches guessing with the selected deck", async ({
   page,
 }) => {
   await page.route(/test-release-v2\.json/, (route) =>
     route.fulfill({ contentType: "application/json", body: "[]" }),
   );
-  const sessions: { socket: WebSocketRoute; packets: Buffer[] }[] = [];
+  const sessions: {
+    socket: WebSocketRoute;
+    packets: Buffer[];
+    rules: string;
+    deckCode: number;
+  }[] = [];
   const frame = (type: number, data = Buffer.alloc(0)) => {
     const packet = Buffer.alloc(3 + data.length);
     packet.writeUInt16LE(1 + data.length);
@@ -256,12 +386,25 @@ test("single mode preserves shuffle and room identity on the wire, then adds AI 
   await page.routeWebSocket(
     /wss:\/\/koishi\.momobako\.com:7211\/?$/,
     (socket) => {
-      const session = { socket, packets: [] as Buffer[] };
+      const session = {
+        socket,
+        packets: [] as Buffer[],
+        rules: "",
+        deckCode: 0,
+      };
       sessions.push(session);
       socket.onMessage((message) => {
         if (typeof message === "string") return;
         session.packets.push(message);
-        if (message[2] === 18) socket.send(frame(18));
+        if (message[2] === 18) {
+          session.rules = message
+            .subarray(11, 51)
+            .toString("utf16le")
+            .replace(/\0.*$/, "")
+            .split("#")[0];
+          socket.send(frame(18));
+        }
+        if (message[2] === 2) session.deckCode = message.readUInt32LE(11);
         if (message[2] === 22) {
           expect(
             message.subarray(3).toString("utf16le").replace(/\0.*$/, ""),
@@ -269,7 +412,25 @@ test("single mode preserves shuffle and room identity on the wire, then adds AI 
           socket.send(enter("Bot", 1));
           socket.send(frame(33, Buffer.from([0x19])));
         }
-        if (message[2] === 34) socket.send(frame(33, Buffer.from([0x09])));
+        if (message[2] === 34) {
+          // Apply SRVPro's two independent rules: this fixture deck is banned and
+          // exceeds the default three-copy limit. Both rules must reach the server.
+          if (
+            /(^|,)(NOLFLIST|NF)(,|$)/.test(session.rules) &&
+            /(^|,)(NOCHECK|NC)(,|$)/.test(session.rules)
+          ) {
+            socket.send(frame(33, Buffer.from([0x09])));
+          } else {
+            const error = Buffer.alloc(8);
+            error[0] = 2;
+            error.writeUInt32LE(0x10000000 | session.deckCode, 4);
+            socket.send(frame(2, error));
+          }
+        }
+        if (message[2] === 37) {
+          socket.send(frame(21));
+          socket.send(frame(3));
+        }
       });
     },
   );
@@ -282,8 +443,21 @@ test("single mode preserves shuffle and room identity on the wire, then adds AI 
     });
     await page.evaluate(async () => {
       const { deckStore } = await import("/src/stores/index.ts");
+      const { forbidden } = await import("/src/api/forbiddens.ts");
+      forbidden.set(100000001, 0);
       deckStore.decks = [
-        { deckName: "Test", main: [46986414], extra: [], side: [] },
+        {
+          deckName: "First",
+          main: Array(40).fill(46986414),
+          extra: [],
+          side: [],
+        },
+        {
+          deckName: "Chosen",
+          main: Array(40).fill(100000001),
+          extra: [],
+          side: [],
+        },
       ];
     });
     await page.getByText(/^(单人模式|Single Player Mode)$/).click();
@@ -297,32 +471,38 @@ test("single mode preserves shuffle and room identity on the wire, then adds AI 
       passwordBytes.subarray(password.length * 2, password.length * 2 + 2),
     ).toEqual(Buffer.from([0, 0]));
     const [rules, roomId] = password.split("#");
-    expect(rules.split(",")).not.toContain("NS");
-    expect(rules.split(",")).not.toContain("NOSHUFFLE");
-    expect(roomId.length).toBeGreaterThanOrEqual(8);
+    expect(rules.split(",")).toEqual(["NF", "NC", "TI0"]);
+    expect(roomId.length).toBe(9);
     passwords.push(password);
-    await expect(page.getByTestId("waitroom-deck-select")).toBeVisible();
-    expect(session.packets.some((packet) => packet[2] === 22)).toBe(false);
+    await expect(page.getByTestId("waitroom-start")).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await page.getByTestId("waitroom-start").dispatchEvent("click");
+    expect(session.packets.map((packet) => packet[2])).toEqual([16, 18]);
 
     session.socket.send(enter("Me", 0));
     session.socket.send(frame(19, Buffer.from([0x10])));
-    await expect(page.getByTestId("waitroom-player-op")).toHaveAttribute(
+    await expect(page.getByTestId("waitroom-player-me")).toHaveAttribute(
       "data-player-name",
-      "Bot",
+      "Me",
     );
-    await expect(page.getByTestId("waitroom-deck-select")).not.toHaveClass(
+    await chooseDeck(page, "Chosen");
+    expect(session.packets.map((packet) => packet[2])).toEqual([16, 18]);
+    await expect(page.getByTestId("waitroom-start")).toHaveAttribute(
+      "aria-disabled",
+      "false",
+    );
+    // Exercise keyboard activation as well as the real WebSocket event loop.
+    await page.getByTestId("waitroom-start").focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("waitroom-mora-scissors")).toBeVisible();
+    expect(session.packets.map((packet) => packet[2])).toEqual([
+      16, 18, 2, 34, 22, 37,
+    ]);
+    expect(session.deckCode).toBe(100000001);
+    await expect(page.getByTestId("waitroom-deck-select")).toHaveClass(
       /ant-select-disabled/,
-    );
-    expect(session.packets.filter((packet) => packet[2] === 22)).toHaveLength(
-      1,
-    );
-    expect(session.packets.some((packet) => packet[2] === 37)).toBe(false);
-    await page.getByTestId("waitroom-ready-toggle").click();
-    await expect
-      .poll(() => session.packets.filter((packet) => packet[2] === 37).length)
-      .toBe(1);
-    expect(session.packets.filter((packet) => packet[2] === 22)).toHaveLength(
-      1,
     );
     session.socket.close();
   }

@@ -70,6 +70,8 @@ export const Component: React.FC = () => {
   const hasMe = me !== undefined;
   const hasOpponent = op !== undefined;
   const navigate = useNavigate();
+  const [singleStarting, setSingleStarting] = useState(false);
+  const singleStartRequested = useRef(false);
   const startedSingleDuel = useRef(false);
   const requestedSingleBot = useRef(false);
 
@@ -83,15 +85,54 @@ export const Component: React.FC = () => {
     sideStore.setSideDeck(deck);
   };
 
+  const cancelSingleStart = () => {
+    singleStartRequested.current = false;
+    startedSingleDuel.current = false;
+    setSingleStarting(false);
+    sendHsNotReady(container.conn);
+    const player = roomStore.getMePlayer();
+    if (player) player.state = PlayerState.NO_READY;
+  };
+
   const onDeckSelected = (deckName: string) => {
     const newDeck = deckStore.get(deckName);
     if (newDeck) {
-      if (me?.state === PlayerState.READY) sendHsNotReady(container.conn);
+      if (roomStore.singlePlayer && singleStartRequested.current) {
+        cancelSingleStart();
+      } else if (me?.state === PlayerState.READY) {
+        sendHsNotReady(container.conn);
+      }
       setSelectedDeckName(deckName);
       roomStore.preferredDeckName = deckName;
     } else {
       message.error(`Deck ${deckName} not found`);
     }
+  };
+
+  const onSingleStart = () => {
+    if (
+      singleStartRequested.current ||
+      roomStore.stage !== RoomStage.WAITING ||
+      !roomStore.joined ||
+      !roomStore.isHost ||
+      !roomStore.getMePlayer()
+    )
+      return;
+    if (!deck) {
+      message.error("请先选择卡组");
+      return;
+    }
+    singleStartRequested.current = true;
+    setSingleStarting(true);
+    const player = roomStore.getMePlayer()!;
+    if (player.state === PlayerState.READY) {
+      sendHsNotReady(container.conn);
+      player.state = PlayerState.NO_READY;
+    }
+    // Do not upload the single-player deck on mount: an AI/server may start
+    // immediately after receiving it. Upload the current selection on Start.
+    updateDeck(deck);
+    sendHsReady(container.conn);
   };
 
   const onReady = () => {
@@ -111,15 +152,18 @@ export const Component: React.FC = () => {
     // 卡组异步加载后，及切换卡组时发送更新包。
     //
     // 否则娱乐匹配准备会有问题（原因不明）
-    if (deck) updateDeck(deck);
-  }, [deck?.deckName, container.conn]);
+    if (deck && !room.singlePlayer) updateDeck(deck);
+  }, [deck?.deckName, container.conn, room.singlePlayer]);
   useEffect(() => {
     if (
+      !singleStarting ||
+      !singleStartRequested.current ||
       !room.singlePlayer ||
       !room.joined ||
       !room.isHost ||
       !hasMe ||
-      room.stage !== RoomStage.WAITING
+      room.stage !== RoomStage.WAITING ||
+      me?.state !== PlayerState.READY
     )
       return;
     if (hasOpponent) {
@@ -131,28 +175,40 @@ export const Component: React.FC = () => {
       // An unnamed request selects an available public AI on the server.
       sendChat(container.conn, "/ai");
     }
+    if (
+      hasOpponent &&
+      op?.state === PlayerState.READY &&
+      !startedSingleDuel.current
+    ) {
+      startedSingleDuel.current = true;
+      sendHsStart(container.conn);
+    }
   }, [
+    singleStarting,
     room.singlePlayer,
     room.joined,
     room.isHost,
     room.stage,
     hasMe,
     hasOpponent,
+    me?.state,
+    op?.state,
     container.conn,
   ]);
   useEffect(() => {
-    if (!room.singlePlayer || room.stage !== RoomStage.WAITING) return;
-    const bothReady =
-      room.isHost &&
-      me?.state === PlayerState.READY &&
-      op?.state === PlayerState.READY;
-    if (!bothReady) {
-      startedSingleDuel.current = false;
-    } else if (!startedSingleDuel.current) {
-      startedSingleDuel.current = true;
-      sendHsStart(container.conn);
+    if (!singleStarting) return;
+    if (room.stage !== RoomStage.WAITING) {
+      singleStartRequested.current = false;
+      setSingleStarting(false);
+      return;
     }
-  }, [room.singlePlayer, room.stage, room.isHost, me?.state, op?.state]);
+    const timer = window.setTimeout(() => {
+      requestedSingleBot.current = false;
+      cancelSingleStart();
+      message.error("AI 对战开始超时，请重试");
+    }, 30000);
+    return () => window.clearTimeout(timer);
+  }, [singleStarting, room.stage]);
   useEffect(() => {
     if (room.stage === RoomStage.DUEL_START) {
       // 决斗开始，跳转决斗页面
@@ -163,6 +219,7 @@ export const Component: React.FC = () => {
   useEffect(() => {
     // 出现错误
     if (errorMsg !== undefined && errorMsg !== "") {
+      if (singleStartRequested.current) cancelSingleStart();
       message.error(errorMsg);
       roomStore.errorMsg = undefined;
     }
@@ -195,19 +252,21 @@ export const Component: React.FC = () => {
               avatar={user?.avatar_url}
               ready={me?.state === PlayerState.READY}
               btn={
-                room.stage === RoomStage.WAITING ? (
+                room.stage === RoomStage.WAITING &&
+                (!room.singlePlayer || singleStarting) ? (
                   <Button
                     data-testid="waitroom-ready-toggle"
                     data-player-ready={me?.state === PlayerState.READY}
                     size="large"
                     className={styles["btn-join"]}
-                    onClick={onReady}
+                    disabled={!hasMe}
+                    onClick={room.singlePlayer ? cancelSingleStart : onReady}
                   >
-                    {me?.state === PlayerState.NO_READY
+                    {!room.singlePlayer && me?.state === PlayerState.NO_READY
                       ? i18n("DuelReady")
                       : i18n("CancelReady")}
                   </Button>
-                ) : (
+                ) : room.stage === RoomStage.WAITING ? null : (
                   <MoraAvatar
                     mora={
                       me?.moraResult !== undefined
@@ -241,6 +300,9 @@ export const Component: React.FC = () => {
               ))}
           </div>
           <ActionButton
+            singleStarting={singleStarting}
+            canStartSingle={room.joined && room.isHost && hasMe && !!deck}
+            onSingleStart={onSingleStart}
             onMoraSelect={(mora) => {
               sendHandResult(container.conn, mora);
               roomStore.stage = RoomStage.HAND_SELECTED;
@@ -361,26 +423,28 @@ const Controller: React.FC<{
         }))}
         onChange={(value) => onDeckChange(value as string)}
       />
-      <Button
-        size="large"
-        icon={<IconFont type="icon-record" size={18} />}
-        onClick={() => {
-          if (snapRoom.selfType !== SelfType.OBSERVER) {
-            sendHsToObserver(container.conn);
-          } else {
-            sendHsToDuelList(container.conn);
-          }
-        }}
-      >
-        {snapRoom.selfType === SelfType.OBSERVER
-          ? i18n("JoinDuelist")
-          : i18n("JoinSpectator")}
-        {!!snapRoom.observerCount && (
-          <Avatar size="small" style={{ marginLeft: 8 }}>
-            {snapRoom.observerCount}
-          </Avatar>
-        )}
-      </Button>
+      {!snapRoom.singlePlayer && (
+        <Button
+          size="large"
+          icon={<IconFont type="icon-record" size={18} />}
+          onClick={() => {
+            if (snapRoom.selfType !== SelfType.OBSERVER) {
+              sendHsToObserver(container.conn);
+            } else {
+              sendHsToDuelList(container.conn);
+            }
+          }}
+        >
+          {snapRoom.selfType === SelfType.OBSERVER
+            ? i18n("JoinDuelist")
+            : i18n("JoinSpectator")}
+          {!!snapRoom.observerCount && (
+            <Avatar size="small" style={{ marginLeft: 8 }}>
+              {snapRoom.observerCount}
+            </Avatar>
+          )}
+        </Button>
+      )}
     </Space>
   );
 };
@@ -431,19 +495,34 @@ const SideButtons: React.FC<{
 };
 
 const ActionButton: React.FC<{
+  singleStarting: boolean;
+  canStartSingle: boolean;
+  onSingleStart: () => void;
   onMoraSelect: (mora: Mora) => void;
   onTpSelect: (tp: Tp) => void;
-}> = ({ onMoraSelect, onTpSelect }) => {
+}> = ({
+  singleStarting,
+  canStartSingle,
+  onSingleStart,
+  onMoraSelect,
+  onTpSelect,
+}) => {
   const container = getUIContainer();
   const room = useSnapshot(roomStore);
   const { stage, isHost } = room;
   const { t: i18n } = useTranslation("WaitRoom");
   const startDisabled =
     stage !== RoomStage.WAITING ||
-    (stage === RoomStage.WAITING &&
-      (!isHost ||
+    (room.singlePlayer
+      ? !canStartSingle || singleStarting
+      : !isHost ||
         room.getMePlayer()?.state !== PlayerState.READY ||
-        room.getOpPlayer()?.state !== PlayerState.READY));
+        room.getOpPlayer()?.state !== PlayerState.READY);
+  const onStart = () => {
+    if (startDisabled) return;
+    if (roomStore.singlePlayer) onSingleStart();
+    else sendHsStart(container.conn);
+  };
   return (
     <MoraPopover onSelect={onMoraSelect}>
       <TpPopover onSelect={onTpSelect}>
@@ -452,16 +531,31 @@ const ActionButton: React.FC<{
           data-room-stage={stage}
           data-room-is-host={isHost}
           aria-disabled={startDisabled}
+          aria-busy={singleStarting}
+          role="button"
+          tabIndex={startDisabled ? -1 : 0}
           className={styles["btns-action"]}
           disabled={startDisabled}
-          onClick={() => {
-            sendHsStart(container.conn);
+          onClick={onStart}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onStart();
+            }
           }}
         >
           {stage === RoomStage.WAITING ? (
             <>
-              <IconFont type="icon-play" size={12} />
-              <span>{i18n("StartGame")}</span>
+              {singleStarting ? (
+                <LoadingOutlined />
+              ) : (
+                <IconFont type="icon-play" size={12} />
+              )}
+              <span>
+                {singleStarting
+                  ? i18n("WaitingForGameToStart")
+                  : i18n("StartGame")}
+              </span>
             </>
           ) : stage === RoomStage.HAND_SELECTING ? (
             <>

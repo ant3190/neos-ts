@@ -34,7 +34,7 @@ NEOS has launched its public beta! For more details, please visit the [post](htt
 - **MC Watching List**
   - Watch ongoing duels on MyCard.
 - **Single Mode**
-  - Start a duel against AI on the Koishi 7210 server to test your deck or simply pass the time.
+  - Choose a deck in the waiting room, then click Start Game to upload it, add an available AI, and begin guessing. Single-player rooms disable the banlist and deck checks while keeping shuffle enabled. Changing decks cancels a pending start; errors or timeouts allow you to select again and retry.
 - **Custom Room**
   - Create a custom duel room to easily battle with friends.
 - **Replay**
