@@ -24,6 +24,7 @@ import {
   measureCard,
   type Point,
   revealDuelCue,
+  showDuelResolution,
 } from "./runtime";
 
 const { HAND, MZONE, SZONE, GRAVE, REMOVED, DECK, EXTRA, EMPTY } =
@@ -54,6 +55,8 @@ const attributeTones: Record<number, string> = {
 };
 let summonMaterials: number[] = [];
 let pendulumSummon = false;
+const isChainReveal = (cue: DuelCue) =>
+  ["activate", "chain", "resolve"].includes(cue.kind);
 
 export function summonType(type: number): DuelCue["summonType"] {
   if (type & TYPE_LINK) return "link";
@@ -163,21 +166,21 @@ export function presentGameMessage(
       );
       if (detail) {
         if (notification.kind === "solving") {
-          detail.resolving = true;
-          if (!detail.negated)
-            revealDuelCue(
-              {
-                kind: "resolve",
-                code: detail.code,
-                index: detail.index,
-                label: "连锁结算",
-                opponent: !context.matStore.isMe(detail.controller),
-                source: `${
-                  context.matStore.isMe(detail.controller) ? "我方" : "对方"
-                }${names[detail.zone]}`,
-              },
-              850,
-            );
+          for (const entry of context.matStore.chainDetails)
+            entry.resolving = entry.id === detail.id && !entry.resolved;
+          if (!detail.negated && !detail.resolved)
+            showDuelResolution({
+              kind: "resolve",
+              code: detail.code,
+              index: detail.index,
+              chainId: detail.id,
+              label: "连锁结算",
+              opponent: !context.matStore.isMe(detail.controller),
+              source: `${
+                context.matStore.isMe(detail.controller) ? "我方" : "对方"
+              }${names[detail.zone]}`,
+            });
+          else duelTimeline.discardReveals(isChainReveal);
         } else if (
           notification.kind === "negated" ||
           notification.kind === "disabled"
@@ -187,7 +190,7 @@ export function presentGameMessage(
           detail.negation =
             notification.kind === "negated" ? "activation" : "effect";
           duelTimeline.discardReveals(
-            (cue) => cue.kind === "resolve" && cue.index === detail.index,
+            (cue) => cue.kind === "resolve" && cue.chainId === detail.id,
           );
           const card = context.cardStore.inner.find(
             (entry) => entry.uuid === detail.cardUuid,
@@ -223,6 +226,7 @@ export function presentGameMessage(
             kind: "chain",
             code: detail.code,
             index: detail.index,
+            chainId: detail.id,
             previousCode: previous?.code,
             previousIndex: previous?.index,
             label: "CHAIN",
@@ -230,7 +234,7 @@ export function presentGameMessage(
           } as const;
           if (
             !duelTimeline.reviseReveal(
-              (cue) => cue.kind === "activate" && cue.index === detail.index,
+              (cue) => cue.kind === "activate" && cue.chainId === detail.id,
               pair,
             )
           )
@@ -483,6 +487,7 @@ export function presentGameMessage(
         kind: "activate",
         code: event.code,
         index: context.matStore.chains.length + 1,
+        chainId: context.matStore.chainEventId + 1,
         label: "效果发动",
         source: source(event.location),
         opponent: !context.matStore.isMe(event.location.controller),
@@ -490,6 +495,19 @@ export function presentGameMessage(
       emitDuelCue({ kind: "activate", point: point(event.location) }, 900);
       break;
     }
+    case "chain_solved": {
+      const detail = context.matStore.chainDetails.find(
+        (entry) => entry.index === msg.chain_solved.solved_index,
+      );
+      if (detail)
+        duelTimeline.discardReveals(
+          (cue) => isChainReveal(cue) && cue.chainId === detail.id,
+        );
+      break;
+    }
+    case "chain_end":
+      duelTimeline.discardReveals(isChainReveal);
+      break;
     case "confirm_cards":
       msg.confirm_cards.cards.forEach((card) =>
         revealDuelCue(

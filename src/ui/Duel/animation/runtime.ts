@@ -36,11 +36,14 @@ export interface DuelCue {
     | "life"
     | "result";
   duration: number;
+  /** Lifetime follows engine messages; duration is only the entrance animation. */
+  live?: boolean;
   code?: number;
   cardUuid?: string;
   negation?: "activation" | "effect";
   previousCode?: number;
   index?: number;
+  chainId?: number;
   previousIndex?: number;
   label?: string;
   source?: string;
@@ -141,6 +144,10 @@ export function revealDuelCue(cue: Omit<DuelCue, "duration">, duration = 1050) {
       animationQuality() === "full" ? duration : Math.min(duration, 750),
   });
 }
+export function showDuelResolution(cue: Omit<DuelCue, "duration" | "live">) {
+  if (typeof document !== "undefined" && document.hidden) return;
+  duelTimeline.showLive({ ...cue, live: true, duration: 150 });
+}
 
 /** Only samples while a cue is visible; no perpetual animation/render loop. */
 export function startAnimationRuntime() {
@@ -170,7 +177,10 @@ export function startAnimationRuntime() {
       samples = slow = 0;
     }
     const state = duelTimeline.getSnapshot();
-    if (!document.hidden && (state.cues.length || state.reveal))
+    if (
+      !document.hidden &&
+      (state.cues.length || (state.reveal && !state.reveal.live))
+    )
       frame = requestAnimationFrame(sample);
     else last = 0;
   };

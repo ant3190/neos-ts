@@ -23,8 +23,9 @@ export function readPresentationMessage(
   const chainKinds = {
     71: "chained",
     72: "solving",
-    74: "negated",
-    75: "disabled",
+    // 74 is CHAIN_END, handled by the rules adapter without a link index.
+    75: "negated",
+    76: "disabled",
   } as const;
   const kind = chainKinds[command as keyof typeof chainKinds];
   if (kind) return bytes.length ? { kind, index: bytes[0] } : undefined;

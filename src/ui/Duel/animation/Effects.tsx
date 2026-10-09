@@ -191,6 +191,7 @@ export function DuelEffects() {
         ),
       )}
       {reveal &&
+        !reveal.live &&
         quality === "full" &&
         ["activate", "resolve", "chain"].includes(reveal.kind) && (
           <div
@@ -207,6 +208,7 @@ export function DuelEffects() {
           }`}
           data-testid="duel-card-reveal"
           data-effect-kind={reveal.kind}
+          data-effect-live={reveal.live}
           data-chain-index={reveal.index}
           data-card-code={reveal.code}
           style={

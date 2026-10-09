@@ -142,6 +142,9 @@
   margin-left: max(-195px, -32.5vw);
   animation: reveal var(--duration) ease-out both;
 }
+.reveal[data-effect-live="true"] {
+  animation: revealIn var(--duration) ease-out both;
+}
 .revealCards {
   display: flex;
   justify-content: center;
@@ -307,6 +310,16 @@
     transform: translateY(-8px) scale(0.95);
   }
 }
+@keyframes revealIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 @keyframes aim {
   0%,
   100% {
@@ -321,7 +334,7 @@
   .ray {
     display: none;
   }
-  .reveal {
+  .reveal:not([data-effect-live="true"]) {
     animation-name: cueFade;
   }
   .aim line {
@@ -357,6 +370,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .reveal,
+  .reveal[data-effect-live="true"],
   .negationArt,
   .cue,
   .ring,

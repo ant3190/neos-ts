@@ -24,6 +24,13 @@ export async function installOfflineDuelResources(page: Page) {
   db.run(
     "INSERT INTO texts (id, name, desc, str1, str2) VALUES (46986414, '测试卡片', '交互回归测试', '效果一', '效果二')",
   );
+  for (let index = 1; index <= 3; index++) {
+    const code = 100000000 + index;
+    db.run(`INSERT INTO datas VALUES (${code}, 3, 0, 0, 2, 0, 0, 0, 0, 0)`);
+    db.run(
+      `INSERT INTO texts (id, name, desc) VALUES (${code}, '测试魔法${index}', '连锁时序回归测试')`,
+    );
+  }
   const bytes = Buffer.from(db.export());
   db.close();
   await page.route(/\.cdb(?:\?.*)?$/, (route) =>

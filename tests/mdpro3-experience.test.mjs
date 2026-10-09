@@ -55,7 +55,7 @@ test("bursts stay bounded and a new duel cancels the entire old timeline", (t) =
   assert.deepEqual(timeline.getSnapshot(), { cues: [], reveal: undefined });
 });
 
-test("a chain pair updates an activation without delaying the resolving link", (t) => {
+test("live resolution replaces activation backlog and stays until the engine completes it", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const timeline = new EffectTimeline();
   timeline.reveal({ kind: "activate", index: 2, code: 20, duration: 1000 });
@@ -66,11 +66,40 @@ test("a chain pair updates an activation without delaying the resolving link", (
     }),
     true,
   );
-  timeline.reveal({ kind: "resolve", index: 2, duration: 700 });
+  timeline.reveal({ kind: "activate", index: 3, duration: 1000 });
   assert.equal(timeline.getSnapshot().reveal.previousCode, 10);
-  t.mock.timers.tick(1000);
+  timeline.showLive({ kind: "resolve", index: 3, duration: 150 });
   assert.equal(timeline.getSnapshot().reveal.kind, "resolve");
+  assert.equal(timeline.getSnapshot().reveal.index, 3);
+  t.mock.timers.tick(5000);
+  assert.equal(timeline.getSnapshot().reveal.index, 3);
+  timeline.discardReveals((cue) => cue.index === 3);
+  assert.equal(timeline.getSnapshot().reveal, undefined);
+  t.mock.timers.tick(5000);
+  assert.equal(timeline.getSnapshot().reveal, undefined);
   timeline.clear();
+});
+
+test("rapid links and reset cannot replay a retired timer or remove a new live resolution", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const timeline = new EffectTimeline();
+  timeline.reveal({ kind: "activate", index: 1, duration: 1000 });
+  t.mock.timers.tick(300);
+  timeline.emit({ kind: "negate", duration: 1000 });
+  timeline.showLive({ kind: "resolve", index: 3, duration: 150 });
+  timeline.showLive({ kind: "resolve", index: 2, duration: 150 });
+  timeline.discardReveals((cue) => cue.index === 3);
+  assert.equal(timeline.getSnapshot().reveal.index, 2);
+  assert.equal(timeline.getSnapshot().cues[0].kind, "negate");
+  t.mock.timers.tick(700);
+  assert.equal(timeline.getSnapshot().reveal.index, 2);
+  timeline.clear();
+  timeline.showLive({ kind: "resolve", index: 1, duration: 150 });
+  t.mock.timers.tick(10000);
+  assert.equal(timeline.getSnapshot().reveal.index, 1);
+  assert.equal(timeline.getSnapshot().cues.length, 0);
+  timeline.discardReveals(() => true);
+  assert.equal(timeline.getSnapshot().reveal, undefined);
 });
 
 test("resetting a prompt cannot let its promise close a replacement prompt", async () => {
@@ -170,15 +199,19 @@ test("chain and damage notifications preserve engine timing and invalid payloads
     kind: "solving",
     index: 3,
   });
-  assert.deepEqual(readPresentationMessage(74, Uint8Array.of(3)), {
+  assert.deepEqual(readPresentationMessage(75, Uint8Array.of(3)), {
     kind: "negated",
     index: 3,
   });
-  assert.deepEqual(readPresentationMessage(75, Uint8Array.of(3)), {
+  assert.deepEqual(readPresentationMessage(76, Uint8Array.of(3)), {
     kind: "disabled",
     index: 3,
   });
   assert.equal(readPresentationMessage(72, new Uint8Array()), undefined);
+  assert.equal(readPresentationMessage(74, new Uint8Array()), undefined);
+  assert.equal(readPresentationMessage(74, Uint8Array.of(3)), undefined);
+  assert.equal(readPresentationMessage(75, new Uint8Array()), undefined);
+  assert.equal(readPresentationMessage(76, new Uint8Array()), undefined);
   assert.equal(readPresentationMessage(111, new Uint8Array(25)), undefined);
   assert.equal(readPresentationMessage(199, new Uint8Array()), undefined);
   const message = {};

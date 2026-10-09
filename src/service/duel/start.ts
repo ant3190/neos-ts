@@ -20,6 +20,7 @@ export default async (
   resetDuelDialogs();
   context.matStore.chains = [];
   context.matStore.chainDetails = [];
+  context.matStore.completedChainDetails = [];
   context.matStore.chainActivation = undefined;
   context.matStore.chainEventId = 0;
   // 先初始化`matStore`

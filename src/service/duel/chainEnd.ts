@@ -8,7 +8,12 @@ export default (
   console.info(`<ChainEnd>chain has been end`);
   const context = container.context;
 
+  // Preserve final statuses even if SOLVING, SOLVED and END share one React batch.
+  context.matStore.completedChainDetails = context.matStore.chainDetails.map(
+    (entry) => ({ ...entry, resolving: false, resolved: true }),
+  );
   context.matStore.chainDetails = [];
+  context.matStore.chainActivation = undefined;
 
   while (true) {
     const chain = context.matStore.chains.pop();

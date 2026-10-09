@@ -22,6 +22,8 @@ export default async (
   const target = context.cardStore.find(location);
 
   // 将`location`添加到连锁栈
+  if (context.matStore.chainDetails.length === 0)
+    context.matStore.completedChainDetails = [];
   context.matStore.chains.push(location);
   const detail = {
     id: ++context.matStore.chainEventId,

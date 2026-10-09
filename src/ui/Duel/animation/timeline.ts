@@ -63,6 +63,17 @@ export class EffectTimeline<T extends { duration: number }> {
     this.publish();
     this.revealTimer = this.later(() => this.advanceReveal(), cue.duration);
   }
+  /** Engine-controlled state replaces cosmetic backlog and ends only on a message. */
+  showLive(cue: T) {
+    if (this.revealTimer !== undefined) {
+      clearTimeout(this.revealTimer);
+      this.timers.delete(this.revealTimer);
+      this.revealTimer = undefined;
+    }
+    this.waiting = [];
+    this.state = { ...this.state, reveal: { ...cue, id: ++this.serial } };
+    this.publish();
+  }
   private advanceReveal() {
     this.revealTimer = undefined;
     this.state = { ...this.state, reveal: undefined };
@@ -76,7 +87,7 @@ export class EffectTimeline<T extends { duration: number }> {
       });
     else this.publish();
   }
-  /** A negated link must not later replay a queued successful resolution. */
+  /** A completed or negated link must not later replay an obsolete display. */
   discardReveals(predicate: (cue: T) => boolean) {
     this.waiting = this.waiting.filter((cue) => !predicate(cue));
     if (!this.state.reveal || !predicate(this.state.reveal)) return;

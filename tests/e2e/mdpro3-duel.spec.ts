@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
+
 import { installOfflineDuelResources } from "./helpers/offlineDuel";
 
 async function duelFixture(page: Page) {
@@ -91,8 +92,138 @@ async function beginFixtureChain(page: Page) {
   });
 }
 
-async function chainNotification(page: Page, command: number) {
-  await page.evaluate(async (command) => {
+async function chainNotification(page: Page, command: number, index = 1) {
+  await page.evaluate(
+    async ({ command, index }) => {
+      const { getUIContainer } = await import("/src/container/compat.ts");
+      const { default: handleGameMsg } = await import(
+        "/src/service/duel/gameMsg.ts"
+      );
+      const { default: GameMsgAdapter } = await import(
+        "/src/api/ocgcore/ocgAdapter/stoc/stocGameMsg/mod.ts"
+      );
+      const packet = new GameMsgAdapter({
+        exData:
+          command === 74
+            ? Uint8Array.of(command)
+            : Uint8Array.of(command, index),
+      } as any).upcast();
+      await handleGameMsg(getUIContainer(), packet);
+    },
+    { command, index },
+  );
+}
+
+async function beginSpellChain(page: Page) {
+  await page.evaluate(async () => {
+    const { getUIContainer } = await import("/src/container/compat.ts");
+    const { cardStore } = await import("/src/stores/index.ts");
+    const { genCard } = await import("/src/service/utils/index.ts");
+    const { ygopro, fetchCard } = await import("/src/api/index.ts");
+    const { default: handleGameMsg } = await import(
+      "/src/service/duel/gameMsg.ts"
+    );
+    const { default: GameMsgAdapter } = await import(
+      "/src/api/ocgcore/ocgAdapter/stoc/stocGameMsg/mod.ts"
+    );
+    for (let index = 1; index <= 3; index++) {
+      const code = 100000000 + index;
+      cardStore.inner.push(
+        genCard({
+          ...cardStore.inner[0],
+          uuid: `fixture-spell-${index}`,
+          code,
+          meta: fetchCard(code),
+          location: new ygopro.CardLocation({
+            controller: 0,
+            zone: ygopro.CardZone.SZONE,
+            sequence: index - 1,
+            position: ygopro.CardPosition.FACEUP_ATTACK,
+          }),
+          idleInteractivities: [],
+        }),
+      );
+      // Legacy YGOPro: CHAINING, uint32 code, controller/zone/sequence/position.
+      const bytes = new Uint8Array(9);
+      bytes[0] = 70;
+      new DataView(bytes.buffer).setUint32(1, code, true);
+      bytes.set([0, 8, index - 1, 1], 5);
+      await handleGameMsg(
+        getUIContainer(),
+        new GameMsgAdapter({ exData: bytes } as any).upcast(),
+      );
+      await handleGameMsg(
+        getUIContainer(),
+        new GameMsgAdapter({
+          exData: Uint8Array.of(71, index),
+        } as any).upcast(),
+      );
+    }
+  });
+  await expect(page.getByTestId("duel-chain-entry")).toHaveCount(3);
+}
+
+for (const mode of ["full", "lite"] as const) {
+  test(`${mode}: live resolution immediately replaces queued activations and follows reverse engine order`, async ({
+    page,
+  }) => {
+    await duelFixture(page);
+    await beginSpellChain(page);
+    await page.evaluate(async (mode) => {
+      const { animationSettings } = await import(
+        "/src/ui/Duel/animation/runtime.ts"
+      );
+      animationSettings.mode = mode;
+    }, mode);
+    const reveal = page.getByTestId("duel-card-reveal");
+    await chainNotification(page, 72, 3);
+    await expect(reveal).toHaveAttribute("data-chain-index", "3");
+    await expect(reveal).toHaveAttribute("data-effect-kind", "resolve");
+    await expect(reveal).toHaveAttribute("data-effect-live", "true");
+    // A link waiting on further engine messages must outlive the old 850 ms cut-in.
+    await page.waitForTimeout(1100);
+    await expect(reveal).toBeVisible();
+    expect(
+      await reveal.evaluate((node) => getComputedStyle(node).opacity),
+    ).toBe("1");
+    for (const index of [3, 2, 1]) {
+      if (index !== 3) await chainNotification(page, 72, index);
+      await expect(reveal).toHaveAttribute("data-chain-index", `${index}`);
+      await expect(reveal).toHaveAttribute(
+        "data-card-code",
+        `${100000000 + index}`,
+      );
+      // Use the link index rather than its position in the reverse resolution order.
+      await expect(
+        page.locator(
+          `[data-testid="duel-chain-entry"][data-chain-index="${index}"]`,
+        ),
+      ).toHaveAttribute("data-chain-resolving", "true");
+      await chainNotification(page, 73, index);
+      await expect(reveal).toHaveCount(0);
+      await expect(
+        page.locator(
+          `[data-testid="duel-chain-entry"][data-chain-index="${index}"]`,
+        ),
+      ).toHaveAttribute("data-chain-resolved", "true");
+    }
+    await chainNotification(page, 74);
+    await expect(page.getByTestId("duel-chain-stack")).not.toContainText(
+      "结算中",
+    );
+  });
+}
+
+test("batched chain completion and spell cleanup leave only final history and cannot replay old resolution", async ({
+  page,
+}) => {
+  await duelFixture(page);
+  await beginSpellChain(page);
+  await chainNotification(page, 72, 3);
+  await expect(
+    page.locator('[data-testid="duel-chain-entry"][data-chain-index="3"]'),
+  ).toContainText("结算中");
+  await page.evaluate(async () => {
     const { getUIContainer } = await import("/src/container/compat.ts");
     const { default: handleGameMsg } = await import(
       "/src/service/duel/gameMsg.ts"
@@ -100,12 +231,107 @@ async function chainNotification(page: Page, command: number) {
     const { default: GameMsgAdapter } = await import(
       "/src/api/ocgcore/ocgAdapter/stoc/stocGameMsg/mod.ts"
     );
-    const packet = new GameMsgAdapter({
-      exData: Uint8Array.of(command, 1),
-    } as any).upcast();
-    await handleGameMsg(getUIContainer(), packet);
-  }, command);
-}
+    const send = (bytes: Uint8Array) =>
+      handleGameMsg(
+        getUIContainer(),
+        new GameMsgAdapter({ exData: bytes } as any).upcast(),
+      );
+    // Complete all remaining links in one browser task, then clean up the spells.
+    for (const index of [3, 2, 1]) {
+      if (index !== 3) await send(Uint8Array.of(72, index));
+      await send(Uint8Array.of(73, index));
+    }
+    await send(Uint8Array.of(74));
+    for (let index = 1; index <= 3; index++) {
+      const bytes = new Uint8Array(17);
+      bytes[0] = 50;
+      new DataView(bytes.buffer).setUint32(1, 100000000 + index, true);
+      bytes.set([0, 8, index - 1, 1, 0, 16, 0, 1], 5);
+      await send(bytes);
+    }
+  });
+  for (let index = 1; index <= 3; index++)
+    await expect(
+      page.locator(`[data-card-uuid="fixture-spell-${index}"]`),
+    ).toHaveAttribute("data-card-zone", "GRAVE");
+  const entries = page.getByTestId("duel-chain-entry");
+  await expect(entries).toHaveCount(3);
+  for (const entry of await entries.all()) {
+    await expect(entry).toHaveAttribute("data-chain-resolved", "true");
+    await expect(entry).toHaveAttribute("data-chain-resolving", "false");
+    await expect(entry).toContainText("已处理");
+  }
+  await expect(page.getByTestId("duel-card-reveal")).toHaveCount(0);
+  // A new chain reuses CHAIN 1 while the previous history's expiry is still pending.
+  await page.evaluate(async () => {
+    const { getUIContainer } = await import("/src/container/compat.ts");
+    const { default: handleGameMsg } = await import(
+      "/src/service/duel/gameMsg.ts"
+    );
+    const { default: GameMsgAdapter } = await import(
+      "/src/api/ocgcore/ocgAdapter/stoc/stocGameMsg/mod.ts"
+    );
+    const bytes = new Uint8Array(9);
+    bytes[0] = 70;
+    new DataView(bytes.buffer).setUint32(1, 100000003, true);
+    bytes.set([0, 16, 0, 1], 5);
+    await handleGameMsg(
+      getUIContainer(),
+      new GameMsgAdapter({ exData: bytes } as any).upcast(),
+    );
+  });
+  await chainNotification(page, 72, 1);
+  await page.waitForTimeout(1600);
+  await expect(entries).toHaveCount(1);
+  await expect(entries).toContainText("结算中");
+  await expect(page.getByTestId("duel-card-reveal")).toHaveAttribute(
+    "data-card-code",
+    "100000003",
+  );
+  await chainNotification(page, 73, 1);
+  await chainNotification(page, 74);
+  await expect(entries).toContainText("已处理");
+  await expect(page.getByTestId("duel-card-reveal")).toHaveCount(0);
+  await expect(entries).toHaveCount(0);
+  await expect(page.getByTestId("duel-card-reveal")).toHaveCount(0);
+});
+
+test("a card moving to the grave during its effect does not prematurely finish the live resolution", async ({
+  page,
+}) => {
+  await duelFixture(page);
+  await beginFixtureChain(page);
+  await chainNotification(page, 72);
+  await page.evaluate(async () => {
+    const { getUIContainer } = await import("/src/container/compat.ts");
+    const { default: handleGameMsg } = await import(
+      "/src/service/duel/gameMsg.ts"
+    );
+    const { default: GameMsgAdapter } = await import(
+      "/src/api/ocgcore/ocgAdapter/stoc/stocGameMsg/mod.ts"
+    );
+    const bytes = new Uint8Array(17);
+    bytes[0] = 50;
+    new DataView(bytes.buffer).setUint32(1, 46986414, true);
+    bytes.set([0, 4, 2, 1, 0, 16, 0, 1], 5);
+    await handleGameMsg(
+      getUIContainer(),
+      new GameMsgAdapter({ exData: bytes } as any).upcast(),
+    );
+  });
+  await expect(
+    page.locator('[data-card-uuid="fixture-monster"]'),
+  ).toHaveAttribute("data-card-zone", "GRAVE");
+  await expect(page.getByTestId("duel-card-reveal")).toHaveAttribute(
+    "data-effect-kind",
+    "resolve",
+  );
+  await expect(page.getByTestId("duel-chain-entry")).toContainText("结算中");
+  await chainNotification(page, 73);
+  await expect(page.getByTestId("duel-card-reveal")).toHaveCount(0);
+  await chainNotification(page, 74);
+  await expect(page.getByTestId("duel-chain-entry")).toContainText("已处理");
+});
 
 async function updateFixtureStatus(page: Page, status: number) {
   await page.evaluate(async (status) => {
@@ -143,7 +369,7 @@ test("activation negation greys the original card, cancels its cut-in and keeps 
   });
   await chainNotification(page, 72);
   await expect(page.getByTestId("duel-card-reveal")).toBeVisible();
-  await chainNotification(page, 74);
+  await chainNotification(page, 75);
   const card = page.locator('[data-card-uuid="fixture-monster"]');
   const face = card.locator("[data-card-face]");
   await expect(card).toHaveAttribute("data-card-negation", "activation");
@@ -155,7 +381,7 @@ test("activation negation greys the original card, cancels its cut-in and keeps 
   await expect(page.getByTestId("duel-card-negation")).toHaveCount(0);
   await expect(page.getByTestId("duel-chain-entry")).not.toContainText("无效");
   const token = await card.getAttribute("data-card-negating");
-  await chainNotification(page, 75);
+  await chainNotification(page, 76);
   await expect(card).toHaveAttribute("data-card-negating", token!);
   await card.click();
   await page.getByTestId("duel-action-attack").click();
@@ -244,7 +470,7 @@ test("opponent hand negation briefly turns the public source face up and returns
     );
     animationSettings.mode = "full";
   });
-  await chainNotification(page, 74);
+  await chainNotification(page, 75);
   const card = page.locator('[data-card-uuid="fixture-monster"]');
   await expect(card.locator("[data-card-face] img")).toHaveAttribute(
     "src",
@@ -313,7 +539,7 @@ test("effect negation follows the same card after movement and reset removes its
       }),
     );
   });
-  await chainNotification(page, 75);
+  await chainNotification(page, 76);
   const card = page.locator('[data-card-uuid="fixture-monster"]');
   await expect(card).toHaveAttribute("data-card-sequence", "3");
   await expect(card).toHaveAttribute("data-card-negation", "effect");
@@ -376,7 +602,7 @@ test("negating a card returned deep into the deck shows its public identity at t
     );
   });
   await expect(page.locator('[data-card-uuid="fixture-monster"]')).toBeHidden();
-  await chainNotification(page, 75);
+  await chainNotification(page, 76);
   const feedback = page.getByTestId("duel-card-negation");
   await expect(feedback).toBeVisible();
   await expect(feedback).toHaveAttribute("data-card-code", "46986414");

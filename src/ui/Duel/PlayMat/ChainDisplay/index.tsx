@@ -20,24 +20,25 @@ const zoneNames: Record<number, string> = {
 
 export const ChainDisplay: React.FC = () => {
   const snap = useSnapshot(matStore);
-  const [chainDetails, setChainDetails] = useState<ChainDetail[]>([]);
+  const [expiredDetails, setExpiredDetails] = useState<
+    readonly ChainDetail[] | undefined
+  >();
+  const chainDetails = snap.chainDetails.length
+    ? snap.chainDetails
+    : snap.completedChainDetails !== expiredDetails
+    ? snap.completedChainDetails
+    : [];
   const entriesRef = useRef<HTMLDivElement>(null);
   const english = /^(en|br|pt|fr|es)/i.test(
     localStorage.getItem("language") ?? "",
   );
 
   useEffect(() => {
-    if (matStore.chainEventId === 0) {
-      setChainDetails([]);
-      return;
-    }
-    if (matStore.chainDetails.length) {
-      setChainDetails(matStore.chainDetails.map((entry) => ({ ...entry })));
-      return;
-    }
-    const timer = setTimeout(() => setChainDetails([]), 1400);
+    const completed = snap.completedChainDetails;
+    if (!completed.length) return;
+    const timer = setTimeout(() => setExpiredDetails(completed), 1400);
     return () => clearTimeout(timer);
-  }, [snap.chainDetails, snap.chainEventId]);
+  }, [snap.completedChainDetails]);
 
   useEffect(() => {
     const list = entriesRef.current;

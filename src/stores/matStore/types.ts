@@ -20,6 +20,8 @@ export interface MatState {
 
   /** Keep each revealed effect visible even when its card moves or a marker overlaps. */
   chainDetails: ChainDetail[];
+  /** Final status captured before CHAIN_END clears the active chain. */
+  completedChainDetails: ChainDetail[];
   chainActivation?: ChainDetail;
   chainEventId: number;
 
