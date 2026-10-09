@@ -16,6 +16,14 @@ import {
 } from "./runtime";
 
 const cueClasses = styles as Record<string, string>;
+const fieldFeedbackKinds = new Set<DuelCue["kind"]>([
+  "activate",
+  "resolve",
+  "negate",
+  "chain",
+  "target",
+  "impact",
+]);
 const typeTones = {
   fusion: "#c697ff",
   synchro: "#b5fff1",
@@ -146,7 +154,7 @@ export function DuelEffects() {
             } as CSSProperties
           }
         >
-          {cue.point && cue.kind !== "life" && (
+          {cue.point && fieldFeedbackKinds.has(cue.kind) && (
             <>
               <i className={styles.ring} />
               <i className={styles.innerRing} />
@@ -165,14 +173,7 @@ export function DuelEffects() {
                 </svg>
               )}
               {quality === "full" &&
-                [
-                  "special",
-                  "summon",
-                  "impact",
-                  "destroy",
-                  "banish",
-                  "material",
-                ].includes(cue.kind) &&
+                cue.kind === "impact" &&
                 Array.from({ length: 6 }, (_, i) => (
                   <i
                     key={i}
