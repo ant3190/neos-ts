@@ -98,18 +98,30 @@ export class EffectTimeline<T extends { duration: number }> {
     this.advanceReveal();
   }
   /** CHAINED enriches the activation already showing, without adding another wait. */
-  reviseReveal(predicate: (cue: T) => boolean, update: Partial<T>): boolean {
+  reviseReveal(
+    predicate: (cue: T) => boolean,
+    update: Partial<T>,
+    remainingMs?: number,
+  ): boolean {
     if (this.state.reveal && predicate(this.state.reveal)) {
       this.state = {
         ...this.state,
         reveal: { ...this.state.reveal, ...update },
       };
+      if (remainingMs !== undefined) {
+        if (this.revealTimer !== undefined) {
+          clearTimeout(this.revealTimer);
+          this.timers.delete(this.revealTimer);
+        }
+        this.revealTimer = this.later(() => this.advanceReveal(), remainingMs);
+      }
       this.publish();
       return true;
     }
     const index = this.waiting.findIndex(predicate);
     if (index < 0) return false;
     this.waiting[index] = { ...this.waiting[index], ...update };
+    if (remainingMs !== undefined) this.waiting[index].duration = remainingMs;
     return true;
   }
   clear() {

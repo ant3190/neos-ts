@@ -1,5 +1,7 @@
 import { ygopro } from "@/api";
+import { getPresentationMessage } from "@/api/ocgcore/ocgAdapter/stoc/stocGameMsg/presentation";
 import { Container } from "@/container";
+import { isCurrentUIContainer } from "@/container/compat";
 import { replayStore } from "@/stores";
 import { presentGameMessage } from "@/ui/Duel/animation/present";
 import { showWaiting } from "@/ui/Duel/Message";
@@ -22,6 +24,7 @@ import onLpUpdate from "./lpUpdate";
 import onMsgMove from "./move";
 import onMsgNewPhase from "./newPhase";
 import onMsgNewTurn from "./newTurn";
+import { getDuelPacing, waitForDuelPace } from "./pacing";
 import onMsgPosChange from "./posChange";
 import onMsgReloadField from "./reloadField";
 import onMsgRockPaperScissors from "./rockPaperScissors";
@@ -79,6 +82,51 @@ const ActiveList = [
 ];
 
 export default async function handleGameMsg(
+  container: Container,
+  pb: ygopro.YgoStocMsg,
+): Promise<void> {
+  if (!isCurrentUIContainer(container)) return;
+  const msg = pb.stoc_game_msg;
+  const notification = getPresentationMessage(msg);
+  let pacing = getDuelPacing(
+    notification?.kind ?? msg.gameMsg,
+    container.context.matStore.chainDetails.length,
+  );
+  if (msg.gameMsg === "new_phase") {
+    const phases = ygopro.StocGameMessage.MsgNewPhase.PhaseType;
+    if (
+      ![
+        phases.DRAW,
+        phases.STANDBY,
+        phases.MAIN1,
+        phases.BATTLE_START,
+        phases.MAIN2,
+        phases.END,
+      ].includes(msg.new_phase.phase_type)
+    )
+      pacing = undefined;
+  }
+  if (
+    notification &&
+    (notification.kind === "negated" || notification.kind === "disabled") &&
+    container.context.matStore.chainDetails.find(
+      (entry) => entry.index === notification.index,
+    )?.negated
+  )
+    pacing = undefined;
+
+  const startedAt = performance.now();
+  await applyGameMsg(container, pb);
+  if (!isCurrentUIContainer(container)) return;
+  // Quality limits GPU work, not reading time. Paused replay steps remain instant.
+  await waitForDuelPace(
+    pacing,
+    performance.now() - startedAt,
+    replayStore.isReplay && replayStore.paused,
+  );
+}
+
+async function applyGameMsg(
   container: Container,
   pb: ygopro.YgoStocMsg,
 ): Promise<void> {

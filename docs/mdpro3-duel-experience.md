@@ -12,6 +12,8 @@
 - `Assets/Scripts/MDPro3/Duel/BG/DuelBGManager.cs`：多段连锁的卡片对照、编号和逆序结算。
 - `Assets/Scripts/MDPro3/UI/Popup/Old/PopupDuelSelectCard.cs` 和 `PopupDuelSelectCardItem.cs`：单击选中／取消、单选替换、双击快捷确认、先选卡再选效果。
 
+动作衔接参考 [YGOPro 的 `gframe/duelclient.cpp`](https://github.com/Fluorohydride/ygopro/blob/master/gframe/duelclient.cpp) 中的 `WaitFrameSignal`：移动、发动、连锁、攻击和阶段切换分别留出观看时间，查询与操作提示直接处理。
+
 没有移植 Unity、AssetBundle 或 Master Duel 的模型／粒子资源。以下表现采用浏览器中的 CSS、少量 SVG 和已有的卡片 spring，实现相同类别的事件反馈；不是商业客户端全部演出的逐帧复刻。
 
 ## 已实现的表现与交互
@@ -39,7 +41,7 @@
 
 - 没有新增运行时依赖，也没有新增 WebGL／Canvas 引擎。
 - 场上装饰效果最多同时 10 个；中央展示卡最多两张，加上完整模式最多四张召唤素材。排队展示最多 8 条，积压时缩短展示，保留卡片栈供查看。
-- `CHAINED` 更新正在展示的发动卡，不额外插入一次重复等待。
+- `CHAINED` 更新正在展示的发动卡，刷新并列卡图的可见寿命，不额外排入第二次展示；开始结算时立即替换。
 - 连锁结算不进入定时展示队列：`CHAIN_SOLVING` 立即替换旧的展示和积压，`CHAIN_SOLVED` 立即撤下该段提示，`CHAIN_END` 清除剩余连锁展示。持续时间由服务端消息决定，不能用送墓推断效果已经处理完。静态结算提示不触发持续帧采样。
 - 侧栏直接读取活动连锁状态，结束时先保存最终状态再清空活动列表；同一帧快速处理多个消息也不会保留旧的“结算中”。历史过期按记录身份区分，新连锁复用编号不会被旧计时器隐藏。
 - 其他装饰寿命由墙钟计时器结束；图片解码和装饰层不阻塞规则消息处理。已有卡片 spring 仍有停帧超时兜底。
@@ -51,18 +53,28 @@
 - 标签页隐藏时清除装饰队列并直接落到卡片目标姿态；新局和退出清除所有展示、选择和旧提示回调。
 - 展示层和操作按钮使用 viewport portal，避免小屏自适应缩放把测量坐标二次缩放。
 
+## 动作衔接节奏
+
+在原有动画完成后补足短停顿，默认速度的单张移动整体约 300 ms、单张抽卡约 380 ms，发动至少 600 ms。已有完整发动动画超过这个时间时只补 80 ms，不重复等待整段动画。两段以上的连锁形成时留出 320 ms 观看并列卡图，每段结算开始留出 240 ms，再处理实际效果。
+
+阶段切换约 300 ms，回合切换约 380 ms；战斗步骤等内部阶段不另加停顿。查询、选择提示、`CHAIN_SOLVED` 和 `CHAIN_END` 不增加等待，结束显示仍与实际效果同步。完整、轻量和减少动画模式保留相同的观看时间，降低动效不会把动作压成瞬间跳转。
+
+停顿只用墙钟计时器，不依赖动画帧或新增渲染循环。隐藏标签页时释放正在进行的停顿，后台消息不累积额外等待；暂停回放的手动单步跳过补充停顿，连续播放保留节奏。
+
 ## 验证
 
 ```bash
 npx tsc --noEmit
 npm run lint
 npm run build
-./node_modules/.bin/esbuild tests/mdpro3-experience.test.mjs tests/card-animation.test.mjs tests/eventbus.test.mjs --bundle --platform=node --format=esm --out-extension:.js=.mjs --outdir=/tmp/neos-mdpro3-tests
+./node_modules/.bin/esbuild tests/duel-pacing.test.mjs tests/mdpro3-experience.test.mjs tests/card-animation.test.mjs tests/eventbus.test.mjs --bundle --platform=node --format=esm --out-extension:.js=.mjs --outdir=/tmp/neos-mdpro3-tests
 node --test /tmp/neos-mdpro3-tests/*.test.mjs
-npm run test:e2e -- tests/e2e/mdpro3-duel.spec.ts tests/e2e/duel-dialog-regression.spec.ts --workers=1
+npm run test:e2e -- tests/e2e/duel-pacing.spec.ts tests/e2e/mdpro3-duel.spec.ts tests/e2e/duel-dialog-regression.spec.ts --workers=1
 ```
 
 验证覆盖无动画帧时仍推进、队列上限、旧局队列取消、连锁对照、无效取消结算展示的计时器竞争，以及浏览器中的真实选择回传。浏览器回归通过原始 75／76 无效消息和 QUERY_STATUS 查询验证原卡灰化、重复无效合并、持续无效恢复、移动后定位和无可见模型的来源展示。连锁时序回归用原始 70／71／72／73／74／50 消息验证单段不显示连锁、第二段出现并列卡图及标记、完整和轻量模式的即时逆序结算、超过旧定时长度仍保持提示、同帧结算结束与魔法卡送墓、下一次连锁重用编号，以及结算中途送墓不误判完成。按钮回归测量七种操作图标与圆心的实际偏差；卡堆回归在 1280×720、640×360、390×844 检查列表滚动和直接点击投降按钮。没有测量用户低性能电脑的实际帧率。
+
+节奏回归使用同一个网络消息中的连续发动、连锁、送墓、结算结束和操作提示，用受控浏览器时钟核对停顿与结束显示同步，避免首次渲染或 GC 开销干扰断言；完整与轻量模式使用实际计时验证抽卡、出牌和卡图，回放验证暂停单步与内部阶段不新增等待。上述浏览器测试使用离线资源和协议夹具，未测量真实网络对局及用户设备的帧率。
 
 协议编号对照 [ygopro-core/common.h](https://github.com/Fluorohydride/ygopro-core/blob/master/common.h)：74 是 `CHAIN_END`（没有段号），75 是 `CHAIN_NEGATED`，76 是 `CHAIN_DISABLED`；无效展示不能截获结束消息。
 

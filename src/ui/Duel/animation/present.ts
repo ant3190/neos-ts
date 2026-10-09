@@ -235,6 +235,7 @@ export function presentGameMessage(
             !duelTimeline.reviseReveal(
               (cue) => cue.kind === "activate" && cue.chainId === detail.id,
               pair,
+              650,
             )
           )
             revealDuelCue(pair, 650);

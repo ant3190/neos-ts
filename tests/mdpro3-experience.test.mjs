@@ -80,6 +80,28 @@ test("live resolution replaces activation backlog and stays until the engine com
   timeline.clear();
 });
 
+test("CHAINED leaves time to read its pair after a paced activation and its old timer cannot hide live resolution", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const timeline = new EffectTimeline();
+  timeline.reveal({ kind: "activate", index: 2, duration: 750 });
+  t.mock.timers.tick(600);
+  assert.equal(
+    timeline.reviseReveal(
+      (cue) => cue.index === 2,
+      { kind: "chain", previousCode: 10 },
+      650,
+    ),
+    true,
+  );
+  t.mock.timers.tick(320);
+  assert.equal(timeline.getSnapshot().reveal.kind, "chain");
+  timeline.showLive({ kind: "resolve", index: 2, duration: 150 });
+  t.mock.timers.tick(2000);
+  assert.equal(timeline.getSnapshot().reveal.kind, "resolve");
+  timeline.discardReveals(() => true);
+  assert.equal(timeline.getSnapshot().reveal, undefined);
+});
+
 test("rapid links and reset cannot replay a retired timer or remove a new live resolution", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const timeline = new EffectTimeline();
