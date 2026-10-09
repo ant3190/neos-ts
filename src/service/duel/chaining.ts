@@ -19,6 +19,7 @@ export default async (
   });
 
   const location = chaining.location;
+  const target = context.cardStore.find(location);
 
   // 将`location`添加到连锁栈
   context.matStore.chains.push(location);
@@ -26,6 +27,7 @@ export default async (
     id: ++context.matStore.chainEventId,
     index: context.matStore.chains.length,
     code: chaining.code,
+    cardUuid: target?.uuid,
     controller: location.controller,
     zone: location.zone,
     resolved: false,
@@ -36,7 +38,6 @@ export default async (
   requestCardImage(chaining.code);
   context.historyStore.putEffect(context, meta.id, location);
 
-  const target = context.cardStore.find(location);
   if (target) {
     // 设置连锁序号
     const block = context.placeStore.of(context, location);

@@ -85,6 +85,22 @@ test("resetting a prompt cannot let its promise close a replacement prompt", asy
   assert.equal(await current.promise, 42);
 });
 
+test("negation cancels current and queued resolution without an old timer skipping the next link", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const timeline = new EffectTimeline();
+  timeline.reveal({ kind: "resolve", index: 2, duration: 1000 });
+  timeline.reveal({ kind: "resolve", index: 2, duration: 600 });
+  timeline.reveal({ kind: "resolve", index: 1, duration: 800 });
+  t.mock.timers.tick(300);
+  timeline.discardReveals((cue) => cue.kind === "resolve" && cue.index === 2);
+  assert.equal(timeline.getSnapshot().reveal.index, 1);
+  t.mock.timers.tick(700);
+  assert.equal(timeline.getSnapshot().reveal.index, 1);
+  t.mock.timers.tick(100);
+  assert.equal(timeline.getSnapshot().reveal, undefined);
+  timeline.clear();
+});
+
 test("material levels accept mixed alternatives and reject invalid counts", () => {
   assert.equal(
     levelsMatch(

@@ -5,6 +5,7 @@ export class EffectTimeline<T extends { duration: number }> {
   private cueTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private listeners = new Set<() => void>();
   private waiting: T[] = [];
+  private revealTimer?: ReturnType<typeof setTimeout>;
   private state: { cues: (T & { id: number })[]; reveal?: T & { id: number } } =
     { cues: [] };
 
@@ -60,18 +61,30 @@ export class EffectTimeline<T extends { duration: number }> {
     }
     this.state = { ...this.state, reveal: { ...cue, id: ++this.serial } };
     this.publish();
-    this.later(() => {
-      this.state = { ...this.state, reveal: undefined };
-      const next = this.waiting.shift();
-      if (next)
-        this.reveal({
-          ...next,
-          duration: this.waiting.length
-            ? Math.min(next.duration, 650)
-            : next.duration,
-        });
-      else this.publish();
-    }, cue.duration);
+    this.revealTimer = this.later(() => this.advanceReveal(), cue.duration);
+  }
+  private advanceReveal() {
+    this.revealTimer = undefined;
+    this.state = { ...this.state, reveal: undefined };
+    const next = this.waiting.shift();
+    if (next)
+      this.reveal({
+        ...next,
+        duration: this.waiting.length
+          ? Math.min(next.duration, 650)
+          : next.duration,
+      });
+    else this.publish();
+  }
+  /** A negated link must not later replay a queued successful resolution. */
+  discardReveals(predicate: (cue: T) => boolean) {
+    this.waiting = this.waiting.filter((cue) => !predicate(cue));
+    if (!this.state.reveal || !predicate(this.state.reveal)) return;
+    if (this.revealTimer !== undefined) {
+      clearTimeout(this.revealTimer);
+      this.timers.delete(this.revealTimer);
+    }
+    this.advanceReveal();
   }
   /** CHAINED enriches the activation already showing, without adding another wait. */
   reviseReveal(predicate: (cue: T) => boolean, update: Partial<T>): boolean {
@@ -93,6 +106,7 @@ export class EffectTimeline<T extends { duration: number }> {
     this.timers.clear();
     this.cueTimers.clear();
     this.waiting = [];
+    this.revealTimer = undefined;
     this.state = { cues: [] };
     this.publish();
   }

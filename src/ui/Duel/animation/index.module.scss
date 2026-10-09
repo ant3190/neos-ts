@@ -216,16 +216,30 @@
   font-size: 12px;
   color: #c8d5e0;
 }
-.negate .art {
-  filter: grayscale(1);
-}
-.invalid {
+.negationAtSource {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 80px;
-  color: #ff9c93;
+  transform: translate(-50%, -50%);
+}
+.negationArt {
+  width: clamp(72px, 8vw, 112px) !important;
+  filter: grayscale(1);
+  box-shadow: 0 3px 10px #0008;
+  animation: negateAtSource var(--duration) ease-out both;
+}
+@keyframes negateAtSource {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  10%,
+  80% {
+    opacity: 1;
+    transform: translateY(-8px) scale(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(0) scale(1);
+  }
 }
 @keyframes ring {
   0% {
@@ -321,6 +335,7 @@
     display: none;
   }
   .reveal,
+  .negationArt,
   .cue,
   .aim line {
     animation: none;
@@ -342,6 +357,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .reveal,
+  .negationArt,
   .cue,
   .ring,
   .innerRing,

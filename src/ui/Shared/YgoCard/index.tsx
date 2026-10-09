@@ -9,6 +9,7 @@ import styles from "./index.module.scss";
 const { assetsPath } = useConfig();
 
 interface Props {
+  "data-card-face"?: boolean;
   className?: string;
   isBack?: boolean;
   code?: number;
@@ -59,6 +60,7 @@ export const YgoCard: React.FC<Props> = (props) => {
 
   return (
     <div
+      data-card-face={props["data-card-face"]}
       className={classNames(styles["ygo-card"], className)}
       style={{
         width,

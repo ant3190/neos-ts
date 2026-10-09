@@ -63,11 +63,14 @@ export interface ChainDetail {
   id: number;
   index: number;
   code: number;
+  /** Follow the actual card when costs or earlier links move it. */
+  cardUuid?: string;
   controller: number;
   zone: ygopro.CardZone;
   resolved: boolean;
   resolving?: boolean;
   negated?: boolean;
+  negation?: "activation" | "effect";
 }
 
 export interface InitInfo {

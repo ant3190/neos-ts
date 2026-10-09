@@ -164,31 +164,57 @@ export function presentGameMessage(
       if (detail) {
         if (notification.kind === "solving") {
           detail.resolving = true;
-          revealDuelCue(
-            {
-              kind: "resolve",
-              code: detail.code,
-              index: detail.index,
-              label: "连锁结算",
-              opponent: !context.matStore.isMe(detail.controller),
-              source: `${
-                context.matStore.isMe(detail.controller) ? "我方" : "对方"
-              }${names[detail.zone]}`,
-            },
-            850,
-          );
+          if (!detail.negated)
+            revealDuelCue(
+              {
+                kind: "resolve",
+                code: detail.code,
+                index: detail.index,
+                label: "连锁结算",
+                opponent: !context.matStore.isMe(detail.controller),
+                source: `${
+                  context.matStore.isMe(detail.controller) ? "我方" : "对方"
+                }${names[detail.zone]}`,
+              },
+              850,
+            );
         } else if (
           notification.kind === "negated" ||
           notification.kind === "disabled"
         ) {
+          if (detail.negated) return true;
           detail.negated = true;
-          revealDuelCue({
-            kind: "negate",
-            code: detail.code,
-            index: detail.index,
-            label: notification.kind === "negated" ? "发动无效" : "效果无效",
-            opponent: !context.matStore.isMe(detail.controller),
-          });
+          detail.negation =
+            notification.kind === "negated" ? "activation" : "effect";
+          duelTimeline.discardReveals(
+            (cue) => cue.kind === "resolve" && cue.index === detail.index,
+          );
+          const card = context.cardStore.inner.find(
+            (entry) => entry.uuid === detail.cardUuid,
+          );
+          const knownFace =
+            detail.code > 0 &&
+            card &&
+            (card.code === detail.code ||
+              (card.code === 0 && card.meta.id === detail.code));
+          // MDPro3 AnimationNegate acts on the source card, outside the chain cut-in.
+          // Identity comes only from this publicly revealed chain link.
+          emitDuelCue(
+            {
+              kind: "negate",
+              code: detail.code,
+              cardUuid: knownFace ? card.uuid : undefined,
+              index: detail.index,
+              negation: detail.negation,
+              point: measureCard(
+                knownFace ? card.uuid : undefined,
+                `${card?.location.controller ?? detail.controller}:${
+                  card?.location.zone ?? detail.zone
+                }`,
+              ),
+            },
+            1000,
+          );
         } else if (notification.kind === "chained" && detail.index > 1) {
           const previous = context.matStore.chainDetails.find(
             (entry) => entry.index === detail.index - 1,

@@ -301,21 +301,23 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
           [styles.focusing]: classFocus,
         })}
       >
-        <YgoCard
-          className={styles.cover}
-          code={snap.code === 0 ? snap.meta.id : snap.code}
-          name={snap.meta.text.name}
-          disabled={disabled}
-          urgent
-        />
-        <YgoCard className={styles.back} isBack />
-        <ActionFrame
-          highlight={actionHighlight}
-          className={styles["action-frame"]}
-        />
-        {(snap.selectInfo.selectable || snap.selectInfo.selected) && (
-          <div aria-hidden="true" className={styles["selection-frame"]} />
-        )}
+        <div className={styles["negation-wrap"]} data-card-negation-wrap>
+          <YgoCard
+            className={styles.cover}
+            code={snap.code === 0 ? snap.meta.id : snap.code}
+            name={snap.meta.text.name}
+            urgent
+            data-card-face
+          />
+          <YgoCard className={styles.back} isBack />
+          <ActionFrame
+            highlight={actionHighlight}
+            className={styles["action-frame"]}
+          />
+          {(snap.selectInfo.selectable || snap.selectInfo.selected) && (
+            <div aria-hidden="true" className={styles["selection-frame"]} />
+          )}
+        </div>
       </div>
       {snap.targeted && <div className={styles.targeted} />}
     </animated.div>

@@ -98,7 +98,9 @@ export const ChainDisplay: React.FC = () => {
                 onClick={() => showCardModal({ meta: fetchCard(entry.code) })}
                 aria-label={`${english ? "Chain" : "连锁"} ${
                   entry.index
-                }: ${name(entry.code)}, ${label(entry)}`}
+                }: ${name(entry.code)}, ${label(entry)}${
+                  entry.negated ? (english ? ", negated" : ", 已无效") : ""
+                }`}
               >
                 <span className={styles.index}>{entry.index}</span>
                 <YgoCard
@@ -111,9 +113,7 @@ export const ChainDisplay: React.FC = () => {
                   <strong>{name(entry.code)}</strong>
                   <small>
                     {label(entry)} ·{" "}
-                    {entry.negated
-                      ? "已无效"
-                      : entry.resolving
+                    {entry.resolving
                       ? "结算中"
                       : entry.resolved
                       ? "已处理"

@@ -99,6 +99,10 @@
   flex: 0 0 2.1rem;
 }
 
+.entry[data-chain-negated="true"] .smallArt {
+  filter: grayscale(1);
+}
+
 .entryText strong {
   overflow: hidden;
   font-size: 0.8rem;

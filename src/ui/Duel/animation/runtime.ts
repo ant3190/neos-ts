@@ -37,6 +37,8 @@ export interface DuelCue {
     | "result";
   duration: number;
   code?: number;
+  cardUuid?: string;
+  negation?: "activation" | "effect";
   previousCode?: number;
   index?: number;
   previousIndex?: number;
@@ -78,13 +80,16 @@ export function registerZoneElement(key: string, element: HTMLElement | null) {
   if (element) zones.set(key, element);
   else zones.delete(key);
 }
+export function getCardElement(uuid?: string): HTMLElement | undefined {
+  const element = uuid ? elements.get(uuid) : undefined;
+  return element?.isConnected ? element : undefined;
+}
 export function measureCard(
   uuid?: string,
   zoneKey?: string,
 ): Point | undefined {
   const element =
-    (uuid ? elements.get(uuid) : undefined) ??
-    (zoneKey ? zones.get(zoneKey) : undefined);
+    getCardElement(uuid) ?? (zoneKey ? zones.get(zoneKey) : undefined);
   if (!element?.isConnected) return undefined;
   const rect = element.getBoundingClientRect();
   return {

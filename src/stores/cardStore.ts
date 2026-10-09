@@ -101,7 +101,16 @@ export class CardStore implements NeosStore {
 
 // TODO: provided in class
 export function isCardDisabled(card: CardType): boolean {
-  return (card.status & (STATUS_DISABLED | STATUS_FORBIDDEN)) > 0;
+  return (
+    [ygopro.CardZone.MZONE, ygopro.CardZone.SZONE].includes(
+      card.location.zone,
+    ) &&
+    [
+      ygopro.CardPosition.FACEUP_ATTACK,
+      ygopro.CardPosition.FACEUP_DEFENSE,
+    ].includes(card.location.position) &&
+    (card.status & (STATUS_DISABLED | STATUS_FORBIDDEN)) > 0
+  );
 }
 
 export const cardStore = proxy(new CardStore());

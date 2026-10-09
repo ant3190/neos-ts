@@ -6,6 +6,7 @@ import { fetchCard } from "@/api";
 import { YgoCard } from "@/ui/Shared";
 
 import styles from "./index.module.scss";
+import { NegationEffect } from "./NegationEffect";
 import { combatPresentation } from "./present";
 import {
   animationQuality,
@@ -19,7 +20,6 @@ const cueClasses = styles as Record<string, string>;
 const fieldFeedbackKinds = new Set<DuelCue["kind"]>([
   "activate",
   "resolve",
-  "negate",
   "chain",
   "target",
   "impact",
@@ -132,63 +132,67 @@ export function DuelEffects() {
           )}
         </svg>
       )}
-      {cues.map((cue) => (
-        <div
-          key={cue.id}
-          data-testid="duel-event-effect"
-          data-effect-kind={cue.kind}
-          data-summon-type={cue.summonType}
-          className={`${styles.cue} ${cueClasses[cue.kind] ?? ""} ${
-            cue.point ? styles.anchored : styles.banner
-          } ${cue.summonType ? cueClasses[cue.summonType] ?? "" : ""}`}
-          style={
-            {
-              "--tone": cueTone(cue),
-              "--duration": `${cue.duration}ms`,
-              left: cue.point ? cue.point.x : undefined,
-              top: cue.point ? cue.point.y : undefined,
-              "--size": `${Math.max(
-                64,
-                Math.min(cue.point?.width ?? 100, 140),
-              )}px`,
-            } as CSSProperties
-          }
-        >
-          {cue.point && fieldFeedbackKinds.has(cue.kind) && (
-            <>
-              <i className={styles.ring} />
-              <i className={styles.innerRing} />
-              {cue.summonType === "link" && quality === "full" && (
-                <svg className={styles.linkGate} viewBox="0 0 100 100">
-                  <path
-                    d="M50 0 L100 50 L50 100 L0 50 Z M50 14 L86 50 L50 86 L14 50 Z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  />
-                  <path
-                    d="M45 4 L55 4 L50 14 Z M96 45 L96 55 L86 50 Z M45 96 L55 96 L50 86 Z M4 45 L4 55 L14 50 Z"
-                    fill="currentColor"
-                  />
-                </svg>
-              )}
-              {quality === "full" &&
-                cue.kind === "impact" &&
-                Array.from({ length: 6 }, (_, i) => (
-                  <i
-                    key={i}
-                    className={styles.ray}
-                    style={{ "--angle": `${i * 60}deg` } as CSSProperties}
-                  />
-                ))}
-            </>
-          )}
-          {cue.label && <span className={styles.caption}>{cue.label}</span>}
-        </div>
-      ))}
+      {cues.map((cue) =>
+        cue.kind === "negate" ? (
+          <NegationEffect key={cue.id} cue={cue} quality={quality} />
+        ) : (
+          <div
+            key={cue.id}
+            data-testid="duel-event-effect"
+            data-effect-kind={cue.kind}
+            data-summon-type={cue.summonType}
+            className={`${styles.cue} ${cueClasses[cue.kind] ?? ""} ${
+              cue.point ? styles.anchored : styles.banner
+            } ${cue.summonType ? cueClasses[cue.summonType] ?? "" : ""}`}
+            style={
+              {
+                "--tone": cueTone(cue),
+                "--duration": `${cue.duration}ms`,
+                left: cue.point ? cue.point.x : undefined,
+                top: cue.point ? cue.point.y : undefined,
+                "--size": `${Math.max(
+                  64,
+                  Math.min(cue.point?.width ?? 100, 140),
+                )}px`,
+              } as CSSProperties
+            }
+          >
+            {cue.point && fieldFeedbackKinds.has(cue.kind) && (
+              <>
+                <i className={styles.ring} />
+                <i className={styles.innerRing} />
+                {cue.summonType === "link" && quality === "full" && (
+                  <svg className={styles.linkGate} viewBox="0 0 100 100">
+                    <path
+                      d="M50 0 L100 50 L50 100 L0 50 Z M50 14 L86 50 L50 86 L14 50 Z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    />
+                    <path
+                      d="M45 4 L55 4 L50 14 Z M96 45 L96 55 L86 50 Z M45 96 L55 96 L50 86 Z M4 45 L4 55 L14 50 Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                )}
+                {quality === "full" &&
+                  cue.kind === "impact" &&
+                  Array.from({ length: 6 }, (_, i) => (
+                    <i
+                      key={i}
+                      className={styles.ray}
+                      style={{ "--angle": `${i * 60}deg` } as CSSProperties}
+                    />
+                  ))}
+              </>
+            )}
+            {cue.label && <span className={styles.caption}>{cue.label}</span>}
+          </div>
+        ),
+      )}
       {reveal &&
         quality === "full" &&
-        ["activate", "resolve", "negate", "chain"].includes(reveal.kind) && (
+        ["activate", "resolve", "chain"].includes(reveal.kind) && (
           <div
             className={styles.scrim}
             key={`scrim:${reveal.id}`}
@@ -285,9 +289,6 @@ export function DuelEffects() {
                   urgent
                 />
                 {reveal.index && <b>{reveal.index}</b>}
-                {reveal.kind === "negate" && (
-                  <span className={styles.invalid}>⊘</span>
-                )}
               </div>
             )}
           </div>
