@@ -36,8 +36,19 @@
   margin: auto;
   border: 2px solid #8ecfff;
   border-radius: 50%;
+  box-sizing: border-box;
   color: #b9e6ff;
   background: #153449;
+}
+.actions button > span > :global(.anticon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  line-height: 1;
+}
+.actions button > span svg {
+  display: block;
 }
 .actions .gold > span {
   border-color: #f6d37e;

@@ -376,7 +376,7 @@ export const Menu = () => {
   const globalDisable = !matStore.isMe(currentPlayer);
 
   return (
-    <div className={styles["menu-container"]}>
+    <div className={styles["menu-container"]} data-testid="duel-controls">
       <SelectManager />
       <ReplayControl />
       <AnimationQualityControl />

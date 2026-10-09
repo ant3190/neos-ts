@@ -14,8 +14,6 @@ import { showCardModal } from "../CardModal";
 const CARD_WIDTH = "6.25rem";
 const DRAWER_WIDTH = "10rem";
 
-// TODO: 显示的位置还需要细细斟酌
-
 const defaultStore = {
   zone: ygopro.CardZone.HAND,
   controller: 0,
@@ -55,10 +53,16 @@ export const CardListModal = () => {
       onClose={handleOkOrCancel}
       // headerStyle={{ display: "none" }}
       width={DRAWER_WIDTH}
-      style={{ maxHeight: "100%" }}
+      // Leave the bottom duel controls outside the drawer, including its hit area.
+      rootStyle={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}
+      styles={{ body: { padding: "1rem" } }}
+      data-testid="duel-card-list"
       mask={false}
     >
-      <Space direction="vertical">
+      <Space
+        direction="vertical"
+        style={{ width: "100%", alignItems: "center" }}
+      >
         {cardList.map((card) => (
           <div
             key={card.uuid}

@@ -194,31 +194,6 @@
   font-size: 30px;
   color: var(--tone);
 }
-.revealText {
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  width: 100%;
-  padding: 8px 12px;
-  background: #08131feb;
-  border-left: 3px solid var(--tone);
-  box-sizing: border-box;
-  text-align: center;
-}
-.revealText small {
-  color: var(--tone);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-.revealText strong {
-  margin: 4px 0;
-  font-size: 16px;
-  line-height: 1.4;
-}
-.revealText span {
-  font-size: 12px;
-  color: #c8d5e0;
-}
 .negationAtSource {
   position: absolute;
   transform: translate(-50%, -50%);

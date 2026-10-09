@@ -1,7 +1,7 @@
 import { type INTERNAL_Snapshot as Snapshot, useSnapshot } from "valtio";
 
 import { ygopro } from "@/api";
-import { BlockState, isMe, placeStore } from "@/stores";
+import { BlockState, isMe, matStore, placeStore } from "@/stores";
 import { BgChain, type ChainMarker } from "@/ui/Shared";
 
 import styles from "./index.module.scss";
@@ -16,7 +16,9 @@ const getController = (opponent = false) => {
 
 export const HandChain: React.FC = () => {
   const snap = useSnapshot(placeStore.inner);
+  const hasChain = useSnapshot(matStore).chainDetails.length > 1;
   const { me, op } = snap[HAND];
+  if (!hasChain) return null;
 
   const genChains = (states: Snapshot<BlockState[]>, opponent = false) => {
     const controller = getController(opponent);

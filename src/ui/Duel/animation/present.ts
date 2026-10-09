@@ -168,17 +168,17 @@ export function presentGameMessage(
         if (notification.kind === "solving") {
           for (const entry of context.matStore.chainDetails)
             entry.resolving = entry.id === detail.id && !entry.resolved;
-          if (!detail.negated && !detail.resolved)
+          if (
+            context.matStore.chainDetails.length > 1 &&
+            !detail.negated &&
+            !detail.resolved
+          )
             showDuelResolution({
               kind: "resolve",
               code: detail.code,
               index: detail.index,
               chainId: detail.id,
-              label: "连锁结算",
               opponent: !context.matStore.isMe(detail.controller),
-              source: `${
-                context.matStore.isMe(detail.controller) ? "我方" : "对方"
-              }${names[detail.zone]}`,
             });
           else duelTimeline.discardReveals(isChainReveal);
         } else if (
@@ -229,7 +229,6 @@ export function presentGameMessage(
             chainId: detail.id,
             previousCode: previous?.code,
             previousIndex: previous?.index,
-            label: "CHAIN",
             opponent: !context.matStore.isMe(detail.controller),
           } as const;
           if (
@@ -488,11 +487,8 @@ export function presentGameMessage(
         code: event.code,
         index: context.matStore.chains.length + 1,
         chainId: context.matStore.chainEventId + 1,
-        label: "效果发动",
-        source: source(event.location),
         opponent: !context.matStore.isMe(event.location.controller),
       });
-      emitDuelCue({ kind: "activate", point: point(event.location) }, 900);
       break;
     }
     case "chain_solved": {

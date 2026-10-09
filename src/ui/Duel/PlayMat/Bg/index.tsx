@@ -8,6 +8,7 @@ import {
   type BlockState,
   cardStore,
   isMe,
+  matStore,
   type PlaceInteractivity,
   placeStore,
 } from "@/stores";
@@ -54,28 +55,31 @@ const BgBlock: React.FC<
   className,
   chains,
   ...rest
-}) => (
-  <div
-    {...rest}
-    ref={(node) => {
-      const attrs = rest as Record<string, unknown>;
-      const controller = attrs["data-controller"];
-      const zone =
-        attrs["data-zone-value"] ??
-        (attrs["data-zone"] === "DECK" ? ygopro.CardZone.DECK : undefined);
-      if (controller !== undefined && zone !== undefined)
-        registerZoneElement(`${controller}:${zone}`, node);
-    }}
-    data-action-highlight={actionHighlight ?? "none"}
-    className={classnames(styles.block, className, {
-      [styles.highlight]: highlight,
-    })}
-  >
-    {<DisabledCross disabled={disabled} />}
-    {<BgChain {...chains} />}
-    <ActionFrame highlight={actionHighlight} />
-  </div>
-);
+}) => {
+  const hasChain = useSnapshot(matStore).chainDetails.length > 1;
+  return (
+    <div
+      {...rest}
+      ref={(node) => {
+        const attrs = rest as Record<string, unknown>;
+        const controller = attrs["data-controller"];
+        const zone =
+          attrs["data-zone-value"] ??
+          (attrs["data-zone"] === "DECK" ? ygopro.CardZone.DECK : undefined);
+        if (controller !== undefined && zone !== undefined)
+          registerZoneElement(`${controller}:${zone}`, node);
+      }}
+      data-action-highlight={actionHighlight ?? "none"}
+      className={classnames(styles.block, className, {
+        [styles.highlight]: highlight,
+      })}
+    >
+      {<DisabledCross disabled={disabled} />}
+      {hasChain && <BgChain {...chains} />}
+      <ActionFrame highlight={actionHighlight} />
+    </div>
+  );
+};
 
 const BgExtraRow: React.FC<{
   meSnap: Snapshot<BlockState[]>;

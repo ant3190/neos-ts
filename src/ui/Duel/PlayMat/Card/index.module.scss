@@ -132,17 +132,6 @@
       translateZ(calc((var(--z) + var(--sub-z)) * 1px + 0.1px))
       rotateY(calc(var(--ry) * 1deg));
   }
-  .focus {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    transform: scale(var(--focus-scale));
-    pointer-events: none;
-    outline: 2px solid #ffdfa0;
-    display: var(--focus-display);
-    opacity: var(--focus-opacity);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

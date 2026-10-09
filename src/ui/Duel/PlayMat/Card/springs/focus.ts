@@ -34,15 +34,11 @@ export const focus = async (props: { card: CardType; api: SpringApi }) => {
     await asyncStart(api)({
       z: current.z + 60,
       scale: current.scale * 1.07,
-      focusScale: 1.15,
-      focusDisplay: "block",
-      focusOpacity: 1,
       config: { duration },
     });
     await new Promise((resolve) =>
       setTimeout(resolve, quality === "full" ? 700 : 180),
     );
     await asyncStart(api)({ ...current, config: { duration } });
-    api.set({ focusScale: 1, focusOpacity: 1, focusDisplay: "none" });
   }
 };

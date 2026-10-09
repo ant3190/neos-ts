@@ -13,10 +13,6 @@
   flex-direction: column;
   gap: 0.25rem;
 }
-.entryText small {
-  color: #c4d0db;
-  font-size: 0.75rem;
-}
 .resolving {
   background: #4b3c20;
   border-left: 3px solid #ffe1a2;
@@ -117,8 +113,5 @@
     right: 0.5rem;
     width: min(12rem, 42vw);
     max-height: 36vh;
-  }
-  .entryText small {
-    font-size: 0.68rem;
   }
 }

@@ -134,12 +134,7 @@ const Icon: React.FC<{ type: string; size?: number }> = ({
   <IconFont
     type={type}
     size={size}
-    style={{
-      width: 24,
-      height: 30,
-      marginRight: 6,
-      justifyContent: "center",
-    }}
+    style={{ width: size, height: size, lineHeight: 1 }}
   />
 );
 

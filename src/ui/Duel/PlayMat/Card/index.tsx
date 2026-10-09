@@ -51,9 +51,6 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
         rz: 0,
         zIndex: 0,
         scale: 0,
-        focusScale: 1,
-        focusDisplay: "none",
-        focusOpacity: 1,
         subZ: 0,
         opacity: 1,
       }) satisfies SpringApiProps,
@@ -287,15 +284,11 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
           "--ry": spring.ry,
           "--hand-angle": spring.rz,
           zIndex: spring.zIndex,
-          "--focus-scale": spring.focusScale,
-          "--focus-display": spring.focusDisplay,
-          "--focus-opacity": spring.focusOpacity,
           opacity: spring.opacity,
         } as any as CSSProperties
       }
       onClick={onClick}
     >
-      <div className={styles.focus} />
       <div
         className={classnames(styles["img-wrap"], {
           [styles.focusing]: classFocus,

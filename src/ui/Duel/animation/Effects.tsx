@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useSnapshot } from "valtio";
 
 import { fetchCard } from "@/api";
+import { matStore } from "@/stores";
 import { YgoCard } from "@/ui/Shared";
 
 import styles from "./index.module.scss";
@@ -17,12 +18,12 @@ import {
 } from "./runtime";
 
 const cueClasses = styles as Record<string, string>;
-const fieldFeedbackKinds = new Set<DuelCue["kind"]>([
-  "activate",
-  "resolve",
-  "chain",
-  "target",
-  "impact",
+const fieldFeedbackKinds = new Set<DuelCue["kind"]>(["target", "impact"]);
+const captionKinds = new Set<DuelCue["kind"]>([
+  "phase",
+  "turn",
+  "life",
+  "result",
 ]);
 const typeTones = {
   fusion: "#c697ff",
@@ -49,6 +50,7 @@ export function DuelEffects() {
     duelTimeline.getSnapshot,
   );
   const settings = useSnapshot(animationSettings);
+  const hasChain = useSnapshot(matStore).chainDetails.length > 1;
   const combat = useSnapshot(combatPresentation);
   const quality = animationQuality(settings);
   useEffect(startAnimationRuntime, []);
@@ -186,7 +188,9 @@ export function DuelEffects() {
                   ))}
               </>
             )}
-            {cue.label && <span className={styles.caption}>{cue.label}</span>}
+            {cue.label && captionKinds.has(cue.kind) && (
+              <span className={styles.caption}>{cue.label}</span>
+            )}
           </div>
         ),
       )}
@@ -290,19 +294,9 @@ export function DuelEffects() {
                   className={styles.art}
                   urgent
                 />
-                {reveal.index && <b>{reveal.index}</b>}
+                {hasChain && reveal.index && <b>{reveal.index}</b>}
               </div>
             )}
-          </div>
-          <div className={styles.revealText}>
-            <small>
-              {reveal.index ? `CHAIN ${reveal.index} · ` : ""}
-              {reveal.label}
-            </small>
-            <strong>
-              {reveal.code ? fetchCard(reveal.code).text.name : ""}
-            </strong>
-            <span>{reveal.source}</span>
           </div>
         </div>
       )}

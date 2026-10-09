@@ -48,7 +48,7 @@ export const ChainDisplay: React.FC = () => {
       list.scrollTop = list.scrollHeight;
   }, [chainDetails.length]);
 
-  if (chainDetails.length === 0) return null;
+  if (chainDetails.length < 2) return null;
 
   const label = (entry: ChainDetail) => {
     const side = matStore.isMe(entry.controller)
@@ -101,6 +101,18 @@ export const ChainDisplay: React.FC = () => {
                   entry.index
                 }: ${name(entry.code)}, ${label(entry)}${
                   entry.negated ? (english ? ", negated" : ", 已无效") : ""
+                }, ${
+                  entry.resolving
+                    ? english
+                      ? "resolving"
+                      : "结算中"
+                    : entry.resolved
+                    ? english
+                      ? "resolved"
+                      : "已处理"
+                    : english
+                    ? "pending"
+                    : "待处理"
                 }`}
               >
                 <span className={styles.index}>{entry.index}</span>
@@ -112,14 +124,6 @@ export const ChainDisplay: React.FC = () => {
                 />
                 <span className={styles.entryText}>
                   <strong>{name(entry.code)}</strong>
-                  <small>
-                    {label(entry)} ·{" "}
-                    {entry.resolving
-                      ? "结算中"
-                      : entry.resolved
-                      ? "已处理"
-                      : "待处理"}
-                  </small>
                 </span>
               </button>
             ))}
