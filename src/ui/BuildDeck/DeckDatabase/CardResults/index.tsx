@@ -83,7 +83,6 @@ export const CardResults: React.FC<{
                 key={card.id}
                 source="search"
                 onMouseUp={handleMouseUp}
-                onMouseEnter={() => showSelectedCard(card)}
               />
             ))}
           </div>
