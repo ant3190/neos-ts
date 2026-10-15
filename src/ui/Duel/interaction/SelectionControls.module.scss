@@ -1,0 +1,59 @@
+.layer {
+  position: absolute;
+  transform-origin: 0 0;
+  pointer-events: none;
+  z-index: 970;
+}
+.controls {
+  position: absolute;
+  right: 16px;
+  bottom: 84px;
+  width: 340px;
+  max-width: calc(100% - 32px);
+  padding: 12px;
+  border: 1px solid var(--duel-border);
+  border-radius: 5px;
+  background: var(--duel-panel-bg);
+  color: var(--duel-text);
+  pointer-events: auto;
+  font:
+    14px/1.5 var(--theme-font),
+    sans-serif;
+  p {
+    margin: 0 0 12px;
+    overflow-wrap: anywhere;
+  }
+}
+.buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  > div {
+    display: contents;
+  }
+  :global(.ant-btn) {
+    min-width: 96px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid #526473;
+    border-radius: 4px;
+    box-shadow: none;
+    background: #243644;
+    color: #e7edf4;
+    font-size: 14px;
+  }
+  :global(.ant-btn-primary) {
+    background: #245a77;
+    border-color: #598ba4;
+  }
+  :global(.ant-btn:disabled) {
+    background: #24313b;
+    border-color: #3e4c57;
+    color: #82909b;
+  }
+  :global(.ant-btn:focus-visible) {
+    outline: 2px solid #a4d8ed;
+    outline-offset: 2px;
+  }
+}

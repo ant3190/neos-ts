@@ -54,6 +54,9 @@ test("controls and their menus use viewport dimensions at desktop and portrait s
   ]) {
     await page.setViewportSize(size);
     const button = page.getByTestId("duel-settings");
+    await expect
+      .poll(async () => (await button.boundingBox())!.width)
+      .toBeCloseTo(44, 1);
     const box = (await button.boundingBox())!;
     expect(box.width).toBeCloseTo(44, 1);
     expect(box.height).toBeCloseTo(44, 1);
@@ -153,7 +156,7 @@ test("popup fade keeps its anchor fixed and field view restores without submitti
         Math.min(...frames.map((f) => f[key])),
     ).toBeLessThan(0.5);
   await page.keyboard.press("Escape");
-  await page.mouse.click(640, 300, { button: "right" });
+  await page.locator(".ant-modal:visible .ant-modal-close").click();
   await expect(page.getByTestId("duel-yesno-yes")).toBeVisible();
   expect(
     await page.evaluate(() => (window as any).__parityPackets.length),

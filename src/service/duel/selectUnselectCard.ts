@@ -1,9 +1,10 @@
 import { ygopro } from "@/api";
 import { Container } from "@/container";
 import { displaySelectActionsModal } from "@/ui/Duel/Message/SelectActionsModal";
+import { clearSelectInfo } from "@/ui/Duel/utils/clearSelectInfo";
 
 import { fetchCheckCardMeta } from "../utils";
-import { isAllOnField } from "./util";
+import { canSelectOnField } from "./util";
 type MsgSelectUnselectCard = ygopro.StocGameMessage.MsgSelectUnselectCard;
 
 export default async (
@@ -21,12 +22,14 @@ export default async (
     selectable_cards: selectableCards,
     selected_cards: selectedCards,
   } = selectUnselectCards;
+  clearSelectInfo();
   if (
-    isAllOnField(
+    canSelectOnField(
+      context,
       selectableCards.concat(selectedCards).map((info) => info.location),
     )
   ) {
-    // 所有可选卡和已选卡都是在场上或手牌
+    // 所有可选卡和已选卡都在场上，且不包含叠放素材
     // 通过让玩家点击场上的卡来进行选择
     for (const info of selectableCards) {
       const card = cardStore.find(info.location);
@@ -48,7 +51,7 @@ export default async (
     matStore.selectUnselectInfo.finishable = finishable;
     matStore.selectUnselectInfo.cancelable = cancelable;
   } else {
-    // 有一些卡不在场上或手牌，因此无法通过点击卡片来选择
+    // 包含手牌、墓地等区域或叠放素材，统一在弹窗中选择
     // 这里通过让玩家点击Modal中的卡来进行选择
     const {
       selecteds: selecteds1,

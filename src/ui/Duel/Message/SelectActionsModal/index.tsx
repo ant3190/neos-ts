@@ -21,6 +21,7 @@ const defaultProps: Omit<
   isOpen: false,
   isChain: false,
   fieldSelection: false,
+  autoSubmit: undefined,
   min: 0, // 最少选择多少卡
   max: 0, // 最多选择多少卡
   single: false, // 是否只能单选
@@ -56,7 +57,12 @@ export const SelectActionsModal: React.FC = () => {
   };
 
   const onFinish = () => {
-    if (!localStore.isOpen || renderedPromptId !== localStore.promptId) return;
+    if (
+      !localStore.isOpen ||
+      !localStore.finishable ||
+      renderedPromptId !== localStore.promptId
+    )
+      return;
     localStore.isOpen = false;
     resetFieldSelection();
     sendSelectSingleResponse(container.conn, FINISH_RESPONSE);
@@ -64,7 +70,12 @@ export const SelectActionsModal: React.FC = () => {
   };
 
   const onCancel = () => {
-    if (!localStore.isOpen || renderedPromptId !== localStore.promptId) return;
+    if (
+      !localStore.isOpen ||
+      !localStore.cancelable ||
+      renderedPromptId !== localStore.promptId
+    )
+      return;
     localStore.isOpen = false;
     resetFieldSelection();
     sendSelectSingleResponse(container.conn, CANCEL_RESPONSE);
@@ -73,6 +84,7 @@ export const SelectActionsModal: React.FC = () => {
 
   return (
     <SelectCardsModal
+      key={snap.promptId}
       {...{
         ...snap,
         onSubmit,

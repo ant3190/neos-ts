@@ -49,22 +49,24 @@
   min-inline-size: 0;
   margin: 0;
   padding: 6px 12px 10px;
-  border: 1px solid #596f7c;
+  border: 1px solid #4b83ae;
   border-radius: 3px;
+  background: #173d58b8;
 }
 .originTitle {
   max-width: 100%;
   padding: 0 6px;
-  color: #c0d0da;
+  color: #c6e5fa;
   font-size: 20px;
   font-weight: 500;
   line-height: 26px;
   white-space: nowrap;
 }
 .opponent {
-  border-color: #826d64;
+  border-color: #ad6269;
+  background: #54282db8;
   .originTitle {
-    color: #d7c5bc;
+    color: #f1cbd0;
   }
 }
 .groupCards {
@@ -149,51 +151,4 @@
   display: flex;
   justify-content: end;
   gap: 8px;
-}
-.fieldPrompt {
-  position: absolute;
-  inset: 0;
-  z-index: 970;
-  color: #edf8ff;
-  pointer-events: none;
-  p {
-    position: absolute;
-    left: 50%;
-    top: 215px;
-    transform: translateX(-50%);
-    width: 1000px;
-    min-height: 85px;
-    margin: 0;
-    padding: 18px 30px;
-    text-align: center;
-    border: 1px solid #8bbdd177;
-    background: #142d3ae8;
-    border-radius: 6px;
-    font-size: 26px;
-  }
-  > span {
-    display: none;
-  }
-  .footer {
-    position: absolute;
-    left: 50%;
-    top: 405px;
-    width: 800px;
-    transform: translateX(-50%);
-    display: flex;
-    justify-content: space-between;
-    pointer-events: none;
-  }
-  :global(.ant-btn) {
-    min-width: 135px;
-    height: 110px;
-    border-radius: 55px;
-    font-size: 25px;
-    pointer-events: auto;
-    background: #1d3b4d;
-    color: #e5f6ff;
-  }
-  :global(.ant-btn-primary) {
-    margin-left: auto;
-  }
 }

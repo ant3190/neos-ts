@@ -9,8 +9,10 @@ import { matStore, replayStore, SideStage, sideStore } from "@/stores";
 import { warmDeckImages } from "@/ui/Shared/YgoCard/imageCache";
 
 import { DuelEffects } from "./animation/Effects";
-import { CardActions } from "./interaction/CardActions";
+import { CardActions, closeCardActions } from "./interaction/CardActions";
 import { handInteraction, suppressHandClick } from "./interaction/hand";
+import { useDuelRightClick } from "./interaction/rightClick";
+import { IncrementalSelectionControls } from "./interaction/SelectionControls";
 import { FieldInfo } from "./layout/FieldInfo";
 import layoutStyles from "./layout/index.module.scss";
 import { useDuelCamera } from "./layout/viewport";
@@ -53,6 +55,15 @@ export const Component: React.FC = () => {
   const { DEV } = useEnv();
   const RECORD = "record";
 
+  useDuelRightClick(
+    true,
+    () => {
+      closeCardActions();
+      closeCardModal();
+      closeCardListModal();
+    },
+    0,
+  );
   useEffect(() => () => resetDuelDialogs(), []);
   useEffect(() => {
     const outside = (event: PointerEvent) => {
@@ -134,6 +145,7 @@ export const Component: React.FC = () => {
       <SelectActionsModal />
       <Alert />
       <Menu />
+      <IncrementalSelectionControls />
       <LifeBar />
       <Mat />
       <FieldInfo />

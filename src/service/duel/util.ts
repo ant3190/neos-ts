@@ -1,16 +1,28 @@
 import { ygopro } from "@/api";
-const { MZONE, SZONE, HAND } = ygopro.CardZone;
+const { MZONE, SZONE } = ygopro.CardZone;
 import { fetchStrings } from "@/api";
 import { Region } from "@/api";
 import { fetchCard } from "@/api/cards";
 import { Context } from "@/container";
 
 export function isAllOnField(locations: ygopro.CardLocation[]): boolean {
-  const isOnField = (location: ygopro.CardLocation) => {
-    return [MZONE, SZONE, HAND].includes(location.zone);
-  };
+  return (
+    locations.length > 0 &&
+    locations.every(
+      (location) =>
+        [MZONE, SZONE].includes(location.zone) && !location.is_overlay,
+    )
+  );
+}
 
-  return locations.find((location) => !isOnField(location)) === undefined;
+export function canSelectOnField(
+  context: Context,
+  locations: ygopro.CardLocation[],
+) {
+  return (
+    isAllOnField(locations) &&
+    locations.every((location) => !!context.cardStore.find(location))
+  );
 }
 
 export function computeSetDifference(set1: number[], set2: number[]): number[] {

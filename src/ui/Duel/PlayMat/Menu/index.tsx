@@ -13,7 +13,6 @@ import {
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import { Button, Checkbox, Tooltip } from "antd";
-import classNames from "classnames";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSnapshot } from "valtio";
@@ -21,7 +20,6 @@ import { useSnapshot } from "valtio";
 import {
   sendSelectBattleCmdResponse,
   sendSelectIdleCmdResponse,
-  sendSelectSingleResponse,
   sendSurrender,
   ygopro,
 } from "@/api";
@@ -35,18 +33,18 @@ import {
 
 import { AnimationQualityControl } from "../../animation/Quality";
 import { legalPhaseCommands } from "../../interaction/phaseRules";
+import { useDuelRightClick } from "../../interaction/rightClick";
 import { projectWorld } from "../../layout/geometry";
 import { duelPanels, toggleAttachedEffects } from "../../layout/panels";
 import { duelPreferences, setAutoInfo } from "../../layout/preferences";
 import { duelViewport } from "../../layout/viewport";
 import { displayActionHistory } from "../../Message";
 import { duelInputState } from "../../Message/session";
-import { clearAllIdleInteractivities, clearSelectInfo } from "../../utils";
+import { clearAllIdleInteractivities } from "../../utils";
 import { openChatBox } from "../ChatBox";
 import styles from "./index.module.scss";
 import PhaseType = ygopro.StocGameMessage.MsgNewPhase.PhaseType;
 
-const FINISH_CANCEL_RESPONSE = -1;
 const REPLAY_ADVANCE_EVENT = "neos:replay-advance";
 interface ReplayAdvanceEventDetail {
   advanceMask?: number;
@@ -132,6 +130,7 @@ export const Menu = () => {
   }, []);
   useEffect(() => {
     const outside = (event: PointerEvent) => {
+      if (event.button !== 0) return;
       const target = event.target as Element;
       if (
         !target.closest(
@@ -163,6 +162,14 @@ export const Menu = () => {
       sendSelectBattleCmdResponse(container.conn, command.response);
     else sendSelectIdleCmdResponse(container.conn, command.response);
   };
+  useDuelRightClick(
+    settingsOpen || phaseOpen,
+    () => {
+      setSettingsOpen(false);
+      setPhaseOpen(false);
+    },
+    150,
+  );
   const phaseLeft = Math.min(
     window.innerWidth - 88,
     Math.max(88, viewport.left + phaseAnchor.x * viewport.scale),
@@ -242,7 +249,6 @@ export const Menu = () => {
         </div>
       )}
       <div className={styles["menu-container"]} data-testid="duel-controls">
-        <SelectManager />
         <div className={styles.replay}>
           <ReplayControl />
         </div>
@@ -426,26 +432,5 @@ const ReplayControl: React.FC = () => {
         />
       </Tooltip>
     </>
-  );
-};
-
-const SelectManager: React.FC = () => {
-  const container = getUIContainer();
-  const { t: i18n } = useTranslation("Menu");
-  const { finishable, cancelable } = useSnapshot(matStore.selectUnselectInfo);
-  const onFinishOrCancel = () => {
-    sendSelectSingleResponse(container.conn, FINISH_CANCEL_RESPONSE);
-    clearSelectInfo();
-  };
-  return (
-    <div className={styles["select-manager"]}>
-      <Button
-        className={classNames(styles.btn, { [styles.cancle]: cancelable })}
-        disabled={!cancelable && !finishable}
-        onClick={onFinishOrCancel}
-      >
-        {finishable ? i18n("SelectionComplete") : i18n("Deselect")}
-      </Button>
-    </div>
   );
 };

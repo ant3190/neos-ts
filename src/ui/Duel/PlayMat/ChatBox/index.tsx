@@ -6,6 +6,7 @@ import { proxy, useSnapshot } from "valtio";
 
 import { IconFont, ScrollableArea, useChat } from "@/ui/Shared";
 
+import { useDuelRightClick } from "../../interaction/rightClick";
 import styles from "./index.module.scss";
 
 const store = proxy({ open: false });
@@ -19,6 +20,7 @@ export const ChatBox: React.FC = () => {
   const { open } = useSnapshot(store);
   const { dialogs, input, setInput, ref, onSend } = useChat(true);
   const { t: i18n } = useTranslation("Chat");
+  useDuelRightClick(open, closeChatBox, 200);
   useEffect(() => {
     if (!open) return;
     const close = (event: KeyboardEvent | MouseEvent) => {
@@ -32,10 +34,8 @@ export const ChatBox: React.FC = () => {
       }
     };
     document.addEventListener("keydown", close);
-    document.addEventListener("contextmenu", close);
     return () => {
       document.removeEventListener("keydown", close);
-      document.removeEventListener("contextmenu", close);
     };
   }, [open]);
   if (!open) return null;

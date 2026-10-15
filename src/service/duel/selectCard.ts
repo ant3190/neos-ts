@@ -5,6 +5,7 @@ import { Container } from "@/container";
 import { displaySelectActionsModal } from "@/ui/Duel/Message/SelectActionsModal";
 
 import { fetchCheckCardMeta } from "../utils";
+import { canSelectOnField } from "./util";
 
 export default async (container: Container, selectCard: MsgSelectCard) => {
   const { cancelable, min, max, cards } = selectCard;
@@ -24,16 +25,11 @@ export default async (container: Container, selectCard: MsgSelectCard) => {
     cards,
   );
   await displaySelectActionsModal({
-    fieldSelection:
-      cards.length > 0 &&
-      cards.every(
-        (card) =>
-          [ygopro.CardZone.MZONE, ygopro.CardZone.SZONE].includes(
-            card.location.zone,
-          ) &&
-          !card.location.is_overlay &&
-          !!context.cardStore.find(card.location),
-      ),
+    fieldSelection: canSelectOnField(
+      context,
+      cards.map((card) => card.location),
+    ),
+    autoSubmit: "max",
     cancelable,
     min,
     max,

@@ -55,7 +55,10 @@ export function fetchStrings(region: Region, id: string | number): string {
   return localStorage.getItem(`${region}_${id}`) ?? "?";
 }
 
-export function getStrings(description: number): string {
+export function getStrings(
+  description: number,
+  includeFullRules = true,
+): string {
   if (description < DESCRIPTION_LIMIT) {
     return fetchStrings(Region.System, description);
   } else {
@@ -67,8 +70,8 @@ export function getStrings(description: number): string {
     // text is still available and must not turn a prompt into a blank box.
     return (
       getCardStr(meta, index)?.trim() ||
-      meta.text.desc?.trim() ||
-      meta.text.name ||
+      (includeFullRules ? meta.text.desc?.trim() : "") ||
+      (includeFullRules ? meta.text.name : "") ||
       "[?]"
     );
   }

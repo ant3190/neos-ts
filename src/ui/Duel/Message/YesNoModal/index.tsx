@@ -33,38 +33,32 @@ export const YesNoModal: React.FC = () => {
   const message =
     msg?.trim() && msg !== "?" && msg !== "[?]"
       ? msg
-      : meta?.text.desc || "是否继续？";
+      : meta
+      ? "是否发动这个效果？"
+      : "是否继续？";
 
+  const answer = (yes: boolean) => {
+    if (!localStore.isOpen || promptId !== localStore.promptId) return;
+    localStore.isOpen = false;
+    sendSelectEffectYnResponse(container.conn, yes);
+    session.settle();
+  };
   return (
     <NeosModal
       title={meta ? "是否发动这个效果？" : "请确认"}
       open={isOpen}
-      duelWidth={950}
+      duelWidth={760}
+      onDuelCancel={() => answer(false)}
       afterClose={() => (matStore.hint.esHint = undefined)}
       footer={
         <>
-          <Button
-            data-testid="duel-yesno-no"
-            onClick={() => {
-              if (!localStore.isOpen || promptId !== localStore.promptId)
-                return;
-              localStore.isOpen = false;
-              sendSelectEffectYnResponse(container.conn, false);
-              session.settle();
-            }}
-          >
+          <Button data-testid="duel-yesno-no" onClick={() => answer(false)}>
             取消
           </Button>
           <Button
             data-testid="duel-yesno-yes"
             type="primary"
-            onClick={() => {
-              if (!localStore.isOpen || promptId !== localStore.promptId)
-                return;
-              localStore.isOpen = false;
-              sendSelectEffectYnResponse(container.conn, true);
-              session.settle();
-            }}
+            onClick={() => answer(true)}
           >
             确认
           </Button>
@@ -78,14 +72,6 @@ export const YesNoModal: React.FC = () => {
           {source && <p className={styles.source}>{source}</p>}
           {preHintMsg && <p>{preHintMsg}</p>}
           <p data-testid="duel-yesno-message">{message}</p>
-          {meta?.text.desc && meta.text.desc !== message && (
-            <p
-              className={styles.effectText}
-              data-testid="duel-yesno-effect-text"
-            >
-              {meta.text.desc}
-            </p>
-          )}
         </div>
       </div>
     </NeosModal>

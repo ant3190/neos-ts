@@ -1,6 +1,12 @@
 import { Button } from "antd";
 import classnames from "classnames";
-import { type ReactNode, useEffect, useId, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useState,
+} from "react";
 import { type INTERNAL_Snapshot as Snapshot, useSnapshot } from "valtio";
 
 import { type CardMeta, fetchStrings, Region, ygopro } from "@/api";
@@ -9,6 +15,8 @@ import { YgoCard } from "@/ui/Shared";
 
 import { closeCardActions } from "../../interaction/CardActions";
 import { registerFieldSelection } from "../../interaction/fieldSelection";
+import { useDuelRightClick } from "../../interaction/rightClick";
+import { SelectionControls } from "../../interaction/SelectionControls";
 import { selectionValid } from "../../interaction/selectionRules";
 import { useHorizontalWheel } from "../../interaction/useHorizontalWheel";
 import { ActionFrame } from "../../PlayMat/ActionFrame";
@@ -32,6 +40,7 @@ export interface SelectCardsModalProps {
   overflow: boolean;
   isChain?: boolean;
   fieldSelection?: boolean;
+  autoSubmit?: "max" | "sum";
   onSubmit: (options: Snapshot<Option[]>) => void;
   onCancel: () => void;
   onFinish: () => void;
@@ -58,6 +67,7 @@ export function SelectCardsModal({
   overflow,
   isChain = false,
   fieldSelection = false,
+  autoSubmit,
   onSubmit,
   onCancel,
   onFinish,
@@ -66,7 +76,7 @@ export function SelectCardsModal({
   const [effectCard, setEffectCard] = useState<string>();
   const promptId = useId();
   const hint = useSnapshot(matStore.hint);
-  useEffect(() => {
+  useLayoutEffect(() => {
     setChosen(isChain && selectables.length === 1 ? [0] : []);
     setEffectCard(undefined);
   }, [selectables, isOpen, isChain]);
@@ -92,7 +102,7 @@ export function SelectCardsModal({
         : values,
     );
   };
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen || !fieldSelection) return;
     closeCardActions();
     setDuelPrompt(promptId, true);
@@ -101,6 +111,15 @@ export function SelectCardsModal({
         ? cardStore.find(option.location as ygopro.CardLocation)
         : undefined,
     );
+    mustSelects.forEach((option) => {
+      const card = option.location
+        ? cardStore.find(option.location as ygopro.CardLocation)
+        : undefined;
+      if (!card) return;
+      card.selectInfo.selectable = false;
+      card.selectInfo.selected = true;
+      card.selectInfo.response = undefined;
+    });
     candidates.forEach((card, index) => {
       if (!card) return;
       card.selectInfo.selectable = true;
@@ -115,10 +134,26 @@ export function SelectCardsModal({
       release();
       setDuelPrompt(promptId, false);
     };
-  }, [isOpen, fieldSelection, selectables, chosen]);
+  }, [isOpen, fieldSelection, selectables, mustSelects, chosen]);
   const submit = () => {
     if (valid && isOpen) onSubmit([...mustSelects, ...options]);
   };
+  useDuelRightClick(
+    isOpen && fieldSelection,
+    () => {
+      if (cancelable) onCancel();
+      else if (finishable) onFinish();
+    },
+    250,
+  );
+  useEffect(() => {
+    if (!isOpen || !fieldSelection || !valid) return;
+    if (
+      (autoSubmit === "max" && chosen.length >= max) ||
+      (autoSubmit === "sum" && totalLevels > 0 && !overflow)
+    )
+      submit();
+  }, [isOpen, fieldSelection, autoSubmit, valid, chosen]);
   const footer = (
     <div className={styles.footer}>
       {cancelable && (
@@ -137,7 +172,7 @@ export function SelectCardsModal({
         disabled={!valid}
         onClick={submit}
       >
-        确定{chosen.length ? ` (${chosen.length})` : ""}
+        确认选择{chosen.length ? ` (${chosen.length})` : ""}
       </Button>
     </div>
   );
@@ -146,16 +181,7 @@ export function SelectCardsModal({
   } (${min === max ? min : `${min}–${max}`} 张)`;
   if (fieldSelection)
     return isOpen ? (
-      <div
-        className={styles.fieldPrompt}
-        data-testid="duel-field-selection"
-        role="region"
-        aria-label={title}
-      >
-        <p>{title}</p>
-        <span>点击场上的卡片选择，再点击确定</span>
-        {footer}
-      </div>
+      <SelectionControls title={title}>{footer}</SelectionControls>
     ) : null;
   const groups = new Map<string, number[]>();
   selectables.forEach((option, index) => {
@@ -279,6 +305,7 @@ export function SelectCardsModal({
         ),
       )}
       open={isOpen}
+      onDuelCancel={cancelable ? onCancel : finishable ? onFinish : undefined}
       footer={footer}
       afterClose={() => {
         if (!isOpen) {

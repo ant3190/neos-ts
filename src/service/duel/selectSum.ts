@@ -3,6 +3,7 @@ import { Container } from "@/container";
 import { displaySelectActionsModal } from "@/ui/Duel/Message/SelectActionsModal";
 
 import { fetchCheckCardMeta } from "../utils";
+import { canSelectOnField } from "./util";
 type MsgSelectSum = ygopro.StocGameMessage.MsgSelectSum;
 
 export default async (container: Container, selectSum: MsgSelectSum) => {
@@ -23,6 +24,13 @@ export default async (container: Container, selectSum: MsgSelectSum) => {
     selectables: selectable2,
   } = await fetchCheckCardMeta(context, selectSum.selectable_cards);
   await displaySelectActionsModal({
+    fieldSelection: canSelectOnField(
+      context,
+      [...selectSum.must_select_cards, ...selectSum.selectable_cards].map(
+        (card) => card.location,
+      ),
+    ),
+    autoSubmit: "sum",
     overflow: selectSum.overflow !== 0,
     totalLevels: selectSum.level_sum,
     min: selectSum.min < 1 ? 1 : selectSum.min, // ygopro2 implementation

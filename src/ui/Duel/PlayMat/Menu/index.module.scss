@@ -63,24 +63,6 @@
   border-radius: 6px;
   background: var(--duel-panel-bg);
 }
-.select-manager {
-  position: absolute;
-  right: 0;
-  bottom: 66px;
-  width: max-content;
-  .btn {
-    width: auto;
-    padding: 0 16px;
-    font-size: 14px;
-    background: #254455;
-  }
-  .btn:disabled {
-    display: none;
-  }
-  .cancle {
-    color: #e5b1ae;
-  }
-}
 .phase {
   position: absolute;
   transform: translate(-50%, -50%);

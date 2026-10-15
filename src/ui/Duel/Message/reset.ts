@@ -8,6 +8,7 @@ import { resetHandInteraction } from "../interaction/hand";
 import { resetDuelPanels } from "../layout/panels";
 import { resetAnimationStall } from "../PlayMat/Card/springs/asyncStart";
 import { closeChatBox } from "../PlayMat/ChatBox";
+import { clearSelectInfo } from "../utils/clearSelectInfo";
 import { resetAnnounceModal } from "./AnnounceModal";
 import { closeCardListModal } from "./CardListModal";
 import { closeCardModal } from "./CardModal";
@@ -30,6 +31,7 @@ export function resetDuelDialogs() {
   closeChatBox();
   closeCardActions();
   resetFieldSelection();
+  clearSelectInfo();
   duelTimeline.clear();
   resetCombatPresentation();
   resetAnimationStall();

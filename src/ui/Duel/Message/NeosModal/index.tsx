@@ -1,31 +1,29 @@
 import { MinusOutlined, UpOutlined } from "@ant-design/icons";
 import { Modal, type ModalProps } from "antd";
 import classNames from "classnames";
-import { useEffect, useId, useLayoutEffect, useState } from "react";
+import { useId, useLayoutEffect, useState } from "react";
 
 import { closeCardActions } from "../../interaction/CardActions";
+import { useDuelRightClick } from "../../interaction/rightClick";
 import { setDuelPrompt } from "../session";
 import styles from "./index.module.scss";
 
 export const NeosModal = ({
   duelPosition = "center",
   duelWidth = 950,
+  onDuelCancel,
   ...props
 }: ModalProps & {
   duelPosition?: "center" | "selection";
   duelWidth?: number;
+  onDuelCancel?: () => void;
 }) => {
   const [mini, setMini] = useState(false);
   const id = useId();
-  useEffect(() => {
-    if (!props.open) return;
-    const fieldView = (event: MouseEvent) => {
-      event.preventDefault();
-      setMini((value) => !value);
-    };
-    document.addEventListener("contextmenu", fieldView);
-    return () => document.removeEventListener("contextmenu", fieldView);
-  }, [props.open]);
+  useDuelRightClick(!!props.open, () => {
+    if (onDuelCancel) onDuelCancel();
+    else setMini((value) => !value);
+  });
   useLayoutEffect(() => {
     setDuelPrompt(id, !!props.open);
     if (props.open) {

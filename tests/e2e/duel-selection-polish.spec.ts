@@ -141,6 +141,19 @@ test("mixed zones share one row with a single frame for each owner and zone", as
   const frames = row.getByTestId("duel-select-origin-group");
   await expect(cards).toHaveCount(12);
   await expect(frames).toHaveCount(6);
+  const colors = await frames.evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      owner: node.getAttribute("data-origin-controller"),
+      rgb: getComputedStyle(node)
+        .backgroundColor.match(/[\d.]+/g)!
+        .map(Number),
+    })),
+  );
+  for (const { owner, rgb } of colors) {
+    expect(rgb[3]).toBeGreaterThan(0.5);
+    if (owner === "0") expect(rgb[2]).toBeGreaterThan(rgb[0]);
+    else expect(rgb[0]).toBeGreaterThan(rgb[2]);
+  }
   await expect(cards.filter({ hasText: /我方|对方|墓地/ })).toHaveCount(0);
   for (const owner of ["我方", "对方"]) {
     for (const zone of ["怪兽区", "墓地", "主卡组"]) {

@@ -71,6 +71,7 @@ export function OptionModal() {
     <NeosModal
       title={title}
       open={isOpen}
+      onDuelCancel={responseKind !== "option" ? cancel : undefined}
       footer={
         <>
           {responseKind !== "option" && (

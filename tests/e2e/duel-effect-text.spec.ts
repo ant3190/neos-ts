@@ -66,7 +66,7 @@ test("a follow-up yes/no prompt shows the effect inside its body without a card 
     .toBe(1);
 });
 
-test("a card effect yes/no prompt resolves a card description instead of a missing system string", async ({
+test("a card effect yes/no prompt shows only its individual effect and card identity", async ({
   page,
 }) => {
   await mdpro3Fixture(page);
@@ -89,7 +89,8 @@ test("a card effect yes/no prompt resolves a card description instead of a missi
     );
   });
   await expect(page.getByTestId("duel-yesno-modal")).toContainText("效果一");
-  await expect(page.getByTestId("duel-yesno-effect-text")).toContainText(
+  await expect(page.getByTestId("duel-yesno-effect-text")).toHaveCount(0);
+  await expect(page.getByTestId("duel-yesno-modal")).not.toContainText(
     "交互回归测试",
   );
   await expect
@@ -129,7 +130,7 @@ test("left inspection restores missing static text from the card database", asyn
   );
 });
 
-test("empty individual effect strings fall back to the full card rules text", async ({
+test("empty individual effect strings keep a concise readable confirmation", async ({
   page,
 }) => {
   await mdpro3Fixture(page);
@@ -145,7 +146,10 @@ test("empty individual effect strings fall back to the full card rules text", as
       }),
     );
   });
-  await expect(page.getByTestId("duel-yesno-message")).toContainText(
+  await expect(page.getByTestId("duel-yesno-message")).toHaveText(
+    "是否发动这个效果？",
+  );
+  await expect(page.getByTestId("duel-yesno-modal")).not.toContainText(
     "交互回归测试",
   );
   await expect(page.getByTestId("duel-yesno-modal")).toContainText("测试卡片");

@@ -22,6 +22,7 @@ import {
 import { getActionHighlight } from "../utils/actionHighlight";
 import { ACTION_ORDER, interactionAvailable } from "./actionRules";
 import styles from "./index.module.scss";
+import { useDuelRightClick } from "./rightClick";
 
 const store = proxy({
   open: false,
@@ -148,6 +149,7 @@ export function CardActions() {
   useEffect(() => {
     if (!renderedOpen) return;
     const close = (event: PointerEvent) => {
+      if (event.button !== 0) return;
       if (ref.current?.contains(event.target as Node)) return;
       // A card click owns the toggle/open behavior.
       if (
@@ -171,6 +173,7 @@ export function CardActions() {
       window.removeEventListener("resize", resize);
     };
   }, [snap.open]);
+  useDuelRightClick(snap.open && !hasDuelPrompt(), closeCardActions, 40);
   if (!snap.open || !actions.length || hasDuelPrompt()) return null;
   const width = actions.length * 58 + 20;
   const menuWidth = Math.min(width, window.innerWidth - 16);
