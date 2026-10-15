@@ -1,22 +1,12 @@
 import { ygopro } from "@/api/ocgcore/idl/ocgcore";
 
-/**
- * MDPro3 GameCard.GetCardPosition and CameraManager, upstream e177cd8d.
- * World X/Z form the table; world Y is elevation. One world unit is 20 CSS px.
- * Keep these coordinates shared by the slots, moving cards and HUD anchors.
- */
+/** Shared orthographic table coordinates; elevation only controls stacking. */
 export const DUEL_WIDTH = 1920;
 export const DUEL_HEIGHT = 1080;
 export const WORLD_UNIT = 20;
+export const TABLE_SCALE = 0.8;
 export const CARD_HEIGHT = 8.6 * WORLD_UNIT;
 export const CARD_RATIO = 5.9 / 8.6;
-export const CAMERA_PITCH = 70;
-const radians = (degrees: number) => (degrees * Math.PI) / 180;
-const pitch = radians(CAMERA_PITCH);
-export const CAMERA_FOCAL_LENGTH = DUEL_HEIGHT / (2 * Math.tan(radians(15)));
-const distance = 95 / Math.sin(pitch);
-export const CAMERA_GROUND_Z = -37 + distance * Math.cos(pitch);
-export const CAMERA_PLANE_DEPTH = CAMERA_FOCAL_LENGTH - distance * WORLD_UNIT;
 
 const ZONE = ygopro.CardZone;
 export const isFaceDownPosition = (position?: number) =>
@@ -57,17 +47,11 @@ export interface TablePose {
 
 export function projectWorld(
   point: WorldPoint,
-  viewport = { width: DUEL_WIDTH, fov: 30 },
+  viewport = { width: DUEL_WIDTH },
 ) {
-  const focal = DUEL_HEIGHT / (2 * Math.tan(radians(viewport.fov / 2)));
-  const y = point.y - 95;
-  const z = point.z + 37;
-  const depth = -Math.sin(pitch) * y + Math.cos(pitch) * z;
   return {
-    x: viewport.width / 2 + (focal * point.x) / depth,
-    y:
-      DUEL_HEIGHT / 2 -
-      (focal * (Math.cos(pitch) * y + Math.sin(pitch) * z)) / depth,
+    x: viewport.width / 2 + point.x * WORLD_UNIT * TABLE_SCALE,
+    y: DUEL_HEIGHT / 2 - point.z * WORLD_UNIT * TABLE_SCALE,
   };
 }
 
@@ -75,7 +59,6 @@ export function zoneWorldPosition(
   location: TableLocation,
   mine: boolean,
   handCount = 0,
-  aspect = 16 / 9,
 ): WorldPoint {
   const { zone, sequence } = location;
   let x = 0,
@@ -83,16 +66,10 @@ export function zoneWorldPosition(
     z = 0;
   switch (zone) {
     case ZONE.HAND:
-      x = sequence * 4 - (handCount - 1) * 2;
+      const step = handCount <= 10 ? 6.4 : 4.4;
+      x = (sequence - (handCount - 1) / 2) * step;
       y = 15;
-      const clamp = (value: number) => Math.max(0, Math.min(1, value));
-      const outward =
-        1.6 * clamp((aspect - 16 / 9) / (5 / 9)) +
-        1.1 * clamp((aspect - 21 / 9) / (11 / 9));
-      z =
-        (mine ? -28 : -17) -
-        outward -
-        Math.abs(x) * (Math.abs(x) * 0.0055 + 0.08);
+      z = -28.5;
       break;
     case ZONE.DECK:
     case ZONE.EXTRA:
@@ -139,9 +116,8 @@ export function tablePose(
   mine: boolean,
   handCount = 0,
   known = true,
-  aspect = 16 / 9,
 ): TablePose {
-  const world = zoneWorldPosition(location, mine, handCount, aspect);
+  const world = zoneWorldPosition(location, mine, handCount);
   const { zone, sequence, position = 0 } = location;
   const hand = zone === ZONE.HAND;
   const stack = zone === ZONE.DECK || zone === ZONE.EXTRA;
@@ -165,14 +141,9 @@ export function tablePose(
     x: world.x * WORLD_UNIT,
     y: -world.z * WORLD_UNIT,
     z: world.y * WORLD_UNIT,
-    rx: hand ? -20 : 0,
+    rx: 0,
     ry: faceDown ? 180 : 0,
-    rz:
-      (mine ? 0 : 180) +
-      rotation +
-      (hand
-        ? world.x * (1.2 - Math.abs(world.x) * 0.006) * (mine ? 1 : -1)
-        : 0),
+    rz: (mine ? 0 : 180) + rotation,
     scale: zone === ZONE.SZONE ? 0.8 : stack ? 0.9 : 1,
     zIndex: location.is_overlay
       ? 1

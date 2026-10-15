@@ -17,6 +17,7 @@ export const asyncStart = <T extends {}>(api: SpringRef<T>) => {
       animationQuality() === "off" ||
       p.config?.duration === 0
     ) {
+      api.stop?.();
       api.set(target as T);
       return Promise.resolve();
     }

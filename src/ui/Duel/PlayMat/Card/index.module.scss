@@ -22,9 +22,8 @@
     top: 2%;
     height: 96%;
     width: 96%;
-    transform: translateZ(calc(var(--sub-z) * var(--move-arc) + 0.1px))
+    transform: translateY(calc(var(--sub-z) * var(--move-arc) * -1))
       rotateY(calc(var(--ry) * 1deg));
-    transition: 0.2s scale;
     cursor: pointer;
     .cover,
     .back {
@@ -124,21 +123,28 @@
     outline: 2px solid #e6f5ff;
     outline-offset: 5px;
   }
-  &[data-card-zone="HAND"][data-card-controller] .img-wrap {
-    transition: transform 100ms ease-out;
+  .appeal-wrap {
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transform: translateY(0);
   }
   &[data-card-zone="HAND"][data-card-is-me="true"] {
     touch-action: pan-y;
     user-select: none;
   }
-  &[data-card-zone="HAND"][data-card-is-me="true"]:hover {
-    z-index: 50 !important;
+  &[data-card-zone="HAND"][data-card-is-me="true"][data-card-in-motion="false"] {
+    &:hover,
+    &.handAppeal,
+    &.actionsActive {
+      z-index: 50 !important;
+      .appeal-wrap {
+        outline: 1px solid #b6d6e477;
+      }
+    }
   }
-  &[data-card-zone="HAND"][data-card-is-me="true"][data-card-in-motion="false"]:hover
-    .img-wrap {
-    transform: translateY(-22px)
-      translateZ(calc(var(--sub-z) * var(--move-arc) + 0.1px))
-      rotateY(calc(var(--ry) * 1deg));
+  &[data-card-in-motion="true"] .appeal-wrap {
+    transition: none;
   }
 }
 
@@ -184,11 +190,9 @@
   opacity: 1;
   border-width: 3px;
 }
-.mat-card.actionsActive[data-card-zone="HAND"][data-card-is-me="true"]
-  .img-wrap,
-.mat-card.handAppeal[data-card-zone="HAND"][data-card-is-me="true"][data-card-in-motion="false"]
-  .img-wrap {
-  transform: translateY(-28px)
-    translateZ(calc(var(--sub-z) * var(--move-arc) + 0.1px))
-    rotateZ(calc(var(--hand-angle) * -1deg)) rotateY(calc(var(--ry) * 1deg));
+
+@media (prefers-reduced-motion: reduce) {
+  .mat-card .appeal-wrap {
+    transition: none;
+  }
 }

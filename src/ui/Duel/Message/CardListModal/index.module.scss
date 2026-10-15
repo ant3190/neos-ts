@@ -3,6 +3,7 @@
   right: 24px;
   top: 140px;
   height: 833px;
+  max-height: calc(100% - 140px - var(--duel-controls-reserve, 108px));
   width: 130px;
   background: var(--duel-panel-bg);
   border: 1px solid var(--duel-border);

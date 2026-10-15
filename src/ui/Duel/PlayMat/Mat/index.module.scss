@@ -10,8 +10,6 @@ section.mat {
   left: 0;
   top: 0;
   height: 100%;
-  // The camera is a projection surface. Its box must not intercept cards
-  // projected behind Z=0 on the opponent's half of the field.
   pointer-events: none;
   .camera {
     height: 100%;
@@ -19,7 +17,7 @@ section.mat {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    perspective: var(--perspective);
+    perspective: none;
   }
   .camera,
   .plane,
@@ -32,8 +30,7 @@ section.mat {
     top: 50%;
     width: 0;
     height: 0;
-    transform: translateZ(var(--camera-plane-depth))
-      rotateX(var(--plane-rotate-x)) translateY(var(--camera-ground-offset));
+    transform: scale(var(--table-scale));
     transform-origin: 0 0;
   }
 }

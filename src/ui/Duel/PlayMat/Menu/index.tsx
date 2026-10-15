@@ -1,14 +1,18 @@
 import {
-  CloseCircleFilled,
+  CloseCircleOutlined,
   FileSearchOutlined,
   InfoCircleOutlined,
-  MessageFilled,
+  LinkOutlined,
+  MessageOutlined,
   PauseCircleFilled,
   PlayCircleFilled,
-  SettingFilled,
+  RightOutlined,
+  SettingOutlined,
   StepForwardFilled,
+  StopOutlined,
+  ThunderboltOutlined,
 } from "@ant-design/icons";
-import { Button, Checkbox, Dropdown, Tooltip } from "antd";
+import { Button, Checkbox, Tooltip } from "antd";
 import classNames from "classnames";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,7 +32,6 @@ import {
   matStore,
   replayStore,
 } from "@/stores";
-import { IconFont } from "@/ui/Shared";
 
 import { AnimationQualityControl } from "../../animation/Quality";
 import { legalPhaseCommands } from "../../interaction/phaseRules";
@@ -76,6 +79,7 @@ export const Menu = () => {
   const input = useSnapshot(duelInputState);
   const [phaseOpen, setPhaseOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [surrenderOpen, setSurrenderOpen] = useState(false);
   const phaseAnchor = projectWorld(
     { x: 26.314339, y: 0.46804985, z: 0 },
     viewport,
@@ -126,6 +130,25 @@ export const Menu = () => {
     document.addEventListener("keydown", key);
     return () => document.removeEventListener("keydown", key);
   }, []);
+  useEffect(() => {
+    const outside = (event: PointerEvent) => {
+      const target = event.target as Element;
+      if (
+        !target.closest(
+          '[data-testid="duel-settings"], [data-testid="duel-settings-panel"]',
+        )
+      )
+        setSettingsOpen(false);
+      if (
+        !target.closest(
+          '[data-testid="duel-phase-select"], [data-testid="duel-phase-picker"]',
+        )
+      )
+        setPhaseOpen(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, []);
   const choosePhase = (key: string) => {
     // Check the live request again: an old open picker cannot answer a new prompt.
     const command = legalPhaseCommands(
@@ -140,27 +163,53 @@ export const Menu = () => {
       sendSelectBattleCmdResponse(container.conn, command.response);
     else sendSelectIdleCmdResponse(container.conn, command.response);
   };
+  const phaseLeft = Math.min(
+    window.innerWidth - 88,
+    Math.max(88, viewport.left + phaseAnchor.x * viewport.scale),
+  );
+  const phaseTop = viewport.top + phaseAnchor.y * viewport.scale;
   return (
-    <>
+    <div
+      className={styles.ui}
+      style={{
+        left: -viewport.left / viewport.scale,
+        top: -viewport.top / viewport.scale,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        transform: `scale(${1 / viewport.scale})`,
+      }}
+    >
       <button
         type="button"
         className={styles.phase}
-        style={{ left: phaseAnchor.x, top: phaseAnchor.y }}
+        style={{ left: phaseLeft, top: phaseTop }}
         data-testid="duel-phase-select"
         data-current-phase={phaseKey}
+        aria-expanded={phaseOpen}
         disabled={!canCommand}
-        onClick={() => setPhaseOpen(true)}
+        onClick={() => {
+          setPhaseOpen((value) => !value);
+          setSettingsOpen(false);
+        }}
         aria-label={`切换阶段：${phaseText}`}
       >
-        <span>TURN {snap.turnCount}</span>
+        <span className={styles.turn}>T{snap.turnCount}</span>
         <strong>{phaseText}</strong>
-        <small>
-          {matStore.isMe(snap.currentPlayer) ? "YOUR TURN" : "OPPONENT TURN"}
-        </small>
+        <RightOutlined />
       </button>
       {phaseOpen && (
         <div
           className={styles.phasePicker}
+          style={{
+            left: Math.min(
+              window.innerWidth - 260,
+              Math.max(12, phaseLeft - 120),
+            ),
+            top: Math.min(
+              window.innerHeight - 280,
+              Math.max(12, phaseTop + 32),
+            ),
+          }}
           role="dialog"
           aria-modal="false"
           aria-label="选择阶段"
@@ -185,8 +234,8 @@ export const Menu = () => {
                 disabled={!command.enabled}
                 onClick={() => choosePhase(command.key)}
               >
-                <StepForwardFilled />
                 <strong>{command.text}</strong>
+                <RightOutlined />
               </button>
             ))}
           </div>
@@ -227,7 +276,7 @@ export const Menu = () => {
           <Button
             data-testid="duel-chat-toggle"
             aria-label={i18n("ChatRoom")}
-            icon={<MessageFilled />}
+            icon={<MessageOutlined />}
             onClick={openChatBox}
           />
         </Tooltip>
@@ -243,13 +292,22 @@ export const Menu = () => {
           <Button
             data-testid="duel-settings"
             aria-label="决斗菜单"
-            icon={<SettingFilled />}
-            onClick={() => setSettingsOpen((value) => !value)}
+            icon={<SettingOutlined />}
+            aria-expanded={settingsOpen}
+            onClick={() => {
+              setSettingsOpen((value) => !value);
+              setPhaseOpen(false);
+              setSurrenderOpen(false);
+            }}
           />
         </Tooltip>
       </div>
       {settingsOpen && (
-        <section className={styles.settings} aria-label="决斗菜单">
+        <section
+          className={styles.settings}
+          aria-label="决斗菜单"
+          data-testid="duel-settings-panel"
+        >
           <header>
             决斗菜单
             <button
@@ -260,57 +318,56 @@ export const Menu = () => {
               ×
             </button>
           </header>
-          <AnimationQualityControl />
+          <AnimationQualityControl inline />
           <Checkbox
             checked={preferences.autoInfo}
             onChange={(event) => setAutoInfo(event.target.checked)}
           >
             自动显示发动卡片说明
           </Checkbox>
-          <Dropdown
-            trigger={["click"]}
-            menu={{
-              items: [
-                { key: "cancel", label: i18n("Cancel") },
-                {
-                  key: "confirm",
-                  label: (
-                    <span data-testid="duel-surrender-confirm">
-                      {i18n("Confirm")}
-                    </span>
-                  ),
-                  danger: true,
-                  onClick: () => sendSurrender(container.conn),
-                },
-              ],
-            }}
+          <button
+            className={styles.surrender}
+            type="button"
+            data-testid="duel-surrender"
+            aria-label={i18n("DoYouSurrunder")}
+            onClick={() => setSurrenderOpen((value) => !value)}
           >
-            <Button
-              data-testid="duel-surrender"
-              aria-label={i18n("DoYouSurrunder")}
-              danger
-              icon={<CloseCircleFilled />}
-            >
-              {i18n("DoYouSurrunder")}
-            </Button>
-          </Dropdown>
+            <CloseCircleOutlined />
+            {i18n("DoYouSurrunder")}
+          </button>
+          {surrenderOpen && (
+            <div className={styles.confirm}>
+              <span>确定投降？</span>
+              <button type="button" onClick={() => setSurrenderOpen(false)}>
+                {i18n("Cancel")}
+              </button>
+              <button
+                type="button"
+                data-testid="duel-surrender-confirm"
+                onClick={() => {
+                  setSurrenderOpen(false);
+                  setSettingsOpen(false);
+                  sendSurrender(container.conn);
+                }}
+              >
+                {i18n("Confirm")}
+              </button>
+            </div>
+          )}
         </section>
       )}
-    </>
+    </div>
   );
 };
 
-const ChainIcon = ({ chainSetting }: { chainSetting: ChainSetting }) => (
-  <IconFont
-    type={
-      chainSetting === ChainSetting.CHAIN_ALL
-        ? "icon-chain-all"
-        : chainSetting === ChainSetting.CHAIN_SMART
-        ? "icon-chain"
-        : "icon-chain-broken"
-    }
-  />
-);
+const ChainIcon = ({ chainSetting }: { chainSetting: ChainSetting }) =>
+  chainSetting === ChainSetting.CHAIN_ALL ? (
+    <LinkOutlined />
+  ) : chainSetting === ChainSetting.CHAIN_SMART ? (
+    <ThunderboltOutlined />
+  ) : (
+    <StopOutlined />
+  );
 
 const ReplayControl: React.FC = () => {
   const { isReplay, paused, waiting, currentIndex } = useSnapshot(replayStore);

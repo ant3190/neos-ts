@@ -13,12 +13,12 @@ import {
 } from "./geometry";
 import { duelViewport } from "./viewport";
 
-/** Camera-facing labels stay legible while the table itself remains in perspective. */
+/** Labels share the same flat table coordinates as cards and slots. */
 export function FieldInfo() {
   const { inner } = useSnapshot(cardStore);
   const moving = new Set(Object.keys(useSnapshot(cardMotionState).moving));
   const viewport = useSnapshot(duelViewport);
-  const camera = { width: viewport.width, fov: viewport.fov };
+  const camera = { width: viewport.width };
   return (
     <div className={styles.layer} aria-hidden="true">
       {inner
@@ -36,7 +36,7 @@ export function FieldInfo() {
             isMe(card.location.controller),
           );
           const point = projectWorld(
-            { ...world, y: 0.3, z: world.z - 4.4 },
+            { ...world, y: 0.3, z: world.z - 4 },
             camera,
           );
           const link = !!((card.meta.data.type ?? 0) & TYPE_LINK);

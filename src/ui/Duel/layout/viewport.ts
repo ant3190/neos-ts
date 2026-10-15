@@ -1,39 +1,40 @@
 import { type RefObject, useLayoutEffect } from "react";
 import { proxy } from "valtio";
 
-import {
-  CAMERA_FOCAL_LENGTH,
-  CAMERA_PLANE_DEPTH,
-  DUEL_HEIGHT,
-} from "./geometry";
+export const duelViewport = proxy({ width: 1920, scale: 1, left: 0, top: 0 });
 
-export const duelViewport = proxy({ width: 1920, fov: 30 });
-
-/** Unity's height-matched CanvasScaler and desktop ultrawide FOV compensation. */
+/** Measure canvas-to-viewport coordinates for the unscaled control layer. */
 export function useDuelCamera(ref: RefObject<HTMLElement>) {
   useLayoutEffect(() => {
     const stage = ref.current;
     if (!stage) return;
+    let frame = 0;
     const update = () => {
-      const width = stage.clientWidth;
-      const wide = Math.max(
-        0,
-        Math.min(1, (width / DUEL_HEIGHT - 16 / 9) / (16 / 9)),
-      );
-      const fov = 30 + 3 * wide;
-      const focal = DUEL_HEIGHT / (2 * Math.tan((fov * Math.PI) / 360));
-      duelViewport.width = width;
-      duelViewport.fov = fov;
-      stage.style.setProperty("--perspective", `${focal}px`);
+      const rect = stage.getBoundingClientRect();
+      const scale = Math.max(0.01, rect.height / 1080);
       stage.style.setProperty(
-        "--camera-plane-depth",
-        `${CAMERA_PLANE_DEPTH + focal - CAMERA_FOCAL_LENGTH}px`,
+        "--duel-controls-reserve",
+        `${Math.max(0, (rect.bottom - window.innerHeight + 72) / scale)}px`,
       );
-      window.dispatchEvent(new Event("neos:duel-camera-change"));
+      Object.assign(duelViewport, {
+        width: stage.clientWidth,
+        scale,
+        left: rect.left,
+        top: rect.top,
+      });
     };
-    const observer = new ResizeObserver(update);
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(update);
+    };
+    const observer = new ResizeObserver(schedule);
     observer.observe(stage);
+    window.addEventListener("resize", schedule);
     update();
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", schedule);
+      cancelAnimationFrame(frame);
+    };
   }, [ref]);
 }

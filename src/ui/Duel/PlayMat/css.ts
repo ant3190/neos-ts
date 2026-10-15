@@ -1,10 +1,4 @@
-import {
-  CAMERA_FOCAL_LENGTH,
-  CAMERA_GROUND_Z,
-  CAMERA_PLANE_DEPTH,
-  CARD_HEIGHT,
-  WORLD_UNIT,
-} from "../layout/geometry";
+import { CARD_HEIGHT, TABLE_SCALE } from "../layout/geometry";
 
 // 此文件目的是在js和CSS之间共享一些变量。
 type CSSConfig = [string, [number, UNIT]][];
@@ -31,10 +25,8 @@ enum UNIT {
 }
 
 const _matConfigWithUnit: Record<string, [number, UNIT]> = {
-  PERSPECTIVE: [CAMERA_FOCAL_LENGTH, UNIT.PX],
-  PLANE_ROTATE_X: [20, UNIT.DEG],
-  CAMERA_GROUND_OFFSET: [CAMERA_GROUND_Z * WORLD_UNIT, UNIT.PX],
-  CAMERA_PLANE_DEPTH: [CAMERA_PLANE_DEPTH, UNIT.PX],
+  TABLE_SCALE: [TABLE_SCALE, UNIT.NONE],
+  PLANE_ROTATE_X: [0, UNIT.DEG],
   BLOCK_WIDTH: [172, UNIT.PX],
   BLOCK_HEIGHT_M: [172, UNIT.PX],
   BLOCK_HEIGHT_S: [172, UNIT.PX],

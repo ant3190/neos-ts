@@ -33,12 +33,4 @@ export const moveToGround: MoveFunc = async ({ card, api, options }) => {
       clamp: true,
     },
   });
-  await asyncStart(api)({
-    z: pose.z,
-    subZ: 0,
-    config: {
-      duration: options?.positionOnly ? 0 : 100,
-      easing: easings.easeInQuad,
-    },
-  });
 };

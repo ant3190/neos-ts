@@ -3,7 +3,6 @@ import { cardStore, isMe } from "@/stores";
 
 import { handInteraction } from "../../../interaction/hand";
 import { tablePose } from "../../../layout/geometry";
-import { duelViewport } from "../../../layout/viewport";
 import type { MoveFunc } from "./types";
 import { asyncStart, getDuration } from "./utils";
 
@@ -13,13 +12,7 @@ export const moveToHand: MoveFunc = async ({ card, api, options }) => {
     ygopro.CardZone.HAND,
     card.location.controller,
   ).length;
-  const pose = tablePose(
-    card.location,
-    mine,
-    count,
-    card.code !== 0,
-    duelViewport.width / 1080,
-  );
+  const pose = tablePose(card.location, mine, count, card.code !== 0);
   await asyncStart(api)({
     ...pose,
     x: pose.x + (mine ? handInteraction.offset : 0),

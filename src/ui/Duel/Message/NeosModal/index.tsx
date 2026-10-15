@@ -39,7 +39,6 @@ export const NeosModal = ({
     <Modal
       className={classNames(styles.modal, {
         [styles.selection]: duelPosition === "selection",
-        [styles["mini"]]: mini,
       })}
       centered={false}
       getContainer={() =>
@@ -49,23 +48,16 @@ export const NeosModal = ({
       maskClosable={false}
       onCancel={() => setMini(!mini)}
       closeIcon={mini ? <UpOutlined /> : <MinusOutlined />}
-      style={{
-        position: "absolute",
-        top: mini ? undefined : duelPosition === "selection" ? 670 : "50%",
-        bottom: mini ? 0 : undefined,
-        left: "50%",
-        margin: 0,
-        padding: 0,
-        transform: mini
-          ? "translate(-50%, calc(100% - 68px))"
-          : duelPosition === "selection"
-          ? "translateX(-50%)"
-          : "translate(-50%, -50%)",
-      }}
+      style={{ margin: 0, padding: 0, top: "auto" }}
       mask={!mini}
-      wrapClassName={classNames({ [styles.wrap]: mini })}
+      wrapClassName={classNames(styles.wrap, {
+        [styles.fieldView]: mini,
+        [styles.selectionWrap]: duelPosition === "selection",
+      })}
       closable={true}
       {...props}
+      transitionName=""
+      maskTransitionName=""
       width={duelWidth}
       open={props.open}
     />

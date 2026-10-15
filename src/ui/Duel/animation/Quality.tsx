@@ -9,7 +9,11 @@ import {
   setAnimationMode,
 } from "./runtime";
 
-export function AnimationQualityControl() {
+export function AnimationQualityControl({
+  inline = false,
+}: {
+  inline?: boolean;
+}) {
   const settings = useSnapshot(animationSettings);
   const { mode } = settings;
   const qualityLabel = { full: "完整", lite: "轻量", off: "减少动画" }[
@@ -21,6 +25,33 @@ export function AnimationQualityControl() {
     ["lite", "轻量"],
     ["off", "减少动画"],
   ];
+  if (inline)
+    return (
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <span>动画质量</span>
+        <select
+          aria-label="决斗动画质量"
+          data-testid="duel-animation-quality"
+          value={mode}
+          onChange={(event) =>
+            setAnimationMode(event.target.value as AnimationMode)
+          }
+        >
+          {modes.map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
   return (
     <Tooltip
       title={`决斗动画：${modes.find(

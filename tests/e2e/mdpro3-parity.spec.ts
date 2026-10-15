@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { mdpro3Fixture } from "./helpers/mdpro3Fixture";
 
-test("MDPro3 canonical camera and opposing HUD anchors fit a 16:9 viewport", async ({
+test("flat table and opposing HUD anchors fit a 16:9 viewport", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -87,7 +87,10 @@ test("pile inspection replaces the log, supports a grid and restores the log", a
   const canvas = (await page.getByTestId("duel-stage").boundingBox())!;
   const scale = canvas.height / 1080;
   expect(before!.width).toBeCloseTo(130 * scale, 0);
-  expect(before!.height).toBeCloseTo(833 * scale, 0);
+  expect(before!.height).toBeLessThanOrEqual(833 * scale + 1);
+  expect(before!.y + before!.height).toBeLessThan(
+    (await page.getByTestId("duel-controls").boundingBox())!.y,
+  );
   expect(before!.y - canvas.y).toBeCloseTo(140 * scale, 0);
   expect(canvas.x + canvas.width - before!.x - before!.width).toBeCloseTo(
     24 * scale,

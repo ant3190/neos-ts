@@ -50,7 +50,7 @@ test("opposing extra monster slots share the same world position", () => {
   assert.ok(Math.abs(a.z - b.z) < 1e-8);
   const center = projectWorld({ x: 0, y: 0, z: 0 });
   assert.equal(center.x, 960);
-  assert.ok(center.y > 490 && center.y < 500);
+  assert.equal(center.y, 540);
 });
 test("motion categories preserve MDPro3 event-specific travel and departure rules", () => {
   assert.equal(
@@ -132,4 +132,20 @@ test("an old reveal cannot conceal a newer public event for the same card", () =
   assert.equal(cardMotionState.revealed["hidden-hand"].code, 100000001);
   second();
   assert.equal(cardMotionState.revealed["hidden-hand"], undefined);
+});
+
+test("hands are straight and elevation cannot change the orthographic scale", () => {
+  const hands = Array.from({ length: 8 }, (_, sequence) =>
+    tablePose({ zone: Z.HAND, sequence }, true, 8),
+  );
+  assert.equal(new Set(hands.map((p) => p.y)).size, 1);
+  assert.ok(hands.every((p) => p.rz === 0 && p.rx === 0));
+  assert.deepEqual(
+    projectWorld({ x: 10, y: 0, z: -9.48 }),
+    projectWorld({ x: 10, y: 50, z: -9.48 }),
+  );
+  assert.equal(
+    tablePose({ zone: Z.MZONE, sequence: 0 }, true).scale,
+    tablePose({ zone: Z.MZONE, sequence: 0 }, false).scale,
+  );
 });

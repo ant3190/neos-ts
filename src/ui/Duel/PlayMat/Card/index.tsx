@@ -1,6 +1,12 @@
 import { animated, to, useSpring } from "@react-spring/web";
 import classnames from "classnames";
-import React, { type CSSProperties, useEffect, useRef, useState } from "react";
+import React, {
+  type CSSProperties,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useSnapshot } from "valtio";
 
 import { sendSelectMultiResponse, ygopro } from "@/api";
@@ -37,6 +43,7 @@ import {
   handInteraction,
   suppressHandClick,
 } from "../../interaction/hand";
+import { cardPose } from "../../layout/cardPose";
 import { isFaceDownPosition } from "../../layout/geometry";
 import { closeCardListModal, displayCardListModal } from "../../Message";
 import { clearSelectInfo } from "../../utils";
@@ -89,28 +96,18 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       }) satisfies SpringApiProps,
   );
 
-  // A promoted deck card retains its source; other mounts settle at their actual location.
-  useEffect(() => {
+  // Establish the source before the first paint. Only the queue owns motion after this.
+  useLayoutEffect(() => {
     const origin = consumeCardOrigin(card.uuid);
-    if (origin)
-      setMotion(
-        cardMotionPlan({
-          fromZone: origin.zone,
-          toZone: card.location.zone,
-          toPosition: card.location.position,
-          mine,
-        }),
-      );
-    addToAnimation(async () => {
-      if (origin) {
-        await move({
-          card: { ...card, location: origin },
-          api,
-          options: { instant: true },
-        });
-        await move({ card, api, options: { fromZone: origin.zone } });
-      } else await move({ card, api, options: { instant: true } });
+    api.set({
+      ...cardPose(origin ? { ...card, location: origin } : card),
+      subZ: 0,
+      opacity: 1,
     });
+    if (origin) void queueMove({ fromZone: origin.zone });
+    return () => {
+      api.stop();
+    };
   }, []);
 
   const [classFocus, setClassFocus] = useState(false);
@@ -118,15 +115,18 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
   // >>> 动画 >>>
   /** 一次动画失败也不能阻塞这张卡之后的所有操作。 */
   const animationQueue = useRef(Promise.resolve());
+  const movingRef = useRef(false);
 
   const addToAnimation = (p: () => Promise<unknown>) => {
     const next = animationQueue.current
       .then(async () => {
+        movingRef.current = true;
         setMoving(true);
         cardMotionState.moving[card.uuid] = true;
         try {
           await p();
         } finally {
+          movingRef.current = false;
           setMoving(false);
           delete cardMotionState.moving[card.uuid];
         }
@@ -154,20 +154,29 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
     );
   };
 
+  const queueMove = (options?: MoveOptions) =>
+    addToAnimation(async () => {
+      const plan = cardMotionPlan({
+        ...options,
+        toZone: card.location.zone,
+        toPosition: card.location.position,
+        mine: isMe(card.location.controller),
+      });
+      // Update arc ownership before starting the frame loop, rather than in a later render.
+      element.current?.style.setProperty(
+        "--move-arc",
+        `${Math.min(24, plan.arc * 0.08)}px`,
+      );
+      setMotion(plan);
+      await move({ card, api, options });
+    });
+
   useEffect(() => {
     const unsubscribeMove = register(
       Task.Move,
       async (options?: MoveOptions) => {
         consumeCardOrigin(card.uuid);
-        setMotion(
-          cardMotionPlan({
-            ...options,
-            toZone: card.location.zone,
-            toPosition: card.location.position,
-            mine: isMe(card.location.controller),
-          }),
-        );
-        await addToAnimation(() => move({ card, api, options }));
+        await queueMove(options);
       },
     );
 
@@ -204,17 +213,19 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
 
   const element = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (handCard && mine) void move({ card, api, options: { instant: true } });
+  const lastHandOffset = useRef(hand.offset);
+  useLayoutEffect(() => {
+    if (lastHandOffset.current === hand.offset) return;
+    lastHandOffset.current = hand.offset;
+    if (
+      card.location.zone === HAND &&
+      isMe(card.location.controller) &&
+      !movingRef.current
+    ) {
+      api.stop();
+      api.set({ ...cardPose(card), subZ: 0 });
+    }
   }, [hand.offset]);
-  useEffect(() => {
-    const update = () => {
-      if (card.location.zone === HAND)
-        void move({ card, api, options: { instant: true } });
-    };
-    window.addEventListener("neos:duel-camera-change", update);
-    return () => window.removeEventListener("neos:duel-camera-change", update);
-  }, []);
 
   const endGesture = () => {
     if (handInteraction.dragging) suppressHandClick();
@@ -368,14 +379,18 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
           transform: to(
             [spring.x, spring.y, spring.z, spring.rx, spring.rz, spring.scale],
             (x, y, z, rx, rz, scale) =>
-              `translate3d(${x}px, ${y}px, ${z}px) rotateX(${rx}deg) rotateZ(${rz}deg) scale(${scale})`,
+              `translate3d(${x}px, ${y}px, ${
+                moving ? Math.max(z, 360) : z
+              }px) rotateX(${rx}deg) rotateZ(${rz}deg) scale(${scale})`,
           ),
           "--z": spring.z,
-          "--sub-z": spring.subZ.to([0, 50, 100], [0, 1, 0]),
-          "--move-arc": `${motion.arc}px`,
+          "--sub-z": spring.subZ.to(
+            (progress) => Math.sin((Math.PI * progress) / 100) ** 2,
+          ),
+          "--move-arc": `${Math.min(24, motion.arc * 0.08)}px`,
           "--ry": spring.ry,
           "--hand-angle": spring.rz,
-          zIndex: spring.zIndex,
+          zIndex: moving ? 100 : spring.zIndex.to(Math.round),
           opacity: spring.opacity,
         } as any as CSSProperties
       }
@@ -422,22 +437,24 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
           [styles.focusing]: classFocus,
         })}
       >
-        <div className={styles["negation-wrap"]} data-card-negation-wrap>
-          <YgoCard
-            className={styles.cover}
-            code={canInspect ? snap.code : publicFace ?? 0}
-            name={canInspect ? snap.meta.text.name : "背面卡片"}
-            urgent
-            data-card-face
-          />
-          <YgoCard className={styles.back} isBack />
-          <ActionFrame
-            highlight={actionHighlight}
-            className={styles["action-frame"]}
-          />
-          {(snap.selectInfo.selectable || snap.selectInfo.selected) && (
-            <div aria-hidden="true" className={styles["selection-frame"]} />
-          )}
+        <div className={styles["appeal-wrap"]}>
+          <div className={styles["negation-wrap"]} data-card-negation-wrap>
+            <YgoCard
+              className={styles.cover}
+              code={canInspect ? snap.code : publicFace ?? 0}
+              name={canInspect ? snap.meta.text.name : "背面卡片"}
+              urgent
+              data-card-face
+            />
+            <YgoCard className={styles.back} isBack />
+            <ActionFrame
+              highlight={actionHighlight}
+              className={styles["action-frame"]}
+            />
+            {(snap.selectInfo.selectable || snap.selectInfo.selected) && (
+              <div aria-hidden="true" className={styles["selection-frame"]} />
+            )}
+          </div>
         </div>
       </div>
       {snap.targeted && <div className={styles.targeted} />}
