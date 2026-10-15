@@ -60,11 +60,16 @@ export const CardModal = () => {
   const counters = live?.counters ?? snap.counters;
   if (!isOpen) return null;
 
-  const name = meta?.text.name;
+  // Runtime card state may contain only a name/stat update. Keep printed
+  // rules text available from the database rather than erasing the panel.
+  const printedText = meta?.text.desc
+    ? meta.text
+    : fetchCard(live?.code || meta.id).text;
+  const name = meta?.text.name || printedText.name;
   const types = extraCardTypes(meta?.data.type ?? 0);
   const race = meta?.data.race;
   const attribute = meta?.data.attribute;
-  const desc = meta?.text.desc;
+  const desc = meta?.text.desc || printedText.desc;
   const atk = meta?.data.atk;
   const def = meta?.data.def;
 

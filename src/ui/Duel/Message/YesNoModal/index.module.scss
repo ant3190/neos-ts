@@ -1,0 +1,27 @@
+.content {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  color: #e7f1f7;
+  font-size: 24px;
+  line-height: 1.6;
+  > :first-child:not(.details) {
+    flex-shrink: 0;
+  }
+}
+.details {
+  flex: 1;
+  min-width: 0;
+  p {
+    margin: 12px 0 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+.source {
+  color: #e4d099;
+}
+.effectText {
+  padding-top: 12px;
+  border-top: 1px solid #7896a744;
+}

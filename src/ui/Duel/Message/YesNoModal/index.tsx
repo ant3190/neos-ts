@@ -9,6 +9,7 @@ import { YgoCard } from "@/ui/Shared";
 
 import { NeosModal } from "../NeosModal";
 import { PromptSession } from "../session";
+import styles from "./index.module.scss";
 
 interface YesNoModalProps {
   isOpen: boolean;
@@ -29,12 +30,16 @@ export const YesNoModal: React.FC = () => {
   const promptId = localStore.promptId;
 
   const preHintMsg = hint?.esHint || "";
+  const message =
+    msg?.trim() && msg !== "?" && msg !== "[?]"
+      ? msg
+      : meta?.text.desc || "是否继续？";
 
   return (
     <NeosModal
-      title={meta ? "是否发动这个效果？" : `${preHintMsg} ${msg}`}
+      title={meta ? "是否发动这个效果？" : "请确认"}
       open={isOpen}
-      width={"25rem"}
+      duelWidth={950}
       afterClose={() => (matStore.hint.esHint = undefined)}
       footer={
         <>
@@ -66,18 +71,22 @@ export const YesNoModal: React.FC = () => {
         </>
       }
     >
-      <div
-        data-testid="duel-yesno-modal"
-        style={{ display: "flex", alignItems: "center", gap: 16 }}
-      >
-        {meta && <YgoCard code={meta.id} width="6rem" urgent />}
-        {meta && (
-          <div>
-            <strong>{meta.text.name}</strong>
-            <p style={{ color: "#e4d099" }}>{source}</p>
-            <p style={{ lineHeight: 1.5 }}>{msg}</p>
-          </div>
-        )}
+      <div data-testid="duel-yesno-modal" className={styles.content}>
+        {meta && <YgoCard code={meta.id} width="150px" urgent />}
+        <div className={styles.details}>
+          {meta?.text.name && <strong>{meta.text.name}</strong>}
+          {source && <p className={styles.source}>{source}</p>}
+          {preHintMsg && <p>{preHintMsg}</p>}
+          <p data-testid="duel-yesno-message">{message}</p>
+          {meta?.text.desc && meta.text.desc !== message && (
+            <p
+              className={styles.effectText}
+              data-testid="duel-yesno-effect-text"
+            >
+              {meta.text.desc}
+            </p>
+          )}
+        </div>
       </div>
     </NeosModal>
   );

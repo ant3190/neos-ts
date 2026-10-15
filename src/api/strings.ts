@@ -62,6 +62,14 @@ export function getStrings(description: number): string {
     const code = description >> 4;
     const index = description & 0xf;
 
-    return getCardStr(fetchCard(code), index) ?? "[?]";
+    const meta = fetchCard(code);
+    // Some real cards leave individual strN slots empty. The full rules
+    // text is still available and must not turn a prompt into a blank box.
+    return (
+      getCardStr(meta, index)?.trim() ||
+      meta.text.desc?.trim() ||
+      meta.text.name ||
+      "[?]"
+    );
   }
 }

@@ -1,9 +1,17 @@
 .desc {
   line-height: 1.6;
   font-size: 23px;
+  color: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 
   .maro-item {
     display: flex;
     gap: 0.5rem;
+    align-items: flex-start;
+    > span:last-child {
+      min-width: 0;
+      flex: 1;
+    }
   }
 }
