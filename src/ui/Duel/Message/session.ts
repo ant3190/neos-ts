@@ -1,3 +1,7 @@
+import { proxy } from "valtio";
+
+export const duelInputState = proxy({ prompts: 0 });
+
 /** Every prompt owns its resolver; a reset cannot let an old promise close a new prompt. */
 export class PromptSession<T = void> {
   private pending?: { resolve: (value: T) => void; id: number };
@@ -31,8 +35,10 @@ export const hasDuelPrompt = () => prompts.size > 0;
 export function setDuelPrompt(key: string, open: boolean) {
   if (open) prompts.add(key);
   else prompts.delete(key);
+  duelInputState.prompts = prompts.size;
 }
 export function resetDuelPromptSession() {
   duelEpoch++;
   prompts.clear();
+  duelInputState.prompts = 0;
 }

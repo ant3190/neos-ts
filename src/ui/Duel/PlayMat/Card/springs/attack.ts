@@ -3,12 +3,9 @@ import { easings } from "@react-spring/web";
 
 import { isMe } from "@/stores";
 
-import { matConfig } from "../../css";
+import { tablePose } from "../../../layout/geometry";
 import type { AttackFunc } from "./types";
 import { asyncStart } from "./utils";
-
-const { BLOCK_WIDTH, BLOCK_HEIGHT_M, BLOCK_HEIGHT_S, COL_GAP, ROW_GAP } =
-  matConfig;
 
 export const attack: AttackFunc = async (props) => {
   const { card, api, options } = props;
@@ -19,29 +16,17 @@ export const attack: AttackFunc = async (props) => {
   let rz = current.rz;
   if (options?.directAttack) {
     // 直接攻击
-    y = BLOCK_HEIGHT_M + BLOCK_HEIGHT_S;
+    y = 360;
 
     if (isMe(card.location.controller)) {
       y = -y;
     }
   } else if (options?.target) {
     // 攻击`target`
-    const { controller, sequence } = options.target;
-    if (sequence > 4) {
-      // 额外怪兽区
-      x = (sequence > 5 ? 1 : -1) * (BLOCK_WIDTH + COL_GAP);
-      y = 0;
-    } else {
-      x = (sequence - 2) * (BLOCK_WIDTH + COL_GAP);
-      y = BLOCK_HEIGHT_M + ROW_GAP;
-    }
-
-    if (!isMe(controller)) {
-      x = -x;
-      y = -y;
-    }
-
-    rz += -Math.atan((x - current.x) / (y - current.y)) / (Math.PI / 180);
+    const target = tablePose(options.target, isMe(options.target.controller));
+    x = target.x;
+    y = target.y;
+    rz += -Math.atan2(x - current.x, Math.abs(y - current.y)) / (Math.PI / 180);
   } else {
     console.error(`<Spring/Attack>directAttack is false and target is null.`);
     return;
@@ -54,9 +39,7 @@ export const attack: AttackFunc = async (props) => {
   });
   // 后撤半个卡位，并调整倾斜角
   await asyncStart(api)({
-    y:
-      current.y +
-      (BLOCK_HEIGHT_M / 2) * (isMe(card.location.controller) ? 1 : -1),
+    y: current.y + 86 * (isMe(card.location.controller) ? 1 : -1),
     rz,
     config: { duration: 80 },
   });

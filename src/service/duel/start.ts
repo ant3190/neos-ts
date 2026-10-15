@@ -18,6 +18,9 @@ export default async (
 ) => {
   const context = container.context;
   resetDuelDialogs();
+  context.matStore.commandSource = undefined;
+  context.matStore.commandPlayer = undefined;
+  context.matStore.timerPlayer = undefined;
   context.matStore.chains = [];
   context.matStore.chainDetails = [];
   context.matStore.completedChainDetails = [];

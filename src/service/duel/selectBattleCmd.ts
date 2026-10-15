@@ -52,7 +52,10 @@ export default async (
     });
   });
   context.matStore.phase.enableM2 = selectBattleCmd.enable_m2;
+  context.matStore.phase.enableBp = false;
   context.matStore.phase.enableEp = selectBattleCmd.enable_ep;
+  context.matStore.commandSource = "battle";
+  context.matStore.commandPlayer = player;
 };
 
 function battleTypeToInteracType(

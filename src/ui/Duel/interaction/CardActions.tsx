@@ -48,7 +48,6 @@ export function openCardActions(cards: CardType[], anchor: HTMLElement) {
     return;
   }
   if (store.open && store.uuids.join() === uuids.join()) {
-    closeCardActions();
     return;
   }
   const rect = anchor.getBoundingClientRect();
@@ -151,7 +150,11 @@ export function CardActions() {
     const close = (event: PointerEvent) => {
       if (ref.current?.contains(event.target as Node)) return;
       // A card click owns the toggle/open behavior.
-      if ((event.target as Element)?.closest?.('[data-testid="duel-card"]'))
+      if (
+        (event.target as Element)?.closest?.(
+          '[data-testid="duel-card"], [data-pile-card]',
+        )
+      )
         return;
       closeCardActions();
     };

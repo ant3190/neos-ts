@@ -1,6 +1,6 @@
-import { DownOutlined } from "@ant-design/icons";
-import { Button, Drawer, Input } from "antd";
-import React from "react";
+import { CloseOutlined } from "@ant-design/icons";
+import { Button, Input } from "antd";
+import React, { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { proxy, useSnapshot } from "valtio";
 
@@ -19,53 +19,74 @@ export const ChatBox: React.FC = () => {
   const { open } = useSnapshot(store);
   const { dialogs, input, setInput, ref, onSend } = useChat(true);
   const { t: i18n } = useTranslation("Chat");
-  const onClose = () => (store.open = false);
-
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: KeyboardEvent | MouseEvent) => {
+      if ((event.target as Element)?.closest("input, textarea")) return;
+      if (
+        event.type === "contextmenu" ||
+        (event as KeyboardEvent).key === "Escape"
+      ) {
+        event.preventDefault();
+        closeChatBox();
+      }
+    };
+    document.addEventListener("keydown", close);
+    document.addEventListener("contextmenu", close);
+    return () => {
+      document.removeEventListener("keydown", close);
+      document.removeEventListener("contextmenu", close);
+    };
+  }, [open]);
+  if (!open) return null;
+  const send = () => {
+    if (!input?.trim()) closeChatBox();
+    else onSend();
+  };
   return (
-    <Drawer
-      open={open}
-      placement="bottom"
-      mask={false}
-      className={styles.chatbox}
-      onClose={onClose}
-      maskClosable
-      closeIcon={<DownOutlined />}
-    >
-      <div className={styles.container}>
-        <ScrollableArea className={styles.dialogs} ref={ref}>
-          {dialogs.map((item, idx) => (
-            <DialogItem key={idx} {...item} />
-          ))}
-        </ScrollableArea>
-        <div className={styles.input}>
-          <Input.TextArea
-            variant="borderless"
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            autoSize
-            placeholder={i18n("PleaseEnterChatContent")}
-            onPressEnter={(e) => {
-              e.preventDefault();
-              onSend();
-            }}
-          />
-          <Button
-            type="text"
-            icon={<IconFont type="icon-send" size={14} />}
-            onClick={onSend}
-          />
-        </div>
+    <aside className={styles.chatbox} aria-label="聊天" data-testid="duel-chat">
+      <header>
+        <strong>聊天</strong>
+        <button type="button" aria-label="关闭聊天" onClick={closeChatBox}>
+          <CloseOutlined />
+        </button>
+      </header>
+      <ScrollableArea className={styles.dialogs} ref={ref}>
+        {dialogs.map((item, idx) => (
+          <DialogItem key={idx} {...item} />
+        ))}
+      </ScrollableArea>
+      <div className={styles.input}>
+        <Input.TextArea
+          autoFocus
+          variant="borderless"
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          autoSize={{ maxRows: 3 }}
+          placeholder={i18n("PleaseEnterChatContent")}
+          onPressEnter={(event) => {
+            if (event.nativeEvent.isComposing || event.shiftKey) return;
+            event.preventDefault();
+            send();
+          }}
+        />
+        <Button
+          type="text"
+          aria-label="发送消息"
+          icon={<IconFont type="icon-send" size={28} />}
+          onClick={send}
+        />
       </div>
-    </Drawer>
+    </aside>
   );
 };
 
 const DialogItem: React.FC<ChatItem> = ({ name, content }) => (
   <div className={styles.item}>
-    <div className={styles.name}>{name}</div>
-    <span>{` > `}</span>
-    <div className={styles.content}>{content}</div>
+    <strong>{name}</strong>
+    <p>{content}</p>
   </div>
 );
 
 export const openChatBox = () => (store.open = !store.open);
+export const closeChatBox = () => (store.open = false);

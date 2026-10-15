@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { useSnapshot } from "valtio";
 
 import { ygopro } from "@/api";
-import { cardStore } from "@/stores";
+import { cardStore, isMe } from "@/stores";
 
+import { handInteraction } from "../../interaction/hand";
 import { Bg } from "../Bg";
 import { Card } from "../Card";
 import { HiddenCard } from "../Card/HiddenCard";
@@ -26,6 +28,14 @@ export const Mat: React.FC = () => {
 
 const Cards: React.FC = () => {
   const { inner } = useSnapshot(cardStore);
+  const handCount = inner.filter(
+    (card) =>
+      card.location.zone === ygopro.CardZone.HAND &&
+      isMe(card.location.controller),
+  ).length;
+  useEffect(() => {
+    if (handCount <= 10) handInteraction.offset = 0;
+  }, [handCount]);
   const topSequences = new Map<string, number>();
   for (const card of inner) {
     const { zone, controller, sequence } = card.location;

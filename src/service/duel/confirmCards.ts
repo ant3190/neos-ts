@@ -67,7 +67,7 @@ export default async (
         await callCardMove(target.uuid);
       } else {
         // 这个分支是确认手卡或者卡组或者额外卡组的场景（大概）
-        await callCardFocus(target.uuid);
+        await callCardFocus(target.uuid, { code: card.code });
         if (target.code === 0) {
           // 如果是对方或者是在观战模式下双方展示手牌，target的code会是0，
           // 这里应该清掉meta，UI上表现是回复到卡背状态

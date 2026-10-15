@@ -4,6 +4,13 @@ import { ygopro } from "../../../idl/ocgcore";
 export type PresentationMessage =
   | { kind: "chained" | "solving" | "negated" | "disabled"; index: number }
   | { kind: "damage-start" | "damage-end" }
+  | { kind: "player-hint"; player: number; hintType: number; value: number }
+  | {
+      kind: "card-hint";
+      location: ygopro.CardLocation;
+      hintType: number;
+      value: number;
+    }
   | {
       kind: "battle";
       attacker: ygopro.CardLocation;
@@ -20,6 +27,39 @@ export function readPresentationMessage(
   command: number,
   bytes: Uint8Array,
 ): PresentationMessage | undefined {
+  const hintView = new DataView(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength,
+  );
+  if (command === 165 && bytes.length >= 6)
+    return {
+      kind: "player-hint",
+      player: bytes[0],
+      hintType: bytes[1],
+      value: hintView.getUint32(2, true),
+    };
+  if (command === 160 && bytes.length >= 9) {
+    const zones: Record<number, ygopro.CardZone> = {
+      1: ygopro.CardZone.DECK,
+      2: ygopro.CardZone.HAND,
+      4: ygopro.CardZone.MZONE,
+      8: ygopro.CardZone.SZONE,
+      16: ygopro.CardZone.GRAVE,
+      32: ygopro.CardZone.REMOVED,
+      64: ygopro.CardZone.EXTRA,
+    };
+    return {
+      kind: "card-hint",
+      location: new ygopro.CardLocation({
+        controller: bytes[0],
+        zone: zones[bytes[1] & 0x7f],
+        sequence: bytes[2],
+      }),
+      hintType: bytes[4],
+      value: hintView.getUint32(5, true),
+    };
+  }
   const chainKinds = {
     71: "chained",
     72: "solving",

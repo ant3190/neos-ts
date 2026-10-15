@@ -36,6 +36,9 @@ export interface MatState {
   currentPlayer: number; // 当前的操作方
 
   phase: PhaseState;
+  commandSource?: "idle" | "battle";
+  commandPlayer?: number;
+  timerPlayer?: number;
 
   unimplemented: number; // 未处理的`Message`
 

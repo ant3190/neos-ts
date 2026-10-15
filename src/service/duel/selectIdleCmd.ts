@@ -52,7 +52,10 @@ export default async (
   });
 
   context.matStore.phase.enableBp = selectIdleCmd.enable_bp;
+  context.matStore.phase.enableM2 = false;
   context.matStore.phase.enableEp = selectIdleCmd.enable_ep;
+  context.matStore.commandSource = "idle";
+  context.matStore.commandPlayer = player;
 };
 
 function idleTypeToInteractType(

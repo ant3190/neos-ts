@@ -1,9 +1,16 @@
-import { LeftOutlined } from "@ant-design/icons";
-import { Divider, Drawer, Space, Tag } from "antd";
+import { CloseOutlined } from "@ant-design/icons";
+import { Divider, Space, Tag } from "antd";
 import React from "react";
 import { proxy, useSnapshot } from "valtio";
 
-import { type CardMeta, fetchStrings, Region } from "@/api";
+import {
+  type CardMeta,
+  fetchCard,
+  fetchStrings,
+  getStrings,
+  Region,
+} from "@/api";
+import { cardStore, isMe } from "@/stores";
 import { YgoCard } from "@/ui/Shared";
 
 import {
@@ -13,13 +20,16 @@ import {
   TYPE_LINK,
   Type2StringCodeMap,
 } from "../../../../common";
+import { isFaceDownPosition } from "../../layout/geometry";
+import { duelPanels } from "../../layout/panels";
 import { Desc } from "./Desc";
 import styles from "./index.module.scss";
 
-const CARD_WIDTH = "8.75rem";
+const CARD_WIDTH = "220px";
 
 const defaultStore = {
   isOpen: false,
+  uuid: undefined as string | undefined,
   meta: {
     id: 0,
     data: {},
@@ -41,7 +51,14 @@ const store = proxy(defaultStore);
 export const CardModal = () => {
   const snap = useSnapshot(store);
 
-  const { isOpen, meta, counters } = snap;
+  const { inner } = useSnapshot(cardStore);
+  const panels = useSnapshot(duelPanels);
+  const uuid = snap.uuid;
+  const live = uuid ? inner.find((card) => card.uuid === uuid) : undefined;
+  const { isOpen } = snap;
+  const meta = live?.code ? live.meta : snap.meta;
+  const counters = live?.counters ?? snap.counters;
+  if (!isOpen) return null;
 
   const name = meta?.text.name;
   const types = extraCardTypes(meta?.data.type ?? 0);
@@ -52,18 +69,21 @@ export const CardModal = () => {
   const def = meta?.data.def;
 
   return (
-    // TODO: 宽度要好好设置 根据屏幕宽度
-    <Drawer
-      open={isOpen}
-      placement="left"
-      onClose={() => (store.isOpen = false)}
-      rootClassName={styles.root}
+    <aside
       className={styles.drawer}
-      mask={false}
-      title={name}
-      closeIcon={<LeftOutlined />}
-      width={350}
+      aria-label="卡片说明"
+      data-testid="duel-card-description-panel"
     >
+      <header className={styles.header}>
+        <strong>{name}</strong>
+        <button
+          type="button"
+          aria-label="关闭卡片说明"
+          onClick={() => (store.isOpen = false)}
+        >
+          <CloseOutlined />
+        </button>
+      </header>
       <div
         className={styles.container}
         data-testid="duel-card-detail"
@@ -92,8 +112,18 @@ export const CardModal = () => {
         </Space>
         <Divider style={{ margin: "0.875rem 0" }}></Divider>
         <Desc desc={desc} />
+        {snap.uuid &&
+          panels.cardHints[snap.uuid]?.map((hint, index) => (
+            <p key={index} data-testid="duel-card-hint">
+              {hint.type === 2
+                ? `卡片记录：${fetchCard(hint.value).text.name}`
+                : hint.type === 6
+                ? getStrings(hint.value)
+                : `记录：${hint.value}`}
+            </p>
+          ))}
       </div>
-    </Drawer>
+    </aside>
   );
 };
 
@@ -176,8 +206,21 @@ const CounterLine = (props: { counters: { [type: number]: number } }) => {
 };
 
 export const showCardModal = (
-  card: Partial<Pick<typeof store, "meta" | "counters">>,
+  card: Partial<Pick<typeof store, "meta" | "counters" | "uuid">>,
+  revealed = false,
 ) => {
+  if (!card.meta?.id) return;
+  const live = card.uuid
+    ? cardStore.inner.find((entry) => entry.uuid === card.uuid)
+    : undefined;
+  if (
+    !revealed &&
+    live &&
+    !isMe(live.location.controller) &&
+    isFaceDownPosition(live.location.position)
+  )
+    return;
+  store.uuid = card.uuid;
   store.isOpen = true;
   store.meta = card?.meta ?? defaultStore.meta;
   store.counters = card?.counters ?? defaultStore.counters;

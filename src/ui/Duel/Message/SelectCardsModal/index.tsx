@@ -258,7 +258,10 @@ export function SelectCardsModal({
   return (
     <NeosModal
       title={title}
-      width="min(680px, 94vw)"
+      duelPosition="selection"
+      duelWidth={
+        groups.size <= 4 ? 650 : groups.size <= 7 ? groups.size * 150 : 950
+      }
       open={isOpen}
       footer={footer}
       afterClose={() => {

@@ -16,6 +16,7 @@ import { BgChain, type ChainMarker, type ChainProps } from "@/ui/Shared";
 
 import { registerZoneElement } from "../../animation/runtime";
 import { openCardActions } from "../../interaction/CardActions";
+import { tablePose } from "../../layout/geometry";
 import { displayCardListModal } from "../../Message";
 import {
   type ActionHighlight,
@@ -54,12 +55,33 @@ const BgBlock: React.FC<
   actionHighlight,
   className,
   chains,
+  children,
   ...rest
 }) => {
   const hasChain = useSnapshot(matStore).chainDetails.length > 1;
+  const attrs = rest as Record<string, unknown>;
+  const controller = Number(attrs["data-controller"] ?? 0);
+  const zone = Number(
+    attrs["data-zone-value"] ??
+      (attrs["data-zone"] === "DECK" ? ygopro.CardZone.DECK : 0),
+  );
+  const sequence = Number(attrs["data-sequence"] ?? 0);
+  const pose = tablePose({ zone, sequence }, isMe(controller));
+  const field = zone === MZONE || (zone === SZONE && sequence !== 5);
   return (
     <div
       {...rest}
+      role={rest.onClick ? "button" : undefined}
+      tabIndex={rest.onClick ? 0 : undefined}
+      aria-label={`${isMe(controller) ? "我方" : "对方"} ${
+        ygopro.CardZone[zone]
+      } ${sequence + 1}`}
+      onKeyDown={(event) => {
+        if (rest.onClick && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          event.currentTarget.click();
+        }
+      }}
       ref={(node) => {
         const attrs = rest as Record<string, unknown>;
         const controller = attrs["data-controller"];
@@ -70,10 +92,18 @@ const BgBlock: React.FC<
           registerZoneElement(`${controller}:${zone}`, node);
       }}
       data-action-highlight={actionHighlight ?? "none"}
+      style={{
+        left: pose.x,
+        top: pose.y,
+        width: field ? 172 : 118 * pose.scale,
+        height: field ? 172 : 172 * pose.scale,
+        transform: `translate(-50%, -50%) translateZ(${pose.z}px) rotateZ(${pose.rz}deg)`,
+      }}
       className={classnames(styles.block, className, {
         [styles.highlight]: highlight,
       })}
     >
+      {children}
       {<DisabledCross disabled={disabled} />}
       {hasChain && <BgChain {...chains} />}
       <ActionFrame highlight={actionHighlight} />
@@ -102,7 +132,6 @@ const BgExtraRow: React.FC<{
           data-place-selectable={
             !!meSnap[i].interactivity || !!opSnap[1 - i].interactivity
           }
-          className={styles.extra}
           onClick={() => {
             onBlockClick(container, meSnap[i].interactivity);
             onBlockClick(container, opSnap[1 - i].interactivity);
@@ -139,7 +168,7 @@ const BgRow: React.FC<{
   const zone = szone ? SZONE : MZONE;
 
   return (
-    <div className={classnames(styles.row, { [styles.opponent]: opponent })}>
+    <div className={styles.row}>
       {Array.from({ length: 5 }).map((_, i) => (
         <BgBlock
           key={i}
@@ -207,7 +236,7 @@ const BgOtherBlocks: React.FC<{ op?: boolean }> = ({ op }) => {
   };
 
   return (
-    <div className={classnames(styles["other-blocks"], { [styles.op]: op })}>
+    <div className={styles["other-blocks"]}>
       <BgBlock
         data-testid="duel-zone"
         data-zone={ygopro.CardZone[REMOVED]}
@@ -270,18 +299,30 @@ const BgOtherBlocks: React.FC<{ op?: boolean }> = ({ op }) => {
       <BgBlock
         data-testid="duel-zone"
         data-zone="DECK"
+        data-zone-value={ygopro.CardZone.DECK}
         data-controller={controller}
         data-place-selectable={false}
         className={styles.deck}
+        actionHighlight={zoneHighlight(ygopro.CardZone.DECK)}
+        onClick={(event) =>
+          openCardActions(
+            cardStore.at(ygopro.CardZone.DECK, controller),
+            event.currentTarget,
+          )
+        }
         chains={{ chains: [] }}
-      />
+      >
+        <span className={styles.count} data-testid="duel-zone-count">
+          {getN(ygopro.CardZone.DECK)}
+        </span>
+      </BgBlock>
       <BgBlock
         data-testid="duel-zone"
         data-zone={ygopro.CardZone[EXTRA]}
         data-zone-value={EXTRA}
         data-controller={controller}
         data-place-selectable={false}
-        className={classnames(styles.deck, styles["extra-deck"])}
+        className={styles.deck}
         onClick={(event) => {
           displayCardListModal({ isZone: true, zone: EXTRA, controller });
           openCardActions(cardStore.at(EXTRA, controller), event.currentTarget);

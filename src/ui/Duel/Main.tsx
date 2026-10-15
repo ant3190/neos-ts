@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { LoaderFunction, useNavigate, useSearchParams } from "react-router-dom";
 import { useSnapshot } from "valtio";
 
@@ -10,6 +10,10 @@ import { warmDeckImages } from "@/ui/Shared/YgoCard/imageCache";
 
 import { DuelEffects } from "./animation/Effects";
 import { CardActions } from "./interaction/CardActions";
+import { handInteraction, suppressHandClick } from "./interaction/hand";
+import { FieldInfo } from "./layout/FieldInfo";
+import layoutStyles from "./layout/index.module.scss";
+import { useDuelCamera } from "./layout/viewport";
 import {
   ActionHistory,
   Alert,
@@ -17,6 +21,8 @@ import {
   CardListModal,
   CardModal,
   CheckCounterModal,
+  closeCardListModal,
+  closeCardModal,
   EndModal,
   HintNotification,
   OptionModal,
@@ -28,7 +34,6 @@ import {
 } from "./Message";
 import { resetDuelDialogs } from "./Message/reset";
 import { ChatBox, HandChain, LifeBar, Mat, Menu, Underlying } from "./PlayMat";
-import { ChainDisplay } from "./PlayMat/ChainDisplay";
 
 export const loader: LoaderFunction = async () => {
   // 更新场景
@@ -37,6 +42,8 @@ export const loader: LoaderFunction = async () => {
 };
 
 export const Component: React.FC = () => {
+  const stageRef = useRef<HTMLDivElement>(null);
+  useDuelCamera(stageRef);
   const { stage } = useSnapshot(sideStore);
   const { duelEnd } = useSnapshot(matStore);
   const navigate = useNavigate();
@@ -47,6 +54,28 @@ export const Component: React.FC = () => {
   const RECORD = "record";
 
   useEffect(() => () => resetDuelDialogs(), []);
+  useEffect(() => {
+    const outside = (event: PointerEvent) => {
+      if (
+        !(event.target as Element)?.closest?.(
+          '[data-testid="duel-card"], [data-testid="duel-card-actions"]',
+        )
+      )
+        handInteraction.selected = "";
+    };
+    const release = () => {
+      if (handInteraction.dragging) suppressHandClick();
+      handInteraction.dragging = false;
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("pointerup", release);
+    window.addEventListener("blur", release);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("pointerup", release);
+      window.removeEventListener("blur", release);
+    };
+  }, []);
 
   useEffect(() => {
     if (
@@ -89,13 +118,25 @@ export const Component: React.FC = () => {
   }, [duelEnd]);
 
   return (
-    <>
+    <div
+      className={layoutStyles.stage}
+      ref={stageRef}
+      data-testid="duel-stage"
+      data-layout="mdpro3"
+      aria-label="决斗场地"
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        closeCardModal();
+        closeCardListModal();
+      }}
+    >
       <Underlying />
       <SelectActionsModal />
       <Alert />
       <Menu />
       <LifeBar />
       <Mat />
+      <FieldInfo />
       <DuelEffects />
       <CardActions />
       <CardModal />
@@ -111,9 +152,8 @@ export const Component: React.FC = () => {
       <EndModal />
       <ChatBox />
       <HandChain />
-      <ChainDisplay />
       <ActionHistory />
-    </>
+    </div>
   );
 };
 Component.displayName = "NeosDuel";

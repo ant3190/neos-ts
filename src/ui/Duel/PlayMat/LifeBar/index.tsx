@@ -1,165 +1,150 @@
-import { Progress } from "antd";
-import classNames from "classnames";
-import React, { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSnapshot } from "valtio";
 
-import { useEnv } from "@/hook";
 import { matStore, roomStore } from "@/stores";
 
+import { animationQuality } from "../../animation/runtime";
 import styles from "./index.module.scss";
 
-const LIFE_ANIMATION_DURATION = 500;
-
-export const LifeBar: React.FC = () => {
-  const snapInitInfo = useSnapshot(matStore.initInfo);
-  const snapPlayer = useSnapshot(roomStore);
-  const { currentPlayer } = useSnapshot(matStore);
-
-  const [meLife, setMeLife] = React.useState(0);
-  const [opLife, setOpLife] = React.useState(0);
-
+export const LifeBar = () => {
+  const snap = useSnapshot(matStore);
+  const players = useSnapshot(roomStore);
+  const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    setMeLife(snapInitInfo.me.life);
-  }, [snapInitInfo.me.life]);
-
-  useEffect(() => {
-    setOpLife(snapInitInfo.op.life);
-  }, [snapInitInfo.op.life]);
-
-  const snapTimeLimit = useSnapshot(matStore.timeLimits);
-  const [myTimeLimit, setMyTimeLimit] = useState(snapTimeLimit.me);
-  const [opTimeLimit, setOpTimeLimit] = useState(snapTimeLimit.op);
-  useEffect(() => {
-    setMyTimeLimit(snapTimeLimit.me);
-  }, [snapTimeLimit.me]);
-  useEffect(() => {
-    setOpTimeLimit(snapTimeLimit.op);
-  }, [snapTimeLimit.op]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setMyTimeLimit((time) => time - 1);
-      setOpTimeLimit((time) => time - 1);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (useEnv().VITE_IS_AI_MODE) {
-      // 如果是AI模式
-      // FIXME: 探索一个优雅的、判断当前是不是AI模式的方法，用户手动输入AI也是AI模式
-      setMyTimeLimit(240);
-      setOpTimeLimit(240);
-    }
-  }, [currentPlayer]);
-
+    setElapsed(0);
+    const started = Date.now();
+    const timer = setInterval(
+      () => setElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => clearInterval(timer);
+  }, [
+    snap.timeLimits.me,
+    snap.timeLimits.op,
+    snap.timerPlayer,
+    snap.currentPlayer,
+  ]);
   return (
     <div className={styles.container}>
-      <LifeBarItem
-        active={!matStore.isMe(currentPlayer)}
-        name={snapPlayer.getOpPlayer()?.name ?? "?"}
-        life={opLife}
-        timeLimit={opTimeLimit}
-        isMe={false}
-      />
-      <LifeBarItem
-        active={matStore.isMe(currentPlayer)}
-        name={snapPlayer.getMePlayer()?.name ?? "?"}
-        life={meLife}
-        timeLimit={myTimeLimit}
-        isMe={true}
-      />
+      {[false, true].map((mine) => {
+        const info = mine ? snap.initInfo.me : snap.initInfo.op;
+        const rawTime = mine ? snap.timeLimits.me : snap.timeLimits.op;
+        const active = matStore.isMe(snap.currentPlayer) === mine;
+        const ticking =
+          matStore.isMe(snap.timerPlayer ?? snap.currentPlayer) === mine;
+        return (
+          <LifeBarItem
+            key={String(mine)}
+            mine={mine}
+            active={active}
+            name={
+              (mine ? players.getMePlayer() : players.getOpPlayer())?.name ??
+              "?"
+            }
+            life={info.life}
+            time={
+              rawTime < 0
+                ? undefined
+                : Math.max(0, rawTime - (ticking ? elapsed : 0))
+            }
+          />
+        );
+      })}
     </div>
   );
 };
 
-const LifeBarItem: React.FC<{
+function LifeBarItem({
+  mine,
+  active,
+  name,
+  life,
+  time,
+}: {
+  mine: boolean;
   active: boolean;
   name: string;
   life: number;
-  timeLimit: number;
-  isMe: boolean;
-}> = ({ active, name, life, timeLimit, isMe }) => {
-  const animatedLife = useAnimatedLifeNumber(life);
-  const mm = Math.floor(timeLimit / 60);
-  const ss = timeLimit % 60;
-  const timeText =
-    timeLimit < 0
-      ? "00:00"
-      : `${mm < 10 ? "0" + mm : mm}:${ss < 10 ? "0" + ss : ss}`;
+  time?: number;
+}) {
+  const shown = useLifeNumber(life);
   return (
-    <div
+    <section
+      className={`${styles.player} ${mine ? styles.me : styles.op} ${
+        active ? styles.active : ""
+      }`}
       data-testid="duel-player-life"
-      data-player={isMe ? "me" : "op"}
+      data-player={mine ? "me" : "op"}
       data-life={life}
-      style={{
-        flexDirection: isMe ? "column-reverse" : "column",
-        overflow: "hidden",
-        display: "flex",
-        gap: "0.5rem",
-        position: "relative",
-      }}
+      aria-label={`${name} 生命值 ${life}`}
     >
-      <div
-        className={classNames(styles["life-bar"], {
-          "life-bar-activated": active,
-        })}
-      >
-        <div className={styles.name}>{name}</div>
-        <div
-          className={styles.life}
+      <div className={styles.name}>{name}</div>
+      <div className={styles.life}>
+        <span>LP</span>
+        <strong
           data-testid="duel-player-life-value"
-          data-player={isMe ? "me" : "op"}
+          data-player={mine ? "me" : "op"}
           data-target-life={life}
         >
-          {animatedLife}
-        </div>
+          {shown < 0 ? "—" : shown}
+        </strong>
       </div>
-      {active && (
-        <div className={styles["timer-container"]}>
-          <Progress
-            type="circle"
-            percent={Math.floor((timeLimit / 240) * 100)}
-            strokeWidth={20}
-            size={14}
-          />
-          <div className={styles["timer-text"]}>{timeText}</div>
+      {time !== undefined && (
+        <div className={styles.timer} data-testid="duel-player-time">
+          {Math.floor(time / 60)
+            .toString()
+            .padStart(2, "0")}
+          :{(time % 60).toString().padStart(2, "0")}
         </div>
       )}
-    </div>
+    </section>
   );
-};
+}
 
-const useAnimatedLifeNumber = (life: number) => {
-  const [displayLife, setDisplayLife] = useState(life);
-  const displayLifeRef = React.useRef(life);
-
+function useLifeNumber(life: number) {
+  const [shown, setShown] = useState(life);
+  const current = useRef(life);
   useEffect(() => {
-    const from = displayLifeRef.current;
-    const to = life;
-
-    if (from === to) return;
-
+    const from = current.current;
     let frame = 0;
-    const start = performance.now();
-    const animate = (now: number) => {
-      const progress = Math.min(1, (now - start) / LIFE_ANIMATION_DURATION);
-      const easedProgress = 1 - Math.pow(1 - progress, 3);
-      const next = Math.round(from + (to - from) * easedProgress);
-
-      displayLifeRef.current = next;
-      setDisplayLife(next);
-
-      if (progress < 1) {
-        frame = requestAnimationFrame(animate);
-      }
+    let settled = false;
+    const finish = () => {
+      settled = true;
+      cancelAnimationFrame(frame);
+      current.current = life;
+      setShown(life);
     };
-
-    frame = requestAnimationFrame(animate);
-
-    return () => cancelAnimationFrame(frame);
+    if (
+      from < 0 ||
+      life < 0 ||
+      animationQuality() === "off" ||
+      document.hidden
+    ) {
+      finish();
+      return;
+    }
+    const start = performance.now();
+    const tick = (now: number) => {
+      if (settled) return;
+      const progress = Math.min(1, (now - start) / 500);
+      current.current = Math.round(
+        from + (life - from) * (1 - (1 - progress) ** 3),
+      );
+      setShown(current.current);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    // Wall time settles a suspended/slow renderer too; the number cannot stay stale.
+    const deadline = setTimeout(finish, 550);
+    const visibility = () => {
+      if (document.hidden) finish();
+    };
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(deadline);
+      document.removeEventListener("visibilitychange", visibility);
+    };
   }, [life]);
-
-  return displayLife;
-};
+  return shown;
+}

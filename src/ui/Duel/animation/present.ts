@@ -17,6 +17,10 @@ import { AudioActionType, playEffect } from "@/infra/audio";
 import { cardStore, type CardType } from "@/stores";
 import { callCardAttack } from "@/ui/Duel/PlayMat/Card";
 
+import { duelPanels } from "../layout/panels";
+import { duelPreferences } from "../layout/preferences";
+import { closeCardListModal } from "../Message/CardListModal";
+import { closeCardModal, showCardModal } from "../Message/CardModal";
 import {
   type DuelCue,
   duelTimeline,
@@ -110,18 +114,74 @@ export function presentGameMessage(
       context.cardStore.find(location)?.uuid,
       `${location.controller}:${location.zone}`,
     );
-  const playerPoint = (controller: number): Point => ({
-    x: window.innerWidth / 2,
-    y: window.innerHeight * (context.matStore.isMe(controller) ? 0.92 : 0.1),
-    width: 100,
-    height: 50,
-  });
+  const playerPoint = (controller: number): Point => {
+    const side = context.matStore.isMe(controller) ? "me" : "op";
+    const rect = document
+      .querySelector(`[data-testid="duel-player-life"][data-player="${side}"]`)
+      ?.getBoundingClientRect();
+    return rect
+      ? {
+          x: rect.x + rect.width / 2,
+          y: rect.y + rect.height / 2,
+          width: rect.width,
+          height: rect.height,
+        }
+      : {
+          x: window.innerWidth / 2,
+          y: window.innerHeight * (side === "me" ? 0.92 : 0.1),
+          width: 100,
+          height: 50,
+        };
+  };
   const source = (location: ygopro.CardLocation) =>
     `${context.matStore.isMe(location.controller) ? "我方" : "对方"}${
       names[location.zone] ?? "场上"
     }`;
   const notification = getPresentationMessage(msg);
   if (notification) {
+    if (notification.kind === "player-hint") {
+      const { player, value, hintType } = notification;
+      const mask = 1 << player;
+      if (value >= 10000 && (hintType === 6 || hintType === 7)) {
+        const code = value >>> 4;
+        const next =
+          hintType === 6
+            ? (duelPanels.attachedEffects[code] ?? 0) | mask
+            : (duelPanels.attachedEffects[code] ?? 0) & ~mask;
+        if (next) duelPanels.attachedEffects[code] = next;
+        else delete duelPanels.attachedEffects[code];
+      }
+      // MDPro3's explicit engine hint for effects that forbid grave inspection.
+      if (
+        value === 38723936 &&
+        context.matStore.isMe(player) &&
+        (hintType === 6 || hintType === 7)
+      ) {
+        duelPanels.cannotCheckGrave = hintType === 6;
+        if (hintType === 6) closeCardListModal();
+      }
+      return true;
+    }
+    if (notification.kind === "card-hint") {
+      const card = context.cardStore.find(notification.location);
+      if (card) {
+        const hints = duelPanels.cardHints[card.uuid] ?? [];
+        if (notification.hintType === 7)
+          duelPanels.cardHints[card.uuid] = hints.filter(
+            (hint) => hint.value !== notification.value,
+          );
+        else
+          duelPanels.cardHints[card.uuid] = [
+            ...hints.filter((hint) =>
+              notification.hintType === 6
+                ? hint.value !== notification.value
+                : hint.type !== notification.hintType,
+            ),
+            { type: notification.hintType, value: notification.value },
+          ];
+      }
+      return true;
+    }
     if (notification.kind === "battle") {
       const attacker = context.cardStore.find(notification.attacker);
       const target = context.cardStore.find(notification.target);
@@ -363,6 +423,10 @@ export function presentGameMessage(
         : summonMaterials.length
         ? summonType(meta.data.type ?? 0)
         : "normal";
+      if (kind === "special" && type !== "normal" && summonMaterials.length) {
+        closeCardModal();
+        closeCardListModal();
+      }
       playEffect(
         meta.data.type && meta.data.type & TYPE_TOKEN
           ? AudioActionType.SOUND_TOKEN
@@ -483,6 +547,8 @@ export function presentGameMessage(
     case "chaining": {
       const event = msg.chaining;
       summonMaterials = [];
+      if (duelPreferences.autoInfo)
+        showCardModal({ meta: fetchCard(event.code) }, true);
       revealDuelCue({
         kind: "activate",
         code: event.code,

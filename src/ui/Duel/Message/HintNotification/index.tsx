@@ -62,7 +62,6 @@ export const HintNotification = () => {
         Region.System,
         Phase2StringCodeMap.get(currentPhase) ?? 0,
       );
-      msgApi.info(message);
       console.color("DeepPink")(
         `${message}(${matStore.isMe(matStore.currentPlayer) ? "me" : "op"})`,
       );

@@ -1,4 +1,4 @@
-import { ygopro } from "@/api";
+import { fetchCard, ygopro } from "@/api";
 import MsgPosChange = ygopro.StocGameMessage.MsgPosChange;
 import { Container } from "@/container";
 import { callCardMove } from "@/ui/Duel/PlayMat/Card";
@@ -11,6 +11,10 @@ export default async (container: Container, posChange: MsgPosChange) => {
 
   const target = context.cardStore.at(location, controller, sequence);
   if (target) {
+    if (posChange.card_info.code) {
+      target.code = posChange.card_info.code;
+      target.meta = fetchCard(target.code);
+    }
     target.location.position = posChange.cur_position;
 
     // TODO: 暂时用`Move`动画，后续可以单独实现一个改变表示形式的动画

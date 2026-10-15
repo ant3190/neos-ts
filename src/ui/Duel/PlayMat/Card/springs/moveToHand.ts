@@ -1,62 +1,32 @@
 import { ygopro } from "@/api";
 import { cardStore, isMe } from "@/stores";
 
-import { matConfig } from "../../css";
+import { handInteraction } from "../../../interaction/hand";
+import { tablePose } from "../../../layout/geometry";
+import { duelViewport } from "../../../layout/viewport";
 import type { MoveFunc } from "./types";
 import { asyncStart, getDuration } from "./utils";
 
-const {
-  BLOCK_HEIGHT_M,
-  BLOCK_HEIGHT_S,
-  CARD_RATIO,
-  ROW_GAP,
-  HAND_MARGIN_TOP,
-  HAND_CARD_HEIGHT,
-  HAND_CIRCLE_CENTER_OFFSET_Y,
-  HAND_MAT_OFFSET_Y,
-} = matConfig;
-
-const { HAND } = ygopro.CardZone;
-
-export const moveToHand: MoveFunc = async (props) => {
-  const { card, api, options } = props;
-  const { sequence, controller } = card.location;
-  // 手卡会有很复杂的计算...
-  const hand_circle_center_x = 0;
-  const hand_circle_center_y =
-    BLOCK_HEIGHT_M +
-    BLOCK_HEIGHT_S +
-    2 * ROW_GAP +
-    (HAND_MARGIN_TOP + HAND_CARD_HEIGHT + HAND_CIRCLE_CENTER_OFFSET_Y);
-  const hand_card_width = CARD_RATIO * HAND_CARD_HEIGHT;
-  const THETA =
-    2 *
-    Math.atan(
-      hand_card_width / 2 / (HAND_CIRCLE_CENTER_OFFSET_Y + HAND_CARD_HEIGHT),
-    ) *
-    0.9;
-  // 接下来计算每一张手卡
-  const hands_length = cardStore.at(HAND, controller).length;
-  const angle = (sequence - (hands_length - 1) / 2) * THETA;
-  const r = HAND_CIRCLE_CENTER_OFFSET_Y + HAND_CARD_HEIGHT / 2;
-  const negativeX = Math.sin(angle) * r;
-  const negativeY = Math.cos(angle) * r + HAND_CARD_HEIGHT / 2;
-  const x = hand_circle_center_x + negativeX * (isMe(controller) ? 1 : -1);
-  const y = hand_circle_center_y - negativeY + HAND_MAT_OFFSET_Y;
-
-  const _rz = (angle * 180) / Math.PI;
-
+export const moveToHand: MoveFunc = async ({ card, api, options }) => {
+  const mine = isMe(card.location.controller);
+  const count = cardStore.at(
+    ygopro.CardZone.HAND,
+    card.location.controller,
+  ).length;
+  const pose = tablePose(
+    card.location,
+    mine,
+    count,
+    card.code !== 0,
+    duelViewport.width / 1080,
+  );
   await asyncStart(api)({
-    x: isMe(controller) ? x : -x,
-    y: isMe(controller) ? y : -y,
-    z: sequence + 5,
-    rz: isMe(controller) ? _rz : 180 - _rz,
-    ry: isMe(controller) ? 0 : 180,
-    scale: 1,
-    zIndex: sequence,
-    // rx: -PLANE_ROTATE_X,
+    ...pose,
+    x: pose.x + (mine ? handInteraction.offset : 0),
+    subZ: options?.instant ? 0 : 100,
+    opacity: 1,
     config: {
-      duration: options?.instant ? 0 : getDuration(),
+      duration: options?.instant ? 0 : options?.durationMs ?? getDuration(),
       clamp: true,
     },
   });

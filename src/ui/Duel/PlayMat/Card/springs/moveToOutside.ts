@@ -1,55 +1,16 @@
-import { ygopro } from "@/api";
 import { isMe } from "@/stores";
 
-import { matConfig } from "../../css";
+import { tablePose } from "../../../layout/geometry";
 import type { MoveFunc } from "./types";
 import { asyncStart, getDuration } from "./utils";
 
-const {
-  BLOCK_WIDTH,
-  BLOCK_HEIGHT_M,
-  COL_GAP,
-  ROW_GAP,
-  CARD_HEIGHT_O,
-  BLOCK_OUTSIDE_OFFSET_X,
-  CARD_RATIO,
-  HAND_CARD_HEIGHT,
-} = matConfig;
-
-const { REMOVED } = ygopro.CardZone;
-
-export const moveToOutside: MoveFunc = async (props) => {
-  const { card, api, options } = props;
-  const { zone, controller, position, sequence } = card.location;
-
-  let x =
-      BLOCK_WIDTH * 2.5 +
-      COL_GAP * 2 +
-      BLOCK_OUTSIDE_OFFSET_X +
-      CARD_HEIGHT_O * CARD_RATIO * 0.5,
-    y = ROW_GAP + BLOCK_HEIGHT_M + (BLOCK_HEIGHT_M - CARD_HEIGHT_O) / 2;
-  if (zone === REMOVED) y -= ROW_GAP + CARD_HEIGHT_O;
-  if (!isMe(controller)) {
-    x = -x;
-    y = -y;
-  }
+export const moveToOutside: MoveFunc = async ({ card, api, options }) => {
   await asyncStart(api)({
-    x,
-    y,
-    z: 0,
-    scale: CARD_HEIGHT_O / HAND_CARD_HEIGHT,
-    rz: isMe(controller) ? 0 : 180,
-    ry: [
-      ygopro.CardPosition.FACEDOWN,
-      ygopro.CardPosition.FACEDOWN_ATTACK,
-      ygopro.CardPosition.FACEDOWN_DEFENSE,
-    ].includes(position)
-      ? 180
-      : 0,
-    subZ: 100,
-    zIndex: sequence,
+    ...tablePose(card.location, isMe(card.location.controller)),
+    subZ: options?.instant ? 0 : 100,
+    opacity: 1,
     config: {
-      duration: options?.instant ? 0 : getDuration(),
+      duration: options?.instant ? 0 : options?.durationMs ?? getDuration(),
       clamp: true,
     },
   });

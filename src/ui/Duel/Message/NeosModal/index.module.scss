@@ -1,6 +1,7 @@
 .modal {
   :global(.ant-modal-body) {
-    max-height: 70vh;
+    max-height: 560px;
+    font-size: 24px;
     overflow-y: auto;
   }
   :global(.ant-modal-content) {
@@ -15,14 +16,15 @@
   }
   :global(.ant-modal-title) {
     color: #ecf5ff;
-    font-size: 15px;
+    font-size: 26px;
     line-height: 1.5;
   }
   :global(.ant-modal-close) {
     color: #b9d5e5;
   }
   :global(.ant-btn) {
-    min-height: 40px;
+    min-height: 54px;
+    font-size: 23px;
   }
   :global(.ant-btn-default) {
     background: #112b40;
@@ -54,4 +56,26 @@
 }
 .wrap .modal {
   pointer-events: auto;
+}
+
+.modal :global(.ant-modal-content) {
+  min-height: 300px;
+}
+.selection :global(.ant-modal-content) {
+  min-height: 420px;
+}
+.selection :global(.ant-modal-body) {
+  max-height: 340px;
+}
+
+.selection :global(.ant-modal-content) {
+  min-height: 0;
+  height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+.selection :global(.ant-modal-body) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }

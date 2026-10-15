@@ -115,6 +115,9 @@ export class MatStore implements MatState, NeosStore {
   hint = initialState.hint;
   currentPlayer = initialState.currentPlayer;
   phase = initialState.phase;
+  commandSource: MatState["commandSource"] = undefined;
+  commandPlayer: number | undefined = undefined;
+  timerPlayer: number | undefined = undefined;
   unimplemented = initialState.unimplemented;
   handResults = initialState.handResults;
   tossResult = initialState.tossResult;
@@ -126,6 +129,9 @@ export class MatStore implements MatState, NeosStore {
   // methods
   isMe = initialState.isMe;
   reset(): void {
+    this.commandSource = undefined;
+    this.commandPlayer = undefined;
+    this.timerPlayer = undefined;
     this.chains = [];
     this.chainDetails = [];
     this.completedChainDetails = [];

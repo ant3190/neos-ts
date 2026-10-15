@@ -1,8 +1,6 @@
-import path from "node:path";
-
 import { expect, test } from "@playwright/test";
 
-import { uploadReplay } from "./helpers/replay";
+import { mdpro3Fixture } from "./helpers/mdpro3Fixture";
 
 test("scales the app root to fit a small viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1000, height: 620 });
@@ -70,20 +68,17 @@ test("keeps the app centered during intermediate scale updates", async ({
   expect(centerOffset).toEqual({ x: 0, y: 0 });
 });
 
-test("keeps both players' opening hands visible in a compact duel viewport", async ({
+test("keeps both hand rows in view with the MDPro3 camera", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
-  await uploadReplay(
-    page,
-    path.resolve("tests/e2e/fixtures/replays/1/replay.yrp3d"),
-  );
+  await mdpro3Fixture(page);
 
   await expect
     .poll(() =>
       page.evaluate(() => {
         const plane = document.querySelector<HTMLElement>(
-          'section[class*="mat"] > div > div',
+          '[data-testid="duel-stage"]',
         );
         const planeRect = plane?.getBoundingClientRect();
         const handCards = [
@@ -95,7 +90,8 @@ test("keeps both players' opening hands visible in a compact duel viewport", asy
         const visibleCards = handCards.filter((node) => {
           const rect = node.getBoundingClientRect();
 
-          return rect.top >= 0 && rect.bottom <= viewportHeight;
+          // MDPro3 fans hands partly beyond the top/bottom edge.
+          return rect.bottom > 0 && rect.top < viewportHeight;
         });
 
         const planeCenterOffset = planeRect
@@ -131,5 +127,5 @@ test("keeps both players' opening hands visible in a compact duel viewport", asy
   ).toHaveText("8000");
   await expect(
     page.locator('[data-testid="duel-player-life-value"][data-player="op"]'),
-  ).toHaveText("8000");
+  ).toHaveText("7200");
 });

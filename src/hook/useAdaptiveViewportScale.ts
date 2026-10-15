@@ -8,18 +8,24 @@ export interface AdaptiveViewportScaleOptions {
   designWidth?: number;
   designHeight?: number;
   minScale?: number;
+  duel?: boolean;
 }
 
 const setViewportScale = ({
   designWidth = DESIGN_WIDTH,
   designHeight = DESIGN_HEIGHT,
   minScale = MIN_SCALE,
+  duel = false,
 }: AdaptiveViewportScaleOptions = {}) => {
   const viewportWidth = Math.max(window.innerWidth, 1);
   const viewportHeight = Math.max(window.innerHeight, 1);
   const scale = Math.max(
     minScale,
-    Math.min(1, viewportWidth / designWidth, viewportHeight / designHeight),
+    duel
+      ? viewportWidth < viewportHeight
+        ? viewportWidth / designWidth
+        : viewportHeight / designHeight
+      : Math.min(1, viewportWidth / designWidth, viewportHeight / designHeight),
   );
   const roundedScale = Number(scale.toFixed(4));
   const rootStyle = document.documentElement.style;
@@ -41,17 +47,18 @@ export const useAdaptiveViewportScale = (
   const designWidth = options?.designWidth;
   const designHeight = options?.designHeight;
   const minScale = options?.minScale;
+  const duel = options?.duel;
 
   useLayoutEffect(() => {
     let frame = 0;
     const scheduleUpdate = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() =>
-        setViewportScale({ designWidth, designHeight, minScale }),
+        setViewportScale({ designWidth, designHeight, minScale, duel }),
       );
     };
 
-    setViewportScale({ designWidth, designHeight, minScale });
+    setViewportScale({ designWidth, designHeight, minScale, duel });
     window.addEventListener("resize", scheduleUpdate);
     window.visualViewport?.addEventListener("resize", scheduleUpdate);
 
@@ -60,5 +67,5 @@ export const useAdaptiveViewportScale = (
       window.removeEventListener("resize", scheduleUpdate);
       window.visualViewport?.removeEventListener("resize", scheduleUpdate);
     };
-  }, [designWidth, designHeight, minScale]);
+  }, [designWidth, designHeight, minScale, duel]);
 };

@@ -5,6 +5,7 @@ import { isCurrentUIContainer } from "@/container/compat";
 import { replayStore } from "@/stores";
 import { presentGameMessage } from "@/ui/Duel/animation/present";
 import { showWaiting } from "@/ui/Duel/Message";
+import { clearAllIdleInteractivities } from "@/ui/Duel/utils";
 
 import onAnnounce from "./announce";
 import onMsgAttack from "./attack";
@@ -139,6 +140,11 @@ async function applyGameMsg(
   }
 
   if (ActiveList.includes(msg.gameMsg)) {
+    if (
+      msg.gameMsg !== "select_idle_cmd" &&
+      msg.gameMsg !== "select_battle_cmd"
+    )
+      clearAllIdleInteractivities();
     showWaiting(false);
 
     if (replayStore.isReplay) return;

@@ -1,45 +1,47 @@
 import { RightOutlined } from "@ant-design/icons";
-import { Drawer } from "antd";
 import React from "react";
-import { proxy, useSnapshot } from "valtio";
+import { useSnapshot } from "valtio";
 
 import { fetchStrings, Region, ygopro } from "@/api";
 import { useConfig } from "@/config";
 import { History, HistoryOp, historyStore } from "@/stores";
 import { ScrollableArea, YgoCard } from "@/ui/Shared";
 
+import { duelPanels } from "../../layout/panels";
+import { ChainDisplay } from "../../PlayMat/ChainDisplay";
 import styles from "./index.module.scss";
 
 const { assetsPath } = useConfig();
 
-const defaultStore = {
-  isOpen: false,
-};
-
-const store = proxy(defaultStore);
-
 export const ActionHistory: React.FC = () => {
-  const { isOpen } = useSnapshot(store);
+  const panels = useSnapshot(duelPanels);
   const { historys } = useSnapshot(historyStore);
   return (
-    <Drawer
-      open={isOpen}
-      placement="right"
-      rootClassName={styles.root}
+    <aside
+      hidden={panels.right !== "history"}
       className={styles.drawer}
-      mask={false}
-      closeIcon={<RightOutlined />}
-      onClose={() => (store.isOpen = false)}
-      title="操作历史" // TODO: I18N
+      aria-label="操作历史"
+      data-testid="duel-history"
     >
-      <ScrollableArea className={styles.container} maxHeight="var(--height)">
+      <header className={styles.header}>
+        <strong>操作历史</strong>
+        <button
+          type="button"
+          aria-label="关闭操作历史"
+          onClick={() => (duelPanels.right = "none")}
+        >
+          <RightOutlined />
+        </button>
+      </header>
+      <ScrollableArea className={styles.container} maxHeight="750px">
+        <ChainDisplay />
         <div className={styles.timeline}>
           {historys.map((history, idx) => (
             <HistoryItem key={idx} {...(history as History)} />
           ))}
         </div>
       </ScrollableArea>
-    </Drawer>
+    </aside>
   );
 };
 
@@ -111,4 +113,7 @@ function Op2Text(op: HistoryOp): string {
   }
 }
 
-export const displayActionHistory = () => (store.isOpen = true);
+export const displayActionHistory = () => {
+  duelPanels.right = duelPanels.right === "history" ? "none" : "history";
+  duelPanels.restoreHistory = false;
+};

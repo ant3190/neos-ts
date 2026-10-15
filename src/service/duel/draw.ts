@@ -47,8 +47,12 @@ export default async (
 
   // 抽卡动画
   await Promise.all(
-    context.cardStore
-      .at(ygopro.CardZone.HAND, draw.player)
-      .map((card) => callCardMove(card.uuid)),
+    context.cardStore.at(ygopro.CardZone.HAND, draw.player).map((card) =>
+      callCardMove(card.uuid, {
+        fromZone: newHands.includes(card)
+          ? ygopro.CardZone.DECK
+          : ygopro.CardZone.HAND,
+      }),
+    ),
   );
 };

@@ -23,14 +23,21 @@ export default defineConfig({
       name: "chrome",
       use: {
         ...devices["Desktop Chrome"],
-        channel: "chrome",
+        channel: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+          ? undefined
+          : "chrome",
+        launchOptions: {
+          executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+        },
       },
     },
   ],
   webServer: skipWebServer
     ? undefined
     : {
-        command: `npm run dev -- --host ${base.hostname} --port ${base.port || "5173"}`,
+        command: `npm run dev -- --host ${base.hostname} --port ${
+          base.port || "5173"
+        }`,
         url: baseURL,
         reuseExistingServer: true,
         timeout: 120_000,

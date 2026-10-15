@@ -4,6 +4,7 @@ import { fetchCard } from "@/api";
 import { YgoCard } from "@/ui/Shared";
 
 import styles from "./index.module.scss";
+import { revealPublicCardFace } from "./motionState";
 import { type DuelCue, getCardElement } from "./runtime";
 
 /** Reuse the painted source card; no image request or spring/message wait. */
@@ -17,6 +18,7 @@ export function NegationEffect({
   const card = getCardElement(cue.cardUuid);
   useLayoutEffect(() => {
     if (!card) return;
+    const conceal = revealPublicCardFace(cue.cardUuid!, cue.code);
     const token = String(cue.id);
     const animations: Animation[] = [];
     card.dataset.cardNegating = token;
@@ -58,6 +60,7 @@ export function NegationEffect({
       );
     }
     return () => {
+      conceal();
       animations.forEach((animation) => animation.cancel());
       // Another link of the same card can supersede this cue.
       if (card.dataset.cardNegating !== token) return;

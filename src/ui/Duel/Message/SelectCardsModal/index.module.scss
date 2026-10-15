@@ -1,13 +1,17 @@
 .grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-  gap: 12px;
-  padding: 8px 4px;
-  max-height: 35vh;
-  overflow-y: auto;
+  display: flex;
+  gap: 24px;
+  padding: 10px 6px;
+  max-height: 240px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
 }
 .cardButton {
   position: relative;
+  flex: 0 0 126px;
+  width: 126px;
+  height: 184px;
   padding: 0;
   aspect-ratio: var(--card-ratio);
   border: 2px solid transparent;
@@ -45,7 +49,7 @@
   background: #051421da;
   color: #fff;
   line-height: 1.2;
-  font-size: 10px;
+  font-size: 17px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -66,7 +70,7 @@
   left: 0;
   right: 0;
   bottom: 26px;
-  font-size: 10px;
+  font-size: 17px;
   color: #ffe9a9;
   background: #302916e6;
 }
@@ -114,27 +118,49 @@
   gap: 8px;
 }
 .fieldPrompt {
-  position: fixed;
+  position: absolute;
+  inset: 0;
   z-index: 970;
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-  width: min(460px, 90vw);
-  padding: 12px 16px;
-  border: 1px solid #99d6ed;
-  border-radius: 8px;
-  background: #091a29f5;
   color: #edf8ff;
-  box-shadow: 0 6px 20px #0007;
-}
-.fieldPrompt p {
-  margin: 0 0 4px;
-  line-height: 1.4;
-}
-.fieldPrompt > span {
-  color: #bdd1df;
-  font-size: 12px;
-}
-.fieldPrompt .footer {
-  margin-top: 10px;
+  pointer-events: none;
+  p {
+    position: absolute;
+    left: 50%;
+    top: 215px;
+    transform: translateX(-50%);
+    width: 1000px;
+    min-height: 85px;
+    margin: 0;
+    padding: 18px 30px;
+    text-align: center;
+    border: 1px solid #8bbdd177;
+    background: #142d3ae8;
+    border-radius: 6px;
+    font-size: 26px;
+  }
+  > span {
+    display: none;
+  }
+  .footer {
+    position: absolute;
+    left: 50%;
+    top: 405px;
+    width: 800px;
+    transform: translateX(-50%);
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+  :global(.ant-btn) {
+    min-width: 135px;
+    height: 110px;
+    border-radius: 55px;
+    font-size: 25px;
+    pointer-events: auto;
+    background: #1d3b4d;
+    color: #e5f6ff;
+  }
+  :global(.ant-btn-primary) {
+    margin-left: auto;
+  }
 }

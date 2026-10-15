@@ -1,0 +1,79 @@
+.panel {
+  position: absolute;
+  right: 24px;
+  top: 140px;
+  height: 833px;
+  width: 130px;
+  background: var(--duel-panel-bg);
+  border: 1px solid var(--duel-border);
+  border-radius: 6px;
+  color: var(--duel-text);
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  transition: width 100ms ease;
+}
+.panel.triple {
+  width: 302px;
+}
+.panel header {
+  height: 52px;
+  flex-shrink: 0;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 20px;
+  strong {
+    display: none;
+  }
+  button {
+    width: 32px;
+    height: 44px;
+    font-size: 23px;
+    background: none;
+    color: inherit;
+    border: 0;
+    cursor: pointer;
+  }
+}
+.triple header strong {
+  display: block;
+  flex: 1;
+  font-size: 20px;
+}
+.cards {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-auto-rows: 140px;
+  align-content: start;
+  align-items: center;
+  padding: 0 8px;
+  justify-items: center;
+}
+.triple .cards {
+  grid-template-columns: repeat(3, 90px);
+  justify-content: center;
+  padding: 0;
+}
+.cardButton {
+  position: relative;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  &:focus-visible {
+    outline: 3px solid #b8ebff;
+    outline-offset: 4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    transition: none;
+  }
+}

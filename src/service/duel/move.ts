@@ -201,8 +201,14 @@ export default async (container: Container, move: MsgMove) => {
   target.location = to;
   if (fromEmpty) {
     context.cardStore.inner.push(target);
+    if (target.isToken)
+      rememberCardOrigin(
+        target.uuid,
+        new ygopro.CardLocation({ ...to.toObject(), zone: TZONE }),
+      );
   }
   if (toEmpty) {
+    await callCardMove(target.uuid, { exit: true, reason });
     context.cardStore.inner = context.cardStore.inner.filter(
       (card) => card.uuid !== target.uuid,
     );
@@ -237,7 +243,7 @@ export default async (container: Container, move: MsgMove) => {
 
   const p = fromEmpty
     ? Promise.resolve()
-    : callCardMove(target.uuid, { fromZone: from.zone });
+    : callCardMove(target.uuid, { fromZone: from.zone, reason });
   // 如果from或者to是手卡，那么需要刷新除了这张卡之外，这个玩家的所有手卡
   if ([from.zone, to.zone].includes(HAND)) {
     const pHands = context.cardStore

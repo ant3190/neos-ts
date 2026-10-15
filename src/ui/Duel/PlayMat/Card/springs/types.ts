@@ -28,6 +28,9 @@ export interface MoveOptions {
   fromZone?: ygopro.CardZone;
   positionOnly?: boolean;
   instant?: boolean;
+  reason?: number;
+  durationMs?: number;
+  exit?: boolean;
 }
 export type MoveFunc = OptionsToFunc<MoveOptions>;
 

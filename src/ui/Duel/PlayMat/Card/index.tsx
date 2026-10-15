@@ -6,10 +6,24 @@ import { useSnapshot } from "valtio";
 import { sendSelectMultiResponse, ygopro } from "@/api";
 import { getUIContainer } from "@/container/compat";
 import { eventbus, Task } from "@/infra";
-import { cardStore, CardType, InteractType, isCardDisabled } from "@/stores";
+import {
+  cardStore,
+  CardType,
+  InteractType,
+  isCardDisabled,
+  isMe,
+} from "@/stores";
 import { showCardModal as displayCardModal } from "@/ui/Duel/Message/CardModal";
 import { YgoCard } from "@/ui/Shared";
 
+import {
+  type CardMotionKind,
+  cardMotionPlan,
+} from "../../animation/motionRules";
+import {
+  cardMotionState,
+  revealPublicCardFace,
+} from "../../animation/motionState";
 import { consumeCardOrigin } from "../../animation/origins";
 import { inspectCardRelations } from "../../animation/present";
 import { registerCardElement } from "../../animation/runtime";
@@ -18,7 +32,13 @@ import {
   useCardActionActive,
 } from "../../interaction/CardActions";
 import { trySelectFieldCard } from "../../interaction/fieldSelection";
-import { displayCardListModal } from "../../Message";
+import {
+  handClickSuppressed,
+  handInteraction,
+  suppressHandClick,
+} from "../../interaction/hand";
+import { isFaceDownPosition } from "../../layout/geometry";
+import { closeCardListModal, displayCardListModal } from "../../Message";
 import { clearSelectInfo } from "../../utils";
 import { getActionHighlight } from "../../utils/actionHighlight";
 import { ActionFrame } from "../ActionFrame";
@@ -32,13 +52,26 @@ import {
 } from "./springs";
 import type { SpringApiProps } from "./springs/types";
 
-const { HAND, GRAVE, REMOVED, EXTRA, MZONE, SZONE } = ygopro.CardZone;
+const { HAND, DECK, GRAVE, REMOVED, EXTRA, MZONE, SZONE } = ygopro.CardZone;
 
 const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
   const container = getUIContainer();
   const card = cardStore.inner[idx];
   const snap = useSnapshot(card);
   const activeAction = useCardActionActive(card.uuid);
+  const hand = useSnapshot(handInteraction);
+  const publicFace = useSnapshot(cardMotionState).revealed[card.uuid]?.code;
+  const gesture = useRef<{ x: number; offset: number; pointer: number }>();
+  const [moving, setMoving] = useState(false);
+  const [motion, setMotion] = useState<{ kind: CardMotionKind; arc: number }>({
+    kind: "move",
+    arc: 200,
+  });
+  const mine = isMe(snap.location.controller);
+  const handCard = snap.location.zone === HAND;
+  const canInspect =
+    snap.code !== 0 &&
+    (mine || handCard || !isFaceDownPosition(snap.location.position));
 
   const [spring, api] = useSpring<SpringApiProps>(
     () =>
@@ -59,6 +92,15 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
   // A promoted deck card retains its source; other mounts settle at their actual location.
   useEffect(() => {
     const origin = consumeCardOrigin(card.uuid);
+    if (origin)
+      setMotion(
+        cardMotionPlan({
+          fromZone: origin.zone,
+          toZone: card.location.zone,
+          toPosition: card.location.position,
+          mine,
+        }),
+      );
     addToAnimation(async () => {
       if (origin) {
         await move({
@@ -80,7 +122,14 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
   const addToAnimation = (p: () => Promise<unknown>) => {
     const next = animationQueue.current
       .then(async () => {
-        await p();
+        setMoving(true);
+        cardMotionState.moving[card.uuid] = true;
+        try {
+          await p();
+        } finally {
+          setMoving(false);
+          delete cardMotionState.moving[card.uuid];
+        }
       })
       .catch((error) => {
         console.error("Card animation failed:", error);
@@ -110,20 +159,33 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       Task.Move,
       async (options?: MoveOptions) => {
         consumeCardOrigin(card.uuid);
+        setMotion(
+          cardMotionPlan({
+            ...options,
+            toZone: card.location.zone,
+            toPosition: card.location.position,
+            mine: isMe(card.location.controller),
+          }),
+        );
         await addToAnimation(() => move({ card, api, options }));
       },
     );
 
-    const unsubscribeFocus = register(Task.Focus, async () => {
-      await addToAnimation(async () => {
-        setClassFocus(true);
-        try {
-          await focus({ card, api });
-        } finally {
-          setClassFocus(false);
-        }
-      });
-    });
+    const unsubscribeFocus = register(
+      Task.Focus,
+      async (options?: { code?: number }) => {
+        await addToAnimation(async () => {
+          const conceal = revealPublicCardFace(card.uuid, options?.code);
+          setClassFocus(true);
+          try {
+            await focus({ card, api });
+          } finally {
+            conceal();
+            setClassFocus(false);
+          }
+        });
+      },
+    );
 
     const unsubscribeAttack = register(
       Task.Attack,
@@ -142,10 +204,30 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
 
   const element = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => {
+    if (handCard && mine) void move({ card, api, options: { instant: true } });
+  }, [hand.offset]);
+  useEffect(() => {
+    const update = () => {
+      if (card.location.zone === HAND)
+        void move({ card, api, options: { instant: true } });
+    };
+    window.addEventListener("neos:duel-camera-change", update);
+    return () => window.removeEventListener("neos:duel-camera-change", update);
+  }, []);
+
+  const endGesture = () => {
+    if (handInteraction.dragging) suppressHandClick();
+    handInteraction.dragging = false;
+    gesture.current = undefined;
+  };
+
   const onClick = () => {
+    if (handCard && handClickSuppressed()) return;
+    handInteraction.selected = handCard && mine ? card.uuid : "";
     inspectCardRelations(card);
     if (trySelectFieldCard(card.uuid)) {
-      displayCardModal(card);
+      if (canInspect) displayCardModal(card);
       return;
     }
     const onCardClick = (card: CardType) => {
@@ -160,8 +242,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
         }
       }
 
-      // 中央弹窗展示选中卡牌信息
-      // TODO: 同一张卡片，是否重复点击会关闭CardModal？
+      // Card inspection and its available commands stay open on repeated clicks.
       displayCardModal(card);
       if (element.current) openCardActions([card], element.current);
 
@@ -176,7 +257,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
           isZone: false,
           monster: card,
         });
-      }
+      } else closeCardListModal();
     };
 
     const onFieldClick = (card: CardType) => {
@@ -194,6 +275,13 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       onCardClick(card);
     } else if ([EXTRA, GRAVE, REMOVED].includes(card.location.zone)) {
       onFieldClick(card);
+    } else if (card.location.zone === DECK && element.current) {
+      // The painted top card owns the hit area, including commands on buried cards.
+      closeCardListModal();
+      openCardActions(
+        cardStore.at(DECK, card.location.controller),
+        element.current,
+      );
     }
   };
   // <<< 效果 <<<
@@ -237,7 +325,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
           ? 0
           : -1
       }
-      aria-label={snap.meta.text.name || "卡片"}
+      aria-label={canInspect ? snap.meta.text.name || "卡片" : "背面卡片"}
       aria-pressed={snap.selectInfo.selected}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -262,6 +350,8 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       data-card-selected={snap.selectInfo.selected}
       data-card-targeted={snap.targeted}
       data-card-disabled={disabled}
+      data-card-in-motion={moving}
+      data-card-move-kind={motion.kind}
       data-card-is-me={container.context.matStore.isMe(location.controller)}
       data-card-idle-actions={idleActions}
       data-card-action-highlight={actionHighlight ?? "none"}
@@ -271,16 +361,18 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       className={classnames(styles["mat-card"], {
         [styles.selected]: snap.selectInfo.selected,
         [styles.actionsActive]: activeAction,
+        [styles.handAppeal]: handCard && hand.selected === card.uuid,
       })}
       style={
         {
           transform: to(
-            [spring.x, spring.y, spring.rx, spring.rz, spring.scale],
-            (x, y, rx, rz, scale) =>
-              `translate(${x}px, ${y}px) rotateX(${rx}deg) rotateZ(${rz}deg) scale(${scale})`,
+            [spring.x, spring.y, spring.z, spring.rx, spring.rz, spring.scale],
+            (x, y, z, rx, rz, scale) =>
+              `translate3d(${x}px, ${y}px, ${z}px) rotateX(${rx}deg) rotateZ(${rz}deg) scale(${scale})`,
           ),
           "--z": spring.z,
-          "--sub-z": spring.subZ.to([0, 50, 100], [0, 200, 0]), // 中间高，两边低
+          "--sub-z": spring.subZ.to([0, 50, 100], [0, 1, 0]),
+          "--move-arc": `${motion.arc}px`,
           "--ry": spring.ry,
           "--hand-angle": spring.rz,
           zIndex: spring.zIndex,
@@ -288,6 +380,42 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
         } as any as CSSProperties
       }
       onClick={onClick}
+      onPointerDown={(event) => {
+        if (
+          event.button !== 0 ||
+          !handCard ||
+          !mine ||
+          moving ||
+          cardStore.at(HAND, card.location.controller).length <= 10
+        )
+          return;
+        gesture.current = {
+          x: event.clientX,
+          offset: handInteraction.offset,
+          pointer: event.pointerId,
+        };
+      }}
+      onPointerMove={(event) => {
+        const start = gesture.current;
+        if (!start || event.pointerId !== start.pointer) return;
+        const delta = event.clientX - start.x;
+        if (!handInteraction.dragging && Math.abs(delta) < 8) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        handInteraction.dragging = true;
+        handInteraction.selected = "";
+        const stage = document.querySelector<HTMLElement>(
+          '[data-testid="duel-stage"]',
+        )!;
+        const scale = stage.getBoundingClientRect().width / stage.clientWidth;
+        const max =
+          cardStore.at(HAND, card.location.controller).length * 30 * 0.76;
+        handInteraction.offset = Math.max(
+          -max,
+          Math.min(max, start.offset + (delta / scale) * 0.76),
+        );
+      }}
+      onPointerUp={endGesture}
+      onPointerCancel={endGesture}
     >
       <div
         className={classnames(styles["img-wrap"], {
@@ -297,8 +425,8 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
         <div className={styles["negation-wrap"]} data-card-negation-wrap>
           <YgoCard
             className={styles.cover}
-            code={snap.code === 0 ? snap.meta.id : snap.code}
-            name={snap.meta.text.name}
+            code={canInspect ? snap.code : publicFace ?? 0}
+            name={canInspect ? snap.meta.text.name : "背面卡片"}
             urgent
             data-card-face
           />
@@ -325,5 +453,5 @@ const call =
     eventbus.call(task, uuid, options);
 
 export const callCardMove = call<MoveOptions>(Task.Move);
-export const callCardFocus = call(Task.Focus);
+export const callCardFocus = call<{ code?: number }>(Task.Focus);
 export const callCardAttack = call<AttackOptions>(Task.Attack);

@@ -807,15 +807,23 @@ for (const viewport of [
         .click();
       const drawer = page.getByTestId("duel-card-list");
       await expect(drawer).toBeVisible();
-      // Measure the panel after its slide has finished, while it can cover controls.
+      // MDPro3 leaves a 24-unit margin inside the height-scaled duel canvas.
+      const expectedRight = await page
+        .getByTestId("duel-stage")
+        .evaluate((node) => {
+          const box = node.getBoundingClientRect();
+          return box.right - (24 * box.height) / 1080;
+        });
       await expect
-        .poll(() =>
-          drawer.evaluate((node) =>
-            Math.abs(node.getBoundingClientRect().right - window.innerWidth),
+        .poll(async () =>
+          Math.abs(
+            (await drawer.evaluate(
+              (node) => node.getBoundingClientRect().right,
+            )) - expectedRight,
           ),
         )
         .toBeLessThan(1);
-      const body = drawer.locator(".ant-drawer-body");
+      const body = drawer.getByRole("list");
       expect(
         await body.evaluate((node) => node.scrollHeight > node.clientHeight),
       ).toBe(true);
@@ -832,9 +840,9 @@ for (const viewport of [
         .getByTestId("duel-controls")
         .boundingBox())!;
       expect(drawerBox.y + drawerBox.height).toBeLessThan(controlsBox.y);
-      const surrender = page.getByTestId("duel-surrender");
+      const menu = page.getByTestId("duel-settings");
       expect(
-        await surrender.evaluate((node) => {
+        await menu.evaluate((node) => {
           const box = node.getBoundingClientRect();
           return node.contains(
             document.elementFromPoint(
@@ -847,13 +855,16 @@ for (const viewport of [
       await page.screenshot({
         path: test.info().outputPath(`drawer-${zone.toLowerCase()}.png`),
       });
-      await surrender.click();
+      await menu.click();
+      await page.getByTestId("duel-surrender").click();
       await expect(page.getByTestId("duel-surrender-confirm")).toBeVisible();
       expect(
         await page.evaluate(() => (window as any).__mdPackets.length),
       ).toBe(0);
       await page.keyboard.press("Escape");
-      await drawer.locator(".ant-drawer-close").click();
+      await drawer
+        .getByRole("button", { name: "关闭卡堆", exact: true })
+        .click();
     }
   });
 }

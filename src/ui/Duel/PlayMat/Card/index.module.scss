@@ -1,4 +1,5 @@
 .mat-card {
+  pointer-events: auto;
   --card-monochrome: 0;
   &[data-card-disabled="true"] {
     --card-monochrome: 1;
@@ -8,7 +9,9 @@
   }
   position: absolute;
   --card-height: 100px;
-  width: auto !important;
+  width: calc(var(--hand-card-height) * var(--card-ratio)) !important;
+  left: calc(var(--hand-card-height) * var(--card-ratio) / -2);
+  top: calc(var(--hand-card-height) / -2);
   height: var(--hand-card-height);
   aspect-ratio: var(--card-ratio);
   transform-style: preserve-3d;
@@ -19,7 +22,7 @@
     top: 2%;
     height: 96%;
     width: 96%;
-    transform: translateZ(calc((var(--z) + var(--sub-z)) * 1px + 0.1px))
+    transform: translateZ(calc(var(--sub-z) * var(--move-arc) + 0.1px))
       rotateY(calc(var(--ry) * 1deg));
     transition: 0.2s scale;
     cursor: pointer;
@@ -124,12 +127,17 @@
   &[data-card-zone="HAND"][data-card-controller] .img-wrap {
     transition: transform 100ms ease-out;
   }
+  &[data-card-zone="HAND"][data-card-is-me="true"] {
+    touch-action: pan-y;
+    user-select: none;
+  }
   &[data-card-zone="HAND"][data-card-is-me="true"]:hover {
     z-index: 50 !important;
   }
-  &[data-card-zone="HAND"][data-card-is-me="true"]:hover .img-wrap {
+  &[data-card-zone="HAND"][data-card-is-me="true"][data-card-in-motion="false"]:hover
+    .img-wrap {
     transform: translateY(-22px)
-      translateZ(calc((var(--z) + var(--sub-z)) * 1px + 0.1px))
+      translateZ(calc(var(--sub-z) * var(--move-arc) + 0.1px))
       rotateY(calc(var(--ry) * 1deg));
   }
 }
@@ -177,8 +185,10 @@
   border-width: 3px;
 }
 .mat-card.actionsActive[data-card-zone="HAND"][data-card-is-me="true"]
+  .img-wrap,
+.mat-card.handAppeal[data-card-zone="HAND"][data-card-is-me="true"][data-card-in-motion="false"]
   .img-wrap {
   transform: translateY(-28px)
-    translateZ(calc((var(--z) + var(--sub-z)) * 1px + 0.1px))
+    translateZ(calc(var(--sub-z) * var(--move-arc) + 0.1px))
     rotateZ(calc(var(--hand-angle) * -1deg)) rotateY(calc(var(--ry) * 1deg));
 }

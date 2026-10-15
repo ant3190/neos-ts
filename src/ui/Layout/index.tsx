@@ -45,7 +45,12 @@ import {
 
 const NeosConfig = useConfig();
 const DEFAULT_VIEWPORT_SCALE = { designWidth: 1000, designHeight: 620 };
-const DUEL_VIEWPORT_SCALE = { designWidth: 1000, designHeight: 920 };
+const DUEL_VIEWPORT_SCALE = {
+  designWidth: 1920,
+  designHeight: 1080,
+  minScale: 0.1,
+  duel: true,
+};
 
 export const loader: LoaderFunction = async () => {
   getLoginStatus();

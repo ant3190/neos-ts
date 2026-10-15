@@ -1,0 +1,13 @@
+.stage {
+  position: absolute;
+  width: 100%;
+  height: 1080px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  isolation: isolate;
+  --duel-panel-bg: #17232ef5;
+  --duel-border: #7893a577;
+  --duel-text: #e7f1f7;
+  --duel-muted: #b6c9d6;
+}

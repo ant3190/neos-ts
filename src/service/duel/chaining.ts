@@ -61,7 +61,7 @@ export default async (
     }
 
     // 发动效果动画
-    await callCardFocus(target.uuid);
+    await callCardFocus(target.uuid, { code: chaining.code });
     console.color("blue")(`${target.meta.text.name} chaining`);
     console.info(
       `<Chaining>chain stack length = ${context.matStore.chains.length}`,
