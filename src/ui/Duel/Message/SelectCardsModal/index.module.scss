@@ -12,8 +12,8 @@
 }
 .grid {
   display: flex;
-  gap: 24px;
-  padding: 10px 6px;
+  gap: 20px;
+  padding: 6px;
   flex-shrink: 0;
   scrollbar-width: thin;
   overflow-x: auto;
@@ -27,7 +27,7 @@
   height: 184px;
   padding: 0;
   aspect-ratio: var(--card-ratio);
-  border: 2px solid #5087a2;
+  border: 2px solid transparent;
   border-radius: 3px;
   background: #102232;
   cursor: pointer;
@@ -44,28 +44,33 @@
   border-color: #a7eaff;
   box-shadow: 0 0 0 2px #57b8dd;
 }
-.cardButton.opponent {
-  border-color: #b57566;
+.originGroup {
+  flex: 0 0 auto;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 6px 12px 10px;
+  border: 1px solid #596f7c;
+  border-radius: 3px;
 }
-.origin {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  padding: 5px 2px;
-  font-size: 18px;
-  line-height: 1.3;
-  background: #173e54f2;
-  color: #e5f7ff;
+.originTitle {
+  max-width: 100%;
+  padding: 0 6px;
+  color: #c0d0da;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 26px;
   white-space: nowrap;
 }
-.opponent .origin {
-  background: #66372ff2;
-  color: #fff0e9;
+.opponent {
+  border-color: #826d64;
+  .originTitle {
+    color: #d7c5bc;
+  }
 }
-.cardButton.opponent.selected {
-  border-color: #ffc1ac;
-  box-shadow: 0 0 0 2px #d58d77;
+.groupCards {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 20px;
 }
 .cardButton:focus-visible {
   outline: 2px solid #fff;

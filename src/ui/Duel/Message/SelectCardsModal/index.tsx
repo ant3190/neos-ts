@@ -175,13 +175,7 @@ export function SelectCardsModal({
       alreadySelected ||
       effectCard === key ||
       indexes.some((idx) => chosen.includes(idx));
-    const origin = option.location
-      ? `${isMe(option.location.controller) ? "我方" : "对方"} · ${
-          option.location.is_overlay
-            ? "叠放素材"
-            : fetchStrings(Region.System, option.location.zone + 1000)
-        }`
-      : undefined;
+    const origin = originLabel(option);
     const choose = () => {
       showCardModal(option);
       if (mandatory) return;
@@ -204,9 +198,6 @@ export function SelectCardsModal({
         key={key}
         className={classnames(styles.cardButton, {
           [styles.selected]: picked,
-          [styles.opponent]:
-            option.location?.controller !== undefined &&
-            !isMe(option.location.controller),
         })}
         aria-label={`${option.meta.text.name || "卡片"}${
           origin ? `，${origin}` : ""
@@ -254,7 +245,6 @@ export function SelectCardsModal({
           highlight={isChain ? "gold" : option.actionHighlight}
           className={styles.actionFrame}
         />
-        {origin && <span className={styles.origin}>{origin}</span>}
         <span className={styles.cardName}>{option.meta.text.name}</span>
         {picked && <b className={styles.check}>✓</b>}
         {indexes.length > 1 && (
@@ -263,6 +253,18 @@ export function SelectCardsModal({
       </button>
     );
   };
+  const candidates = [...groups].map(([key, indexes]) => ({
+    option: selectables[indexes[0]],
+    node: cardButton(selectables[indexes[0]], indexes[0], indexes, key),
+  }));
+  const mandatoryCards = mustSelects.map((option, index) => ({
+    option,
+    node: cardButton(option, index, [index], `mandatory:${index}`, true, true),
+  }));
+  const selectedCards = selecteds.map((option, index) => ({
+    option,
+    node: cardButton(option, index, [index], `selected:${index}`, true),
+  }));
   return (
     <NeosModal
       title={title}
@@ -271,8 +273,9 @@ export function SelectCardsModal({
         1100,
         Math.max(
           650,
-          Math.max(groups.size, selecteds.length, mustSelects.length) * 150 +
-            40,
+          stripWidth(candidates),
+          stripWidth(mandatoryCards),
+          stripWidth(selectedCards),
         ),
       )}
       open={isOpen}
@@ -294,11 +297,11 @@ export function SelectCardsModal({
         data-select-cancelable={cancelable}
         data-select-finishable={finishable}
       >
-        <CardStrip label="可选卡片" testId="duel-select-candidates">
-          {[...groups].map(([key, indexes]) =>
-            cardButton(selectables[indexes[0]], indexes[0], indexes, key),
-          )}
-        </CardStrip>
+        <CardStrip
+          label="可选卡片"
+          testId="duel-select-candidates"
+          cards={candidates}
+        />
         {effectOptions.length > 1 && (
           <div
             className={styles.effectOptions}
@@ -325,28 +328,21 @@ export function SelectCardsModal({
         {!!mustSelects.length && (
           <section className={styles.section} aria-label="必须使用的素材">
             <h3>必须使用的素材</h3>
-            <CardStrip label="必须使用的素材" testId="duel-select-mandatory">
-              {mustSelects.map((option, index) =>
-                cardButton(
-                  option,
-                  index,
-                  [index],
-                  `mandatory:${index}`,
-                  true,
-                  true,
-                ),
-              )}
-            </CardStrip>
+            <CardStrip
+              label="必须使用的素材"
+              testId="duel-select-mandatory"
+              cards={mandatoryCards}
+            />
           </section>
         )}
         {!!selecteds.length && (
           <section className={styles.section} aria-label="已选择的卡片">
             <h3>{single ? "已选择（点击取消选择）" : "已选择"}</h3>
-            <CardStrip label="已选择的卡片" testId="duel-select-selected">
-              {selecteds.map((option, index) =>
-                cardButton(option, index, [index], `selected:${index}`, true),
-              )}
-            </CardStrip>
+            <CardStrip
+              label="已选择的卡片"
+              testId="duel-select-selected"
+              cards={selectedCards}
+            />
           </section>
         )}
       </div>
@@ -354,12 +350,63 @@ export function SelectCardsModal({
   );
 }
 
+interface StripCard {
+  option: Snapshot<Option>;
+  node: ReactNode;
+}
+
+function originLabel(option: Snapshot<Option>) {
+  const location = option.location;
+  if (!location) return undefined;
+  return `${isMe(location.controller) ? "我方" : "对方"} ${
+    location.is_overlay
+      ? "叠放素材"
+      : fetchStrings(Region.System, location.zone + 1000)
+  }`;
+}
+
+function groupOrigins(cards: StripCard[]) {
+  const groups = new Map<
+    string,
+    { key: string; option: Snapshot<Option>; cards: StripCard[] }
+  >();
+  cards.forEach((card) => {
+    const location = card.option.location;
+    const key = location
+      ? `${location.controller}:${location.zone}:${!!location.is_overlay}`
+      : "unknown";
+    let group = groups.get(key);
+    if (!group) {
+      group = { key, option: card.option, cards: [] };
+      groups.set(key, group);
+    }
+    group.cards.push(card);
+  });
+  return [...groups.values()];
+}
+
+function stripWidth(cards: StripCard[]) {
+  const groups = groupOrigins(cards);
+  return (
+    56 +
+    Math.max(0, groups.length - 1) * 20 +
+    groups.reduce(
+      (width, group) =>
+        width +
+        group.cards.length * 126 +
+        Math.max(0, group.cards.length - 1) * 20 +
+        (group.option.location ? 26 : 0),
+      0,
+    )
+  );
+}
+
 function CardStrip({
-  children,
+  cards,
   label,
   testId,
 }: {
-  children: ReactNode;
+  cards: StripCard[];
   label: string;
   testId: string;
 }) {
@@ -373,7 +420,31 @@ function CardStrip({
       tabIndex={0}
       data-testid={testId}
     >
-      {children}
+      {groupOrigins(cards).map(({ key, option, cards }) =>
+        option.location ? (
+          <fieldset
+            key={key}
+            className={classnames(styles.originGroup, {
+              [styles.opponent]: !isMe(option.location.controller),
+            })}
+            data-testid="duel-select-origin-group"
+            data-origin-controller={option.location.controller}
+            data-origin-zone={ygopro.CardZone[option.location.zone]}
+            data-origin-overlay={!!option.location.is_overlay}
+          >
+            <legend className={styles.originTitle}>
+              {originLabel(option)}
+            </legend>
+            <div className={styles.groupCards}>
+              {cards.map((card) => card.node)}
+            </div>
+          </fieldset>
+        ) : (
+          <div key={key} className={styles.groupCards}>
+            {cards.map((card) => card.node)}
+          </div>
+        ),
+      )}
     </div>
   );
 }

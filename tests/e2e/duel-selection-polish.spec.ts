@@ -131,21 +131,27 @@ test("drawing and searching only slide existing hands sideways, without lift or 
   expect(result.counts).toEqual([12, 12]);
 });
 
-test("mixed zones share one candidate row with visible ownership labels", async ({
+test("mixed zones share one row with a single frame for each owner and zone", async ({
   page,
 }) => {
   await mdpro3Fixture(page);
-  await openSelection(page);
+  await openSelection(page, { candidates: 12, selected: 0, mandatory: 0 });
   const row = page.getByTestId("duel-select-candidates");
   const cards = row.getByTestId("duel-select-card-option");
-  await expect(cards).toHaveCount(6);
-  await expect(cards.nth(0)).toContainText("我方");
-  await expect(cards.nth(1)).toContainText("对方");
-  await expect(cards.nth(0)).toContainText("怪兽区");
-  await expect(cards.nth(2)).toContainText("墓地");
-  await expect(cards.nth(4)).toContainText("主卡组");
-  for (const zone of ["MZONE", "GRAVE", "DECK"])
-    await expect(row.locator(`[data-card-zone="${zone}"]`)).toHaveCount(2);
+  const frames = row.getByTestId("duel-select-origin-group");
+  await expect(cards).toHaveCount(12);
+  await expect(frames).toHaveCount(6);
+  await expect(cards.filter({ hasText: /我方|对方|墓地/ })).toHaveCount(0);
+  for (const owner of ["我方", "对方"]) {
+    for (const zone of ["怪兽区", "墓地", "主卡组"]) {
+      const frame = row.getByRole("group", {
+        name: `${owner} ${zone}`,
+        exact: true,
+      });
+      await expect(frame.locator("legend")).toHaveText(`${owner} ${zone}`);
+      await expect(frame.getByTestId("duel-select-card-option")).toHaveCount(2);
+    }
+  }
   const boxes = await cards.evaluateAll((nodes) =>
     nodes.map((node) => node.getBoundingClientRect().y),
   );
@@ -153,8 +159,17 @@ test("mixed zones share one candidate row with visible ownership labels", async 
   await expect(page.getByRole("navigation", { name: "卡片区域" })).toHaveCount(
     0,
   );
-  await cards.nth(4).click();
-  await expect(cards.nth(4)).toHaveAttribute("aria-pressed", "true");
+  await expect
+    .poll(() =>
+      row.evaluate(
+        (node) => getComputedStyle(node.closest(".ant-modal-content")!).opacity,
+      ),
+    )
+    .toBe("1");
+  await page.screenshot({ path: test.info().outputPath("origin-groups.png") });
+  const deckCard = row.locator('[data-card-response="4"]');
+  await deckCard.click();
+  await expect(deckCard).toHaveAttribute("aria-pressed", "true");
   await page.getByTestId("duel-select-card-submit").click();
   await expect
     .poll(() => page.evaluate(() => (window as any).__parityPackets.length))
