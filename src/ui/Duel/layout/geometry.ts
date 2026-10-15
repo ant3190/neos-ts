@@ -66,7 +66,7 @@ export function zoneWorldPosition(
     z = 0;
   switch (zone) {
     case ZONE.HAND:
-      const step = handCount <= 10 ? 6.4 : 4.4;
+      const step = Math.min(6.4, 57.6 / Math.max(1, handCount - 1));
       x = (sequence - (handCount - 1) / 2) * step;
       y = 15;
       z = -28.5;

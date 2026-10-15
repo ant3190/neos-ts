@@ -1,8 +1,21 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.section h3 {
+  margin: 0 0 6px;
+  color: #bbcedb;
+  font-size: inherit;
+  font-weight: 500;
+  line-height: 1.5;
+}
 .grid {
   display: flex;
   gap: 24px;
   padding: 10px 6px;
-  max-height: 240px;
+  flex-shrink: 0;
+  scrollbar-width: thin;
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior: contain;
@@ -14,7 +27,7 @@
   height: 184px;
   padding: 0;
   aspect-ratio: var(--card-ratio);
-  border: 2px solid transparent;
+  border: 2px solid #5087a2;
   border-radius: 3px;
   background: #102232;
   cursor: pointer;
@@ -30,6 +43,25 @@
 .cardButton.selected {
   border-color: #a7eaff;
   box-shadow: 0 0 0 2px #57b8dd;
+}
+.cardButton.opponent {
+  border-color: #b57566;
+}
+.origin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 5px 2px;
+  font-size: 18px;
+  line-height: 1.3;
+  background: #173e54f2;
+  color: #e5f7ff;
+  white-space: nowrap;
+}
+.opponent .origin {
+  background: #66372ff2;
+  color: #fff0e9;
 }
 .cardButton.opponent.selected {
   border-color: #ffc1ac;
@@ -74,43 +106,39 @@
   color: #ffe9a9;
   background: #302916e6;
 }
-.zones {
+.effectOptions {
   display: flex;
-  gap: 4px;
-  padding: 8px 0;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 10px;
+  font-size: var(--duel-effect-font, 26px);
 }
-.zones button,
+.effectOptions strong {
+  font-size: inherit;
+  line-height: 1.5;
+}
 .effectOptions button {
   background: #152f43;
   border: 1px solid #67889a;
-  color: #d8ecf9;
+  color: #e6f1f8;
   border-radius: 4px;
-  padding: 9px 12px;
+  padding: 12px 16px;
   cursor: pointer;
+  min-height: 56px;
+  text-align: left;
+  font: inherit;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
-.zones button[aria-pressed="true"],
 .effectOptions button[aria-pressed="true"] {
   background: #4c4025;
   border-color: #e0c581;
   color: #ffe4a3;
 }
-.effectOptions {
-  max-height: 25vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-}
-.effectOptions button {
-  min-height: 44px;
-  text-align: left;
-  line-height: 1.5;
-}
-.mandatory {
-  display: flex;
-  gap: 8px;
+.effectOptions button:focus-visible,
+.grid:focus-visible {
+  outline: 2px solid #b8ebff;
+  outline-offset: 2px;
 }
 .footer {
   display: flex;

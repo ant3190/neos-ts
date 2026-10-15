@@ -45,7 +45,7 @@ export async function installOfflineDuelResources(page: Page) {
   );
   await page.route(/\/strings\.conf$/, (route) =>
     route.fulfill({
-      body: "!system 556 选择效果\n!system 203 选择要发动的卡片\n!system 1211 确定\n!system 1295 取消\n!system 1296 完成\n",
+      body: "!system 1000 主卡组\n!system 1001 手牌\n!system 1002 怪兽区\n!system 1003 魔陷区\n!system 1004 墓地\n!system 1005 除外\n!system 1006 额外卡组\n!system 556 选择效果\n!system 203 选择要发动的卡片\n!system 1211 确定\n!system 1295 取消\n!system 1296 完成\n",
       contentType: "text/plain",
       headers: { "access-control-allow-origin": "*" },
     }),

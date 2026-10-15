@@ -16,7 +16,12 @@ export const moveToHand: MoveFunc = async ({ card, api, options }) => {
   await asyncStart(api)({
     ...pose,
     x: pose.x + (mine ? handInteraction.offset : 0),
-    subZ: options?.instant ? 0 : 100,
+    subZ:
+      options?.instant ||
+      options?.fromZone === undefined ||
+      options.fromZone === ygopro.CardZone.HAND
+        ? 0
+        : 100,
     opacity: 1,
     config: {
       duration: options?.instant ? 0 : options?.durationMs ?? getDuration(),

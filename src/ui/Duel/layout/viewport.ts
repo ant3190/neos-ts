@@ -16,6 +16,19 @@ export function useDuelCamera(ref: RefObject<HTMLElement>) {
         "--duel-controls-reserve",
         `${Math.max(0, (rect.bottom - window.innerHeight + 72) / scale)}px`,
       );
+      const visibleTop = Math.max(0, -rect.top) / scale;
+      const visibleBottom =
+        Math.max(0, rect.bottom - window.innerHeight) / scale;
+      stage.style.setProperty("--duel-visible-top", `${visibleTop}px`);
+      stage.style.setProperty("--duel-visible-bottom", `${visibleBottom}px`);
+      stage.style.setProperty(
+        "--duel-dialog-height",
+        `${rect.height / scale - visibleTop - visibleBottom}px`,
+      );
+      stage.style.setProperty(
+        "--duel-effect-font",
+        `${Math.max(26, 18 / scale)}px`,
+      );
       Object.assign(duelViewport, {
         width: stage.clientWidth,
         scale,

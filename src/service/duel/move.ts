@@ -244,12 +244,19 @@ export default async (container: Container, move: MsgMove) => {
   const p = fromEmpty
     ? Promise.resolve()
     : callCardMove(target.uuid, { fromZone: from.zone, reason });
-  // 如果from或者to是手卡，那么需要刷新除了这张卡之外，这个玩家的所有手卡
+  // Reflow both affected hands without replaying the incoming card's lift.
   if ([from.zone, to.zone].includes(HAND)) {
-    const pHands = context.cardStore
-      .at(HAND, target.location.controller)
-      .filter((c) => c.uuid !== target.uuid)
-      .map(async (c) => await callCardMove(c.uuid));
+    const handControllers = new Set(
+      [from, to]
+        .filter((location) => location.zone === HAND)
+        .map((location) => location.controller),
+    );
+    const pHands = [...handControllers].flatMap((controller) =>
+      context.cardStore
+        .at(HAND, controller)
+        .filter((card) => card.uuid !== target.uuid)
+        .map((card) => callCardMove(card.uuid, { fromZone: HAND })),
+    );
     await Promise.all([p, ...pHands]);
   } else {
     await p;

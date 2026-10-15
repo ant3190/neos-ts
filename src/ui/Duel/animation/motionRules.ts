@@ -4,6 +4,7 @@ const { DECK, HAND, MZONE, SZONE, EXTRA, GRAVE, REMOVED } = ygopro.CardZone;
 export type CardMotionKind =
   | "move"
   | "draw"
+  | "reflow"
   | "position"
   | "summon"
   | "set"
@@ -48,6 +49,14 @@ export function cardMotionPlan({
       kind: "position" as CardMotionKind,
       duration: 200,
       arc: 100,
+      depart: false,
+    };
+  // A hand layout refresh only slides existing cards along their row.
+  if (toZone === HAND && (fromZone === HAND || fromZone === undefined))
+    return {
+      kind: "reflow" as CardMotionKind,
+      duration: 180,
+      arc: 0,
       depart: false,
     };
   if (toZone === HAND) {

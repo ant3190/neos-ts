@@ -149,3 +149,22 @@ test("hands are straight and elevation cannot change the orthographic scale", ()
     tablePose({ zone: Z.MZONE, sequence: 0 }, false).scale,
   );
 });
+
+test("hand reflows stay level and preserve their stacking order", () => {
+  for (const fromZone of [Z.HAND, undefined]) {
+    const plan = cardMotionPlan({ fromZone, toZone: Z.HAND });
+    assert.equal(plan.kind, "reflow");
+    assert.equal(plan.arc, 0);
+    assert.equal(plan.depart, false);
+    assert.ok(plan.duration < 250);
+  }
+  assert.equal(
+    cardMotionPlan({ fromZone: Z.GRAVE, toZone: Z.HAND }).kind,
+    "return",
+  );
+  assert.ok(cardMotionPlan({ fromZone: Z.GRAVE, toZone: Z.HAND }).arc > 0);
+  const before = zoneWorldPosition({ zone: Z.HAND, sequence: 0 }, true, 10);
+  const after = zoneWorldPosition({ zone: Z.HAND, sequence: 0 }, true, 11);
+  assert.ok(Math.abs(after.x - before.x) < 0.01);
+  assert.equal(after.z, before.z);
+});

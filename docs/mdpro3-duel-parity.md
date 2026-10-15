@@ -7,11 +7,14 @@
 按最新反馈改为平面场地和平铺手牌，不再使用 MDPro3 的透视相机、扇形手牌、圆形阶段入口或大尺寸阶段弹层。
 
 - 场地采用正交坐标；双方同类卡片尺寸一致，高度只用于遮挡排序，不影响大小。
-- 手牌水平排列，无旋转、下垂或悬停位移。长手牌仍支持横向拖动，拖动结束不发送选卡响应。
+- 手牌水平排列，无旋转、下垂或悬停位移。抽卡、检索及离开手牌时，已有手牌仅沿水平方向补位，保持牌序和遮挡顺序；超过 10 张时逐步压缩间距。长手牌仍支持横向拖动，拖动结束不发送选卡响应。
 - 阶段入口为紧凑横条，显示回合号和当前阶段，点击打开阶段列表。合法性及 idle/battle 回传编码仍由服务端指令决定。
 - 右下角按钮使用屏幕像素坐标，统一 44×44 点击区、图标、间距和面板风格。菜单与按钮处于相同坐标层，不受场地缩放影响。
 - 决斗菜单包含动画质量选择、自动说明开关和投降确认，避免缩放后的按钮配上未缩放的默认下拉菜单。
 - 说明、卡堆、日志、聊天和选择窗口保留原有用途；点击空白场地关闭说明与卡堆并恢复日志。
+- 选牌弹窗取消区域分页，场上、墓地、卡组等候选牌在同一横排中按服务端顺序展示；卡片上方标明我方/对方和区域，并以蓝/红标签区分归属。连锁仍先按卡片合并多个效果。
+- 候选、已选择和必选素材的牌列支持鼠标滚轮、触控板及键盘滚动。多排信息出现时弹窗向上增高，屏幕空间足够时完整显示；只有达到可见区域上限后才启用纵向滚动，操作按钮保留在底部。
+- 连锁的多效果与普通效果选择使用一致的可换行大字号，按场地缩放补偿至至少 18 屏幕像素。长效果列表通过鼠标滚轮纵向浏览。
 
 ## 动画调整
 
@@ -43,10 +46,10 @@ npm run lint
 npm run build
 ./node_modules/.bin/esbuild tests/duel-pacing.test.mjs tests/mdpro3-experience.test.mjs tests/mdpro3-parity.test.mjs tests/card-animation.test.mjs tests/eventbus.test.mjs tests/local-id.test.mjs --bundle --platform=node --format=esm --out-extension:.js=.mjs --outdir=/tmp/neos-parity-tests
 node --test /tmp/neos-parity-tests/*.test.mjs
-npm run test:e2e -- tests/e2e/duel-polish.spec.ts tests/e2e/mdpro3-parity.spec.ts tests/e2e/mdpro3-duel.spec.ts tests/e2e/duel-pacing.spec.ts tests/e2e/duel-dialog-regression.spec.ts tests/e2e/adaptive-scale.spec.ts --workers=1
+npm run test:e2e -- tests/e2e/duel-polish.spec.ts tests/e2e/duel-selection-polish.spec.ts tests/e2e/mdpro3-parity.spec.ts tests/e2e/mdpro3-duel.spec.ts tests/e2e/duel-pacing.spec.ts tests/e2e/duel-dialog-regression.spec.ts tests/e2e/adaptive-scale.spec.ts --workers=1
 ```
 
-新增浏览器回归逐帧检查召唤路径单调、途中卡片尺寸恒定、结束没有跳回；检查弹窗淡入时边界固定、场地查看不会提交；并在桌面与竖屏验证按钮和菜单的实际屏幕尺寸。其他回归覆盖连锁、无效、选择、卡堆、阶段编码、重开清理和停帧处理。没有测量用户设备的实际帧率。
+新增浏览器回归逐帧检查双方抽卡/检索时已有手牌保持同一基线和牌序，检查跨区同排、双方标记、两类滚轮滚动、多排窗口增高及缩放后的效果字号；同时检查召唤路径单调、途中卡片尺寸恒定、结束没有跳回；检查弹窗淡入时边界固定、场地查看不会提交；并在桌面与竖屏验证按钮和菜单的实际屏幕尺寸。其他回归覆盖连锁、无效、选择、卡堆、阶段编码、重开清理和停帧处理。没有测量用户设备的实际帧率。
 
 ## 部署
 

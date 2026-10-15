@@ -380,7 +380,7 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
             [spring.x, spring.y, spring.z, spring.rx, spring.rz, spring.scale],
             (x, y, z, rx, rz, scale) =>
               `translate3d(${x}px, ${y}px, ${
-                moving ? Math.max(z, 360) : z
+                moving && motion.kind !== "reflow" ? Math.max(z, 360) : z
               }px) rotateX(${rx}deg) rotateZ(${rz}deg) scale(${scale})`,
           ),
           "--z": spring.z,
@@ -390,7 +390,10 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
           "--move-arc": `${Math.min(24, motion.arc * 0.08)}px`,
           "--ry": spring.ry,
           "--hand-angle": spring.rz,
-          zIndex: moving ? 100 : spring.zIndex.to(Math.round),
+          zIndex:
+            moving && motion.kind !== "reflow"
+              ? 100
+              : spring.zIndex.to(Math.round),
           opacity: spring.opacity,
         } as any as CSSProperties
       }

@@ -1,6 +1,6 @@
 import { Button } from "antd";
 import classnames from "classnames";
-import { useEffect, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import { type INTERNAL_Snapshot as Snapshot, useSnapshot } from "valtio";
 
 import { type CardMeta, fetchStrings, Region, ygopro } from "@/api";
@@ -10,6 +10,7 @@ import { YgoCard } from "@/ui/Shared";
 import { closeCardActions } from "../../interaction/CardActions";
 import { registerFieldSelection } from "../../interaction/fieldSelection";
 import { selectionValid } from "../../interaction/selectionRules";
+import { useHorizontalWheel } from "../../interaction/useHorizontalWheel";
 import { ActionFrame } from "../../PlayMat/ActionFrame";
 import type { ActionHighlight } from "../../utils/actionHighlight";
 import { showCardModal } from "../CardModal";
@@ -63,13 +64,11 @@ export function SelectCardsModal({
 }: SelectCardsModalProps) {
   const [chosen, setChosen] = useState<number[]>([]);
   const [effectCard, setEffectCard] = useState<string>();
-  const [zone, setZone] = useState<number | undefined>();
   const promptId = useId();
   const hint = useSnapshot(matStore.hint);
   useEffect(() => {
     setChosen(isChain && selectables.length === 1 ? [0] : []);
     setEffectCard(undefined);
-    setZone(selectables[0]?.location?.zone);
   }, [selectables, isOpen, isChain]);
   const options = chosen.map((index) => selectables[index]);
   const valid = selectionValid(
@@ -158,9 +157,6 @@ export function SelectCardsModal({
         {footer}
       </div>
     ) : null;
-  const zones = [
-    ...new Set(selectables.map((option) => option.location?.zone)),
-  ];
   const groups = new Map<string, number[]>();
   selectables.forEach((option, index) => {
     const key = isChain ? cardKey(option) : `option:${index}`;
@@ -173,13 +169,22 @@ export function SelectCardsModal({
     indexes = [index],
     key = `option:${index}`,
     alreadySelected = false,
+    mandatory = false,
   ) => {
     const picked =
       alreadySelected ||
       effectCard === key ||
       indexes.some((idx) => chosen.includes(idx));
+    const origin = option.location
+      ? `${isMe(option.location.controller) ? "我方" : "对方"} · ${
+          option.location.is_overlay
+            ? "叠放素材"
+            : fetchStrings(Region.System, option.location.zone + 1000)
+        }`
+      : undefined;
     const choose = () => {
       showCardModal(option);
+      if (mandatory) return;
       if (alreadySelected && single) {
         onSubmit([option]);
         return;
@@ -203,7 +208,9 @@ export function SelectCardsModal({
             option.location?.controller !== undefined &&
             !isMe(option.location.controller),
         })}
-        aria-label={option.meta.text.name || "卡片"}
+        aria-label={`${option.meta.text.name || "卡片"}${
+          origin ? `，${origin}` : ""
+        }`}
         aria-pressed={picked}
         data-testid="duel-select-card-option"
         data-card-code={option.meta.id}
@@ -219,7 +226,7 @@ export function SelectCardsModal({
         }
         onClick={choose}
         onDoubleClick={() => {
-          if (alreadySelected && !single) return;
+          if (mandatory || (alreadySelected && !single)) return;
           if (
             (single || max === 1) &&
             indexes.length === 1 &&
@@ -247,6 +254,7 @@ export function SelectCardsModal({
           highlight={isChain ? "gold" : option.actionHighlight}
           className={styles.actionFrame}
         />
+        {origin && <span className={styles.origin}>{origin}</span>}
         <span className={styles.cardName}>{option.meta.text.name}</span>
         {picked && <b className={styles.check}>✓</b>}
         {indexes.length > 1 && (
@@ -259,9 +267,14 @@ export function SelectCardsModal({
     <NeosModal
       title={title}
       duelPosition="selection"
-      duelWidth={
-        groups.size <= 4 ? 650 : groups.size <= 7 ? groups.size * 150 : 950
-      }
+      duelWidth={Math.min(
+        1100,
+        Math.max(
+          650,
+          Math.max(groups.size, selecteds.length, mustSelects.length) * 150 +
+            40,
+        ),
+      )}
       open={isOpen}
       footer={footer}
       afterClose={() => {
@@ -272,6 +285,7 @@ export function SelectCardsModal({
       }}
     >
       <div
+        className={styles.content}
         data-testid="duel-select-cards-modal"
         data-select-min={min}
         data-select-max={max}
@@ -280,31 +294,11 @@ export function SelectCardsModal({
         data-select-cancelable={cancelable}
         data-select-finishable={finishable}
       >
-        {zones.length > 1 && (
-          <nav className={styles.zones} aria-label="卡片区域">
-            {zones.map((value) => (
-              <button
-                key={value ?? "unknown"}
-                type="button"
-                aria-pressed={zone === value}
-                onClick={() => setZone(value)}
-              >
-                {value === undefined
-                  ? "卡片"
-                  : fetchStrings(Region.System, value + 1000)}
-              </button>
-            ))}
-          </nav>
-        )}
-        <div className={styles.grid}>
-          {[...groups]
-            .filter(
-              ([, indexes]) => selectables[indexes[0]].location?.zone === zone,
-            )
-            .map(([key, indexes]) =>
-              cardButton(selectables[indexes[0]], indexes[0], indexes, key),
-            )}
-        </div>
+        <CardStrip label="可选卡片" testId="duel-select-candidates">
+          {[...groups].map(([key, indexes]) =>
+            cardButton(selectables[indexes[0]], indexes[0], indexes, key),
+          )}
+        </CardStrip>
         {effectOptions.length > 1 && (
           <div
             className={styles.effectOptions}
@@ -329,32 +323,58 @@ export function SelectCardsModal({
           </div>
         )}
         {!!mustSelects.length && (
-          <>
-            <p>必须使用的素材</p>
-            <div className={styles.mandatory}>
-              {mustSelects.map((option, index) => (
-                <YgoCard
-                  key={index}
-                  code={option.meta.id}
-                  width="3.5rem"
-                  urgent
-                />
-              ))}
-            </div>
-          </>
+          <section className={styles.section} aria-label="必须使用的素材">
+            <h3>必须使用的素材</h3>
+            <CardStrip label="必须使用的素材" testId="duel-select-mandatory">
+              {mustSelects.map((option, index) =>
+                cardButton(
+                  option,
+                  index,
+                  [index],
+                  `mandatory:${index}`,
+                  true,
+                  true,
+                ),
+              )}
+            </CardStrip>
+          </section>
         )}
         {!!selecteds.length && (
-          <>
-            <p>{single ? "已选择（点击取消选择）" : "已选择"}</p>
-            <div className={styles.grid}>
+          <section className={styles.section} aria-label="已选择的卡片">
+            <h3>{single ? "已选择（点击取消选择）" : "已选择"}</h3>
+            <CardStrip label="已选择的卡片" testId="duel-select-selected">
               {selecteds.map((option, index) =>
                 cardButton(option, index, [index], `selected:${index}`, true),
               )}
-            </div>
-          </>
+            </CardStrip>
+          </section>
         )}
       </div>
     </NeosModal>
+  );
+}
+
+function CardStrip({
+  children,
+  label,
+  testId,
+}: {
+  children: ReactNode;
+  label: string;
+  testId: string;
+}) {
+  const ref = useHorizontalWheel();
+  return (
+    <div
+      ref={ref}
+      className={styles.grid}
+      role="group"
+      aria-label={label}
+      tabIndex={0}
+      data-testid={testId}
+    >
+      {children}
+    </div>
   );
 }
 
