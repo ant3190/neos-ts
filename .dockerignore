@@ -11,3 +11,4 @@ neos-protobuf
 *.log
 .env*
 resource-data
+neos-data

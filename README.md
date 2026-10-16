@@ -88,4 +88,4 @@ of this license document, but changing it is not allowed.
 
 # Local resources
 
-Card databases, artwork, banlists and fonts are managed by the independent neos-resources project. The frontend proxies its API and assets and checks for updates on each page load. See [resource service setup and migration](docs/local-resources.md) before deploying the frontend.
+This repository includes the frontend and resource service under one Compose project. Card databases, artwork, banlists and fonts are stored outside the repository, in the sibling `neos-data/` directory by default. Each page load checks for updates and shows download progress when needed. See [data directory setup and migration](docs/local-resources.md).
