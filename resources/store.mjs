@@ -27,6 +27,31 @@ function fresh(row, maxAgeMs, now = Date.now()) {
   return row?.checked > 0 && now >= row.checked && now - row.checked < maxAgeMs;
 }
 
+function sourceVersion(asset, row) {
+  // A lagging index must not downgrade a newer file already fetched from a CDN.
+  if (
+    asset.remote &&
+    Date.parse(row?.modified) > Date.parse(asset.remote.modified)
+  )
+    return { ...asset, remote: undefined };
+  return asset;
+}
+
+function versionMatches(asset, row, maxAgeMs, now = Date.now()) {
+  if (asset.sha256) return row.hash === asset.sha256;
+  if (asset.remote)
+    return row.etag === asset.remote.etag && row.size === asset.remote.size;
+  return fresh(row, maxAgeMs, now);
+}
+
+function sameMissingVersion(asset, row) {
+  return (
+    (!asset.sha256 || row.hash === asset.sha256) &&
+    (!asset.remote ||
+      (row.etag === asset.remote.etag && row.size === asset.remote.size))
+  );
+}
+
 class Slots {
   constructor(limit) {
     this.limit = limit;
@@ -165,7 +190,9 @@ export class ResourceStore {
     // One SQLite query and directory listing instead of a query/stat per card.
     const rows = new Map(
       this.db
-        .prepare("SELECT key,url,checked,status,hash FROM resources")
+        .prepare(
+          "SELECT key,url,checked,status,hash,etag,size,modified FROM resources",
+        )
         .all()
         .map((row) => [row.key, row]),
     );
@@ -183,13 +210,14 @@ export class ResourceStore {
       missing = [];
     const now = Date.now();
     let cached = 0;
-    for (const asset of assets) {
-      const row = rows.get(asset.key);
+    for (const item of assets) {
+      const row = rows.get(item.key);
+      const asset = sourceVersion(item, row);
       if (row?.url === asset.url) {
         if (
           files.has(asset.key) &&
           row.status === 200 &&
-          (asset.sha256 ? row.hash === asset.sha256 : fresh(row, maxAgeMs, now))
+          versionMatches(asset, row, maxAgeMs, now)
         ) {
           cached++;
           continue;
@@ -198,7 +226,7 @@ export class ResourceStore {
           !retry &&
           !files.has(asset.key) &&
           row.status === 404 &&
-          (!asset.sha256 || row.hash === asset.sha256) &&
+          sameMissingVersion(asset, row) &&
           fresh(row, missingMaxAgeMs, now)
         ) {
           missing.push(asset);
@@ -217,13 +245,12 @@ export class ResourceStore {
     if (existing) return existing;
     if (cached && this.has(asset.key)) return { changed: false, cached: true };
     const previous = this.get(asset.key);
+    asset = sourceVersion(asset, previous);
     if (
       previous?.url === asset.url &&
       previous.status === 200 &&
       !full &&
-      (asset.sha256
-        ? previous.hash === asset.sha256
-        : fresh(previous, maxAgeMs)) &&
+      versionMatches(asset, previous, maxAgeMs) &&
       this.has(asset.key)
     )
       return { changed: false, cached: true };
@@ -231,7 +258,7 @@ export class ResourceStore {
       cached &&
       previous?.url === asset.url &&
       previous?.status === 404 &&
-      (!asset.sha256 || previous.hash === asset.sha256) &&
+      sameMissingVersion(asset, previous) &&
       fresh(previous, missingMaxAgeMs)
     )
       throw new NotFound(asset.key);
@@ -279,6 +306,8 @@ export class ResourceStore {
         }
         if (response.status === 304) {
           await response.body?.cancel();
+          if (!headers["If-None-Match"] && !headers["If-Modified-Since"])
+            throw new Error("Unexpected upstream HTTP 304");
           if (canUseFallback)
             this.setting("preferredCdn", url === alternative ? fallback : "");
           return { response, bytes: undefined };
@@ -326,6 +355,12 @@ export class ResourceStore {
         const bytes = Buffer.concat(chunks);
         try {
           validate(bytes, asset.kind);
+          if (
+            asset.remote &&
+            (response.headers.get("etag") !== asset.remote.etag ||
+              size !== asset.remote.size)
+          )
+            throw new Error("Resource does not match S3 index ETag/size");
         } catch (error) {
           error.noRetry = !canUseFallback;
           throw error;
@@ -364,7 +399,9 @@ export class ResourceStore {
         local &&
         old?.url === asset.url &&
         localHash === old.hash &&
-        (!asset.sha256 || old.hash === asset.sha256)
+        (!asset.sha256 || old.hash === asset.sha256) &&
+        (!asset.remote ||
+          (old.etag === asset.remote.etag && old.size === asset.remote.size))
       ) {
         if (old.etag) headers["If-None-Match"] = old.etag;
         if (old.modified) headers["If-Modified-Since"] = old.modified;
@@ -385,9 +422,16 @@ export class ResourceStore {
         }
         this.db
           .prepare(
-            "INSERT OR REPLACE INTO resources (key,url,hash,checked,status) VALUES (?,?,?,?,404)",
+            "INSERT OR REPLACE INTO resources (key,url,hash,etag,size,checked,status) VALUES (?,?,?,?,?,?,404)",
           )
-          .run(asset.key, asset.url, asset.sha256 || null, Date.now());
+          .run(
+            asset.key,
+            asset.url,
+            asset.sha256 || null,
+            asset.remote?.etag || null,
+            asset.remote?.size || 0,
+            Date.now(),
+          );
         throw new NotFound(asset.key);
       }
       const size = bytes.length;
@@ -429,7 +473,10 @@ export class ResourceStore {
           asset.key,
           asset.url,
           response.headers.get("etag"),
-          response.headers.get("last-modified"),
+          response.headers.get("last-modified") ||
+            (asset.remote
+              ? new Date(asset.remote.modified).toUTCString()
+              : null),
           hash,
           size,
           Date.now(),

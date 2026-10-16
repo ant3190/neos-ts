@@ -11,6 +11,14 @@ export interface ResourceUpdate {
   failed: number;
   missing: number;
   missingResources?: { key: string; kind: string }[];
+  index?: {
+    active: boolean;
+    total: number;
+    completed: number;
+    pages: number;
+    cached: number;
+    failed: number;
+  };
   active: { key: string; kind: string; received: number; total: number }[];
 }
 

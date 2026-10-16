@@ -58,7 +58,14 @@ export function ResourceUpdateDialog() {
   const complete = update.phase === "complete";
   const partial = update.phase === "partial";
   const active = !complete && !partial;
-  const stage = update.phase === "checking" ? update.core : update.assets;
+  const indexing = !!update.index?.active;
+  const indexFailed = update.index?.failed || 0;
+  const stage =
+    indexing && update.index
+      ? update.index
+      : update.phase === "checking"
+      ? update.core
+      : update.assets;
   const percent = complete
     ? 100
     : Math.min(
@@ -74,8 +81,14 @@ export function ResourceUpdateDialog() {
       ? "资源更新完成"
       : "资源已是最新"
     : partial
-    ? "部分资源更新失败"
-    : "发现资源更新";
+    ? indexFailed > 0 && update.failed === 0
+      ? "资源索引检查未完成"
+      : "部分资源更新失败"
+    : indexing
+    ? "正在检查资源索引"
+    : update.hasUpdates
+    ? "发现资源更新"
+    : "正在检查资源";
   const transfer = update.active[0];
   const missingResources = update.missingResources || [];
   const retry = () =>
@@ -140,18 +153,30 @@ export function ResourceUpdateDialog() {
                 ? "资源已同步到本地。刷新页面后加载新数据，当前对局不会自动刷新。"
                 : "本次检查已完成，当前资源无需更新。"
               : partial
-              ? "部分资源暂时无法下载，已保留可用的本地数据，可以稍后重试。"
+              ? indexFailed > 0 && update.failed === 0
+                ? "远端索引暂时不可用，已使用缓存和逐项检查，可稍后重试。"
+                : "部分资源暂时无法下载，已保留可用的本地数据，可以稍后重试。"
+              : indexing
+              ? "正在读取远端文件清单，比对本地已有资源。"
               : "正在将更新同步到本地，可以收起窗口在后台继续。"}
           </p>
           <div className={styles.progressHeading}>
             <strong>
-              {update.phase === "checking"
+              {indexing
+                ? "远端资源索引"
+                : update.phase === "checking"
                 ? "卡库与禁限检查"
                 : "卡图与字体同步"}
             </strong>
             <span aria-live="polite" data-testid="resource-update-count">
-              已处理 {stage.completed.toLocaleString()} /{" "}
-              {stage.total.toLocaleString()} 项
+              {indexing ? (
+                `目录 ${stage.completed.toLocaleString()} / ${stage.total.toLocaleString()} · 已读取 ${update.index?.pages.toLocaleString()} 页`
+              ) : (
+                <>
+                  已处理 {stage.completed.toLocaleString()} /{" "}
+                  {stage.total.toLocaleString()} 项
+                </>
+              )}
             </span>
           </div>
           <Progress
@@ -247,7 +272,11 @@ export function ResourceUpdateDialog() {
             <Alert
               type="warning"
               showIcon
-              message={`${update.failed.toLocaleString()} 项资源未能更新，可重试补齐。`}
+              message={
+                update.failed > 0
+                  ? `${update.failed.toLocaleString()} 项资源未能更新，可重试补齐。`
+                  : `${indexFailed} 个目录未能完成索引检查，可重新检查。`
+              }
             />
           )}
           {connectionError && (
@@ -261,7 +290,10 @@ export function ResourceUpdateDialog() {
         </div>
       </Modal>
       {!open &&
-        (update.hasUpdates || reloadAvailable || openRequest > 0) &&
+        (update.hasUpdates ||
+          reloadAvailable ||
+          openRequest > 0 ||
+          (partial && (indexFailed > 0 || update.failed > 0))) &&
         createPortal(
           <Button
             className={styles.reopen}

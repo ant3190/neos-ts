@@ -2,6 +2,9 @@
   "name": "neos-ts",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "resources"
+  ],
   "dependencies": {
     "@ant-design/icons": "^5.3.7",
     "@ant-design/pro-components": "^2.6.12",

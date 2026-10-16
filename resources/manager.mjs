@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 
 import { fontFiles, fontSources, localeFor } from "./config.mjs";
 import { manifestKey, parseManifest } from "./manifest.mjs";
+import { S3Index } from "./s3-index.mjs";
 import { cardIds, NotFound, ResourceStore } from "./store.mjs";
 
 export async function parallel(items, limit, run) {
@@ -17,10 +18,20 @@ export async function parallel(items, limit, run) {
   );
 }
 
+const indexProgress = () => ({
+  active: false,
+  total: 0,
+  completed: 0,
+  pages: 0,
+  cached: 0,
+  failed: 0,
+});
+
 export class ResourceManager {
   constructor(config) {
     this.config = config;
     this.store = new ResourceStore(config);
+    this.s3Index = new S3Index(config, this.store);
     this.manifest = new Map();
     this.manifestAsset = config.manifestUrl
       ? {
@@ -70,11 +81,12 @@ export class ResourceManager {
     return {
       ready: this.required(language).every((key) => this.store.has(key)),
       version,
-      phase: this.coreTask
-        ? "checking"
-        : this.mirrorTask
-        ? "mirroring"
-        : "idle",
+      phase:
+        this.coreTask || this.update?.index.active
+          ? "checking"
+          : this.mirrorTask
+          ? "mirroring"
+          : "idle",
       checkedAt: Number(this.store.setting("checkedAt") || 0),
       completedAt: Number(this.store.setting("completedAt") || 0),
       files: this.store.counts(),
@@ -137,6 +149,7 @@ export class ResourceManager {
       failed: 0,
       missing: 0,
       missingResources: [],
+      index: indexProgress(),
     };
     this.checkTask = (async () => {
       try {
@@ -148,12 +161,18 @@ export class ResourceManager {
             this.update.missing = 0;
             this.update.missingResources = [];
             this.update.core.completed = 0;
+            this.update.index = indexProgress();
             this.missingKeys.clear();
           }
           firstPass = false;
+          this.s3Index.begin();
           this.update.phase = "checking";
           const manifestWarning = await this.checkManifest();
+          const indexWarnings = await this.refreshIndex(this.config.core, {
+            force: pass > 0,
+          });
           await this.checkCore({ full: pass > 0 });
+          this.errors.push(...indexWarnings);
           if (manifestWarning) this.errors.push(manifestWarning);
           if (pass < this.checkMode) continue;
           this.update.core.completed = this.update.core.total;
@@ -165,6 +184,7 @@ export class ResourceManager {
         } while (!this.closed);
         this.update.phase =
           this.update.failed ||
+          this.update.index.failed ||
           this.closed ||
           this.progress.completed < this.progress.total
             ? "partial"
@@ -204,9 +224,33 @@ export class ResourceManager {
       return "资源清单暂时不可用，已改用逐项定期检查";
     }
   }
-  withHash(asset) {
+  async refreshIndex(assets, { force = false } = {}) {
+    const update = this.update;
+    return this.s3Index.refresh(
+      assets.filter((asset) => !this.manifest.has(asset.key)),
+      {
+        force,
+        onProgress(event) {
+          const index = update?.index;
+          if (!index) return;
+          if (event.type === "start") {
+            index.active = event.total > 0;
+            index.total += event.total;
+          } else if (event.type === "page") index.pages++;
+          else if (event.type === "complete") {
+            index.completed++;
+            if (event.cached) index.cached++;
+            if (event.failed) index.failed++;
+          } else if (event.type === "end") index.active = false;
+        },
+      },
+    );
+  }
+  withVersion(asset) {
     const sha256 = this.manifest.get(asset.key);
-    return sha256 ? { ...asset, sha256 } : asset;
+    if (sha256) return { ...asset, sha256 };
+    const remote = this.s3Index.metadata(asset);
+    return remote ? { ...asset, remote } : asset;
   }
   checkCore({ full = false } = {}) {
     if (this.config.offline) return Promise.resolve();
@@ -227,7 +271,7 @@ export class ResourceManager {
         this.config.concurrency,
         async (asset) => {
           try {
-            const result = await this.store.update(this.withHash(asset), {
+            const result = await this.store.update(this.withVersion(asset), {
               priority: true,
               maxAgeMs: full ? 0 : this.config.coreMaxAgeMs,
               full,
@@ -313,10 +357,12 @@ export class ResourceManager {
         if (this.update) this.update.failed++;
         console.warn(error.message);
       }
+      const candidates = [...fonts, ...this.images.values()];
+      this.errors.push(
+        ...(await this.refreshIndex(candidates, { force: full || retry })),
+      );
       const plan = await this.store.plan(
-        [...fonts, ...this.images.values()].map((asset) =>
-          this.withHash(asset),
-        ),
+        candidates.map((asset) => this.withVersion(asset)),
         {
           full,
           retry,
@@ -422,7 +468,7 @@ export class ResourceManager {
     }
     if (!asset) throw new NotFound(key);
     if (!existsSync(this.store.file(key)))
-      await this.store.update(this.withHash(asset), {
+      await this.store.update(this.withVersion(asset), {
         priority: true,
         cached: true,
       });

@@ -374,3 +374,95 @@ test("completed updates identify missing files and offer rechecking without hidi
   await expect(dialog).toContainText("资源更新完成");
   expect(checks).toBe(2);
 });
+
+test("index pagination shows directory/page progress and failed indexes can retry without claiming file downloads failed", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 680 });
+  let current = update({
+    phase: "syncing",
+    changed: 0,
+    downloadedBytes: 0,
+    assets: { total: 0, completed: 0 },
+    index: {
+      active: true,
+      total: 3,
+      completed: 1,
+      pages: 8,
+      cached: 0,
+      failed: 0,
+    },
+  });
+  const traffic = await install(page, () => current);
+  await page.goto("/");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("正在检查资源索引");
+  await expect(dialog.getByTestId("resource-update-count")).toContainText(
+    "目录 1 / 3 · 已读取 8 页",
+  );
+  const box = await dialog.boundingBox();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(680);
+  await page.screenshot({ path: "/tmp/neos-s3-index-progress.png" });
+  current = update({
+    phase: "partial",
+    hasUpdates: false,
+    changed: 0,
+    failed: 0,
+    assets: { total: 0, completed: 0, cached: 32000 },
+    index: {
+      active: false,
+      total: 3,
+      completed: 3,
+      pages: 9,
+      cached: 1,
+      failed: 1,
+    },
+  });
+  await expect(dialog).toContainText("资源索引检查未完成");
+  await expect(dialog).toContainText("1 个目录未能完成索引检查");
+  await expect(dialog).not.toContainText("0 项资源未能更新");
+  current = update({
+    id: "index-recovered",
+    phase: "complete",
+    hasUpdates: false,
+    changed: 0,
+    index: {
+      active: false,
+      total: 3,
+      completed: 3,
+      pages: 9,
+      cached: 0,
+      failed: 0,
+    },
+  });
+  await dialog.getByRole("button", { name: "重试更新" }).click();
+  await expect(dialog).toContainText("资源已是最新");
+  expect(traffic.queries.at(-1)?.get("retry")).toBe("1");
+});
+
+test("an automatic failed index check remains quiet but exposes an actionable progress button", async ({
+  page,
+}) => {
+  await install(page, () =>
+    update({
+      phase: "partial",
+      hasUpdates: false,
+      changed: 0,
+      failed: 0,
+      index: {
+        active: false,
+        total: 3,
+        completed: 3,
+        pages: 2,
+        cached: 2,
+        failed: 1,
+      },
+    }),
+  );
+  await page.goto("/");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const button = page.getByRole("button", { name: "查看资源更新进度" });
+  await expect(button).toContainText("资源更新未完成");
+  await button.click();
+  await expect(page.getByRole("dialog")).toContainText("资源索引检查未完成");
+});

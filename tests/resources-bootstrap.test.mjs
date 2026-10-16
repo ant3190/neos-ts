@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { randomInt } from "node:crypto";
 import { once } from "node:events";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -18,6 +19,7 @@ test("resource data requires an explicit directory and preserves legacy override
     "NEOS_RESOURCE_DATA_DIR",
     "NEOS_RESOURCE_CHECK_INTERVAL",
     "NEOS_RESOURCE_ASSET_CHECK_INTERVAL",
+    "NEOS_RESOURCE_S3_INDEX_URL",
   ];
   const original = names.map((name) => process.env[name]);
   try {
@@ -29,6 +31,17 @@ test("resource data requires an explicit directory and preserves legacy override
     assert.equal(makeConfig({ root: explicitRoot }).root, explicitRoot);
     assert.equal(makeConfig({ root: explicitRoot }).coreMaxAgeMs, 300_000);
     assert.equal(makeConfig({ root: explicitRoot }).assetMaxAgeMs, 86400_000);
+    assert.equal(
+      makeConfig({ root: explicitRoot }).s3IndexUrl,
+      "https://cdncf.moecube.com/",
+    );
+    process.env.NEOS_RESOURCE_S3_INDEX_URL = "  ";
+    assert.equal(makeConfig({ root: explicitRoot }).s3IndexUrl, "");
+    process.env.NEOS_RESOURCE_S3_INDEX_URL = " https://example.test/bucket/ ";
+    assert.equal(
+      makeConfig({ root: explicitRoot }).s3IndexUrl,
+      "https://example.test/bucket/",
+    );
     process.env.NEOS_RESOURCE_CHECK_INTERVAL = "0";
     process.env.NEOS_RESOURCE_ASSET_CHECK_INTERVAL = "3600";
     assert.equal(makeConfig({ root: explicitRoot }).coreMaxAgeMs, 0);
@@ -69,10 +82,22 @@ test(
       path.join(oldConfig, "storage.json"),
       JSON.stringify({ version: 1, directory: obsoleteRoot }),
     );
-    const reserve = createServer();
-    await new Promise((resolve) => reserve.listen(0, "127.0.0.1", resolve));
-    const port = reserve.address().port;
-    await new Promise((resolve) => reserve.close(resolve));
+    // Avoid the ephemeral range used by parallel fixture servers and HTTP clients.
+    let port;
+    for (let attempt = 0; attempt < 10 && !port; attempt++) {
+      const reserve = createServer();
+      try {
+        await new Promise((resolve, reject) => {
+          reserve.once("error", reject);
+          reserve.listen(randomInt(12000, 30000), "127.0.0.1", resolve);
+        });
+        port = reserve.address().port;
+        await new Promise((resolve) => reserve.close(resolve));
+      } catch (error) {
+        if (error.code !== "EADDRINUSE") throw error;
+      }
+    }
+    assert.ok(port, "no available development test port");
     const child = spawn(
       process.execPath,
       [

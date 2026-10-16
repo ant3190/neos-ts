@@ -17,5 +17,6 @@
   "languages": ["zh-CN", "en-US", "es-ES", "ja-JP", "ko-KR"],
   "imageLanguages": ["zh-CN", "en-US"],
   "fontsCss": "https://fonts.font.im/css2?family=Electrolize&family=Noto+Serif+SC:wght@700&display=swap",
-  "fallbackBase": "https://cdncf.moecube.com"
+  "fallbackBase": "https://cdncf.moecube.com",
+  "s3IndexUrl": "https://cdncf.moecube.com/"
 }

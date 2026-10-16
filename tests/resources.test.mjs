@@ -19,6 +19,7 @@ import test from "node:test";
 import { makeConfig } from "../resources/config.mjs";
 import { ResourceManager } from "../resources/manager.mjs";
 import { manifestKey } from "../resources/manifest.mjs";
+import { parseS3Page } from "../resources/s3-index.mjs";
 import { createResourceServer } from "../resources/server.mjs";
 import { NotFound, ResourceStore } from "../resources/store.mjs";
 
@@ -26,8 +27,59 @@ async function fixture(t) {
   const root = mkdtempSync(path.join(os.tmpdir(), "neos-resources-"));
   const files = new Map(),
     requests = [];
+  const index = {
+    enabled: false,
+    hidden: new Set(),
+    metadata: new Map(),
+    fail: null,
+    transform: null,
+  };
   const upstream = createServer(async (req, res) => {
     requests.push({ url: req.url, headers: req.headers });
+    const query = new URL(req.url, "http://upstream.test").searchParams;
+    if (index.enabled && query.get("list-type") === "2") {
+      const failure = index.fail?.(query);
+      if (failure) {
+        res.writeHead(failure);
+        res.end("index unavailable");
+        return;
+      }
+      const prefix = query.get("prefix") || "";
+      const grouped = new Map();
+      for (const [url, file] of files) {
+        const key = url.slice(1);
+        if (!key.startsWith(prefix) || index.hidden.has(key)) continue;
+        const slash = key.indexOf("/", prefix.length);
+        if (slash >= 0) {
+          const directory = key.slice(0, slash + 1);
+          grouped.set(directory, { key: directory, directory: true });
+        } else
+          grouped.set(key, {
+            key,
+            etag:
+              file.etag ||
+              `"${createHash("sha256").update(file.body).digest("hex")}"`,
+            size: file.body.length,
+            modified: file.modified || "2026-10-01T00:00:00.123Z",
+            ...index.metadata.get(key),
+          });
+      }
+      const all = [...grouped.values()].sort((a, b) =>
+        a.key < b.key ? -1 : a.key > b.key ? 1 : 0,
+      );
+      const offset = Number(
+        query.get("continuation-token")?.match(/^page:(\d+)\+&\/$/)?.[1] || 0,
+      );
+      const size = Number(query.get("max-keys") || 1000);
+      const page = all.slice(offset, offset + size);
+      const next =
+        offset + page.length < all.length ? `page:${offset + size}+&/` : null;
+      let xml = s3Xml(prefix, page, next);
+      if (index.transform) xml = index.transform(xml, query);
+      res.writeHead(200, { "Content-Type": "application/xml" });
+      res.end(xml);
+      return;
+    }
     const entry = files.get(req.url);
     if (!entry) {
       res.writeHead(404);
@@ -52,6 +104,9 @@ async function fixture(t) {
       "Content-Type": entry.type || "application/octet-stream",
       ...(!entry.noValidators && { ETag: hash }),
       "Content-Length": entry.body.length,
+      ...(entry.modified && {
+        "Last-Modified": new Date(entry.modified).toUTCString(),
+      }),
     });
     if (entry.chunkBytes) {
       for (
@@ -82,7 +137,34 @@ async function fixture(t) {
     upstream.close();
     rmSync(root, { recursive: true, force: true });
   });
-  return { root, files, requests, base, set, config };
+  return { root, files, requests, base, set, config, index };
+}
+
+function s3Xml(prefix, rows, next = null) {
+  const escape = (text) =>
+    String(text)
+      .replaceAll("&", "&amp;")
+      .replaceAll('"', "&#34;")
+      .replaceAll("<", "&lt;");
+  return `<?xml version="1.0"?><ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Prefix>${escape(
+    encodeURIComponent(prefix),
+  )}</Prefix><EncodingType>url</EncodingType><KeyCount>${
+    rows.length
+  }</KeyCount><IsTruncated>${!!next}</IsTruncated>${
+    next ? `<NextContinuationToken>${escape(next)}</NextContinuationToken>` : ""
+  }${rows
+    .map((row) =>
+      row.directory
+        ? `<CommonPrefixes><Prefix>${escape(
+            encodeURIComponent(row.key),
+          )}</Prefix></CommonPrefixes>`
+        : `<Contents><Key>${escape(
+            encodeURIComponent(row.key),
+          )}</Key><ETag>${escape(row.etag)}</ETag><Size>${
+            row.size
+          }</Size><LastModified>${row.modified}</LastModified></Contents>`,
+    )
+    .join("")}</ListBucketResult>`;
 }
 
 function database(root, ids) {
@@ -99,8 +181,9 @@ function database(root, ids) {
   return readFileSync(filename);
 }
 
-async function managerFixture(t) {
+async function managerFixture(t, { s3 = false, pageSize = 2 } = {}) {
   const f = await fixture(t);
+  f.index.enabled = s3;
   for (const locale of ["zh-CN", "en-US"]) {
     f.set(
       `/db/${locale}/cards.cdb`,
@@ -152,6 +235,8 @@ async function managerFixture(t) {
     timeoutMs: 1000,
     retryDelayMs: 0,
     autoSync: false,
+    s3IndexUrl: s3 ? f.base : "",
+    s3PageSize: pageSize,
   });
   const manager = new ResourceManager(config);
   t.after(async () => {
@@ -860,4 +945,303 @@ test("failed downloads report partial completion and a new check can finish with
   assert.notEqual(f.manager.status().update.id, partial.id);
   assert.equal(f.manager.status().update.phase, "complete");
   assert.equal(f.manager.status().update.failed, 0);
+});
+
+test("S3 XML decodes real entities and encoded keys, and rejects malformed or incomplete pages", () => {
+  const row = {
+    key: "cards/a & b.jpg",
+    etag: '"opaque-v2-3"',
+    size: 123,
+    modified: "2026-10-16T10:00:00.123Z",
+  };
+  const xml = s3Xml(
+    "cards/",
+    [row, { key: "cards/thumbnail/", directory: true }],
+    "next+&/",
+  );
+  const parsed = parseS3Page(xml, "cards/");
+  assert.deepEqual(parsed.entries.get(row.key), {
+    etag: row.etag,
+    size: row.size,
+    modified: row.modified,
+  });
+  assert.equal(parsed.next, "next+&/");
+  assert.equal(
+    parseS3Page(
+      xml.replace(
+        "<ETag>",
+        "<ChecksumAlgorithm>SHA1</ChecksumAlgorithm><ChecksumAlgorithm>CRC32</ChecksumAlgorithm><ETag>",
+      ),
+      "cards/",
+    ).entries.size,
+    1,
+  );
+  for (const invalid of [
+    xml.slice(0, -8),
+    xml.replace("<KeyCount>2", "<KeyCount>1"),
+    xml.replace(/<NextContinuationToken>.*?<\/NextContinuationToken>/, ""),
+    xml.replace("<Size>123", "<Size>-1"),
+    xml.replace("<Contents>", "<Contents><Key>duplicate</Key>"),
+    xml.replace(
+      '<?xml version="1.0"?>',
+      "<!DOCTYPE x [<!ENTITY secret SYSTEM 'file:///etc/passwd'>]>",
+    ),
+    "<html>upstream error</html>",
+  ])
+    assert.throws(() => parseS3Page(invalid, "cards/"));
+  assert.throws(() => parseS3Page(xml, "another/"));
+});
+
+const indexRequests = (f) =>
+  f.requests.filter((request) =>
+    new URL(request.url, f.base).searchParams.has("list-type"),
+  );
+const fileRequests = (f) =>
+  f.requests.filter(
+    (request) => !new URL(request.url, f.base).searchParams.has("list-type"),
+  );
+const expireIndexes = (manager) =>
+  manager.store.db.exec("UPDATE resource_indexes SET checked=0");
+
+test("S3 pagination populates local resources, persists snapshots across restart and eliminates per-file revalidation", async (t) => {
+  const f = await managerFixture(t, { s3: true });
+  await f.manager.check();
+  assert.equal(f.manager.status().update.phase, "complete");
+  assert.equal(f.manager.status().ready, true);
+  assert.equal(fileRequests(f).length, f.files.size);
+  assert.ok(
+    indexRequests(f).some((request) =>
+      new URL(request.url, f.base).searchParams.has("continuation-token"),
+    ),
+  );
+  assert.ok(f.manager.status().update.index.pages > 0);
+  const original = f.requests.length;
+  await f.manager.check();
+  assert.equal(f.requests.length, original);
+  assert.equal(f.manager.status().update.assets.cached, 9);
+  await f.manager.close();
+  const manager = new ResourceManager(f.config);
+  t.after(() => manager.close());
+  await manager.check();
+  assert.equal(
+    f.requests.length,
+    original,
+    "cached indexes survive a container restart",
+  );
+  expireIndexes(manager);
+  const count = fileRequests(f).length;
+  await manager.check();
+  assert.ok(
+    f.requests.length > original,
+    "expired directories are listed again",
+  );
+  assert.equal(
+    fileRequests(f).length,
+    count,
+    "unchanged files do not get even a conditional request",
+  );
+});
+
+test("S3 detects image-only changes inside the asset TTL, treats ETags as opaque and ignores validator-only rotations", async (t) => {
+  const f = await managerFixture(t, { s3: true });
+  await f.manager.check();
+  const version = f.manager.status().version;
+  const image = "/pics/zh-CN/101.jpg";
+  f.set(image, Buffer.from([255, 216, 255, 99, 255, 217]), {
+    etag: '"opaque-image-version-2"',
+  });
+  expireIndexes(f.manager);
+  const before = fileRequests(f).length;
+  await f.manager.check();
+  assert.equal(fileRequests(f).length - before, 1);
+  assert.equal(fileRequests(f).at(-1).url, image);
+  assert.equal(fileRequests(f).at(-1).headers["if-none-match"], undefined);
+  assert.equal(f.manager.status().version, version);
+  assert.equal(f.manager.status().update.changed, 1);
+  assert.deepEqual(
+    readFileSync(f.manager.store.file("images/ygopro-images-zh-CN/101.jpg")),
+    f.files.get(image).body,
+  );
+  f.files.get(image).etag = '"validator-rotated-same-content"';
+  expireIndexes(f.manager);
+  await f.manager.check();
+  assert.equal(f.manager.status().update.hasUpdates, false);
+  assert.equal(f.manager.status().update.changed, 0);
+});
+
+test("S3 changes to core databases rebuild the catalogue and deleted local files are repaired from cached indexes", async (t) => {
+  const f = await managerFixture(t, { s3: true });
+  await f.manager.check();
+  f.set("/db/zh-CN/cards.cdb", database(f.root, [101, 102, 401]));
+  for (const locale of ["zh-CN", "en-US"])
+    f.set(
+      `/pics/${locale}/401.jpg`,
+      Buffer.from([255, 216, 255, 40, 255, 217]),
+    );
+  expireIndexes(f.manager);
+  const before = fileRequests(f).length;
+  await f.manager.check();
+  assert.equal(fileRequests(f).length - before, 3);
+  assert.equal(f.manager.status().update.changed, 3);
+  const key = "images/ygopro-images-en-US/401.jpg";
+  unlinkSync(f.manager.store.file(key));
+  const requests = f.requests.length;
+  await f.manager.check();
+  assert.equal(f.requests.length - requests, 1);
+  assert.equal(f.manager.store.has(key), true);
+});
+
+test("a failed later S3 page never replaces a complete snapshot or masquerades as a successful check", async (t) => {
+  const f = await managerFixture(t, { s3: true });
+  await f.manager.check();
+  const scope = f.manager.s3Index.scope({
+    url: `${f.base}/pics/zh-CN/101.jpg`,
+  });
+  const saved = f.manager.store.db
+    .prepare("SELECT * FROM resource_indexes WHERE scope=?")
+    .get(scope.id);
+  expireIndexes(f.manager);
+  f.index.fail = (query) =>
+    query.get("prefix") === scope.prefix && query.has("continuation-token")
+      ? 503
+      : null;
+  f.set("/pics/zh-CN/101.jpg", Buffer.from([255, 216, 255, 41, 255, 217]));
+  const before = fileRequests(f).length;
+  await f.manager.check();
+  assert.equal(f.manager.status().update.phase, "partial");
+  assert.equal(f.manager.status().update.index.failed, 1);
+  assert.equal(f.manager.status().update.failed, 0);
+  assert.equal(
+    fileRequests(f).length,
+    before,
+    "no partial listing is trusted for comparisons",
+  );
+  const failed = f.manager.store.db
+    .prepare("SELECT * FROM resource_indexes WHERE scope=?")
+    .get(scope.id);
+  assert.equal(failed.entries, saved.entries);
+  assert.ok(failed.failed > 0);
+  await f.manager.close();
+  const manager = new ResourceManager(f.config);
+  t.after(() => manager.close());
+  const requests = f.requests.length;
+  await manager.check();
+  assert.equal(
+    f.requests.length,
+    requests,
+    "failed-index backoff survives restart",
+  );
+  assert.equal(manager.status().update.phase, "partial");
+  f.index.fail = null;
+  await manager.check({ retry: true });
+  assert.equal(manager.status().update.phase, "complete");
+  assert.equal(manager.status().update.changed, 1);
+});
+
+test("malformed S3 XML and repeated pagination tokens fall back while retaining usable files", async (t) => {
+  const f = await managerFixture(t, { s3: true });
+  f.index.transform = () => "<html>not a listing</html>";
+  await f.manager.check();
+  assert.equal(
+    f.manager.status().ready,
+    true,
+    "first downloads still work without an index",
+  );
+  assert.equal(f.manager.status().update.phase, "partial");
+  assert.ok(f.manager.status().update.index.failed > 0);
+  f.index.transform = (xml) =>
+    xml.replace(
+      /<NextContinuationToken>.*?<\/NextContinuationToken>/,
+      "<NextContinuationToken>page:0+&amp;/</NextContinuationToken>",
+    );
+  await f.manager.check({ retry: true });
+  assert.equal(f.manager.status().update.phase, "partial");
+  assert.equal(f.manager.status().ready, true);
+  f.index.transform = null;
+  await f.manager.check({ retry: true });
+  assert.equal(f.manager.status().update.phase, "complete");
+  assert.equal(f.manager.status().update.failed, 0);
+});
+
+test("index omissions never delete saved art and newly listed files bypass an old 404 cache", async (t) => {
+  const f = await managerFixture(t, { s3: true });
+  f.files.delete("/pics/zh-CN/102.jpg");
+  await f.manager.check();
+  assert.equal(f.manager.status().update.missing, 1);
+  f.index.hidden.add("pics/zh-CN/101.jpg");
+  f.set("/pics/zh-CN/102.jpg", Buffer.from([255, 216, 255, 42, 255, 217]));
+  expireIndexes(f.manager);
+  const count = fileRequests(f).length;
+  await f.manager.check();
+  assert.equal(fileRequests(f).length - count, 1);
+  assert.equal(fileRequests(f).at(-1).url, "/pics/zh-CN/102.jpg");
+  assert.equal(f.manager.store.has("images/ygopro-images-zh-CN/101.jpg"), true);
+  assert.equal(f.manager.store.has("images/ygopro-images-zh-CN/102.jpg"), true);
+  assert.equal(f.manager.status().update.missing, 0);
+});
+
+test("index-to-CDN mismatches preserve local art, and an older index cannot roll back newer downloaded files", async (t) => {
+  const f = await managerFixture(t, { s3: true });
+  await f.manager.check();
+  const key = "images/ygopro-images-zh-CN/101.jpg",
+    source = "pics/zh-CN/101.jpg";
+  const original = readFileSync(f.manager.store.file(key));
+  f.index.metadata.set(source, { etag: '"new-version-not-propagated"' });
+  expireIndexes(f.manager);
+  await f.manager.check();
+  assert.equal(f.manager.status().update.phase, "partial");
+  assert.equal(f.manager.status().update.failed, 1);
+  assert.deepEqual(readFileSync(f.manager.store.file(key)), original);
+  f.set(`/${source}`, Buffer.from([255, 216, 255, 43, 255, 217]), {
+    etag: '"new-version-not-propagated"',
+    modified: "2026-10-16T12:00:00Z",
+  });
+  f.index.metadata.clear();
+  await f.manager.check({ retry: true });
+  assert.equal(f.manager.status().update.phase, "complete");
+  const latest = readFileSync(f.manager.store.file(key));
+  f.index.metadata.set(source, {
+    etag: '"old-index-version"',
+    modified: "2026-10-15T12:00:00Z",
+  });
+  expireIndexes(f.manager);
+  const count = fileRequests(f).length;
+  await f.manager.check();
+  assert.equal(fileRequests(f).length, count);
+  assert.deepEqual(readFileSync(f.manager.store.file(key)), latest);
+});
+
+test("full S3 checks repair corrupt local bytes even when remote ETags are unchanged", async (t) => {
+  const f = await managerFixture(t, { s3: true });
+  await f.manager.check();
+  const key = "images/ygopro-images-zh-CN/101.jpg";
+  writeFileSync(f.manager.store.file(key), "corrupted art");
+  const before = indexRequests(f).length;
+  await f.manager.check({ full: true });
+  assert.ok(indexRequests(f).length > before);
+  assert.equal(f.manager.status().update.phase, "complete");
+  assert.equal(f.manager.status().update.changed, 1);
+  assert.deepEqual(
+    readFileSync(f.manager.store.file(key)),
+    f.files.get("/pics/zh-CN/101.jpg").body,
+  );
+});
+
+test("an indexed card whose primary CDN is outdated downloads the matching backup instead", async (t) => {
+  const f = await cdnFixture(t);
+  f.set("/primary/strings.conf", "!system 1 Old\n", { etag: '"old"' });
+  const body = "!system 1 Latest\n";
+  f.set("/backup/strings.conf", body, { etag: '"latest"' });
+  const asset = {
+    ...f.asset,
+    remote: {
+      etag: '"latest"',
+      size: Buffer.byteLength(body),
+      modified: "2026-10-16T12:00:00Z",
+    },
+  };
+  const result = await f.store.update(asset);
+  assert.equal(result.changed, true);
+  assert.match(f.store.read(asset.key), /Latest/);
+  assert.equal(f.requests.length, 2);
 });

@@ -2,6 +2,7 @@ FROM node:24-bookworm-slim AS build
 
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY resources/package.json ./resources/package.json
 RUN npm ci --no-audit --no-fund
 
 COPY . .

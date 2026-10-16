@@ -76,6 +76,11 @@ export function makeConfig(overrides = {}) {
     ),
     coreMaxAgeMs: interval("NEOS_RESOURCE_CHECK_INTERVAL", 300),
     assetMaxAgeMs: interval("NEOS_RESOURCE_ASSET_CHECK_INTERVAL", 86400),
+    s3IndexUrl: (
+      process.env.NEOS_RESOURCE_S3_INDEX_URL ??
+      sources.s3IndexUrl ??
+      ""
+    ).trim(),
     manifestUrl:
       process.env.NEOS_RESOURCE_MANIFEST_URL?.trim() ||
       sources.manifestUrl ||
