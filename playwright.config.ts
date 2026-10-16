@@ -35,11 +35,6 @@ export default defineConfig({
   webServer: skipWebServer
     ? undefined
     : {
-        env: {
-          NEOS_RESOURCE_AUTO_SYNC: "0",
-          NEOS_RESOURCE_OFFLINE:
-            process.env.PLAYWRIGHT_LIVE === "1" ? "0" : "1",
-        },
         command: `npm run dev -- --host ${base.hostname} --port ${
           base.port || "5173"
         }`,

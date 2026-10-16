@@ -46,15 +46,15 @@ NEOS现在开启公测啦，详情请移步[萌卡社区帖子](https://ygobbs.c
 
 ### 本地部署（Docker）
 
-安装 Docker 和 Compose 后，在仓库目录运行：
+安装 Docker 和 Compose 后，先按[独立资源服务说明](docs/local-resources.md)启动 neos-resources，再在仓库目录运行：
 
 ```bash
-docker compose up --build -d
+docker compose up --build -d --remove-orphans
 ```
 
 本机打开 http://localhost:18080，其他设备可通过 `http://服务器公网IP:18080` 访问。容器监听宿主机所有 IPv4 接口；公网访问还需要在主机防火墙和云服务商入站规则中放行 TCP 18080。更新代码后再次运行同一命令即可重建；停止服务使用 `docker compose down`。
 
-容器只提供前端静态文件。卡图、卡牌数据库和联机服务仍需要浏览器能访问项目配置的外部地址。
+卡图、卡片数据库（含效果文本）和禁限表由独立的 neos-resources 服务保存和更新，前端通过同源反向代理读取。账号、匹配和联机对战仍使用原有在线服务。
 
 ## 截图
 
@@ -100,4 +100,4 @@ of this license document, but changing it is not allowed.
 
 # 本地资源部署
 
-当前分支支持在部署服务器保存完整资源，并在每次打开网页时自动检查更新。首次部署、同步进度、持久化和备份方式见 [本地资源说明](docs/local-resources.md)。
+卡库、卡图和禁限已拆入独立资源项目，每次打开网页仍会自动检查更新。首次部署、旧数据卷迁移、服务连接配置见 [独立资源服务说明](docs/local-resources.md)。

@@ -88,4 +88,4 @@ of this license document, but changing it is not allowed.
 
 # Local resources
 
-This branch stores card databases, artwork, banlists and fonts on the deployment server and checks for updates on each page load. See [deployment and resource synchronization](docs/local-resources.md) for setup, persistence, progress and backups.
+Card databases, artwork, banlists and fonts are managed by the independent neos-resources project. The frontend proxies its API and assets and checks for updates on each page load. See [resource service setup and migration](docs/local-resources.md) before deploying the frontend.

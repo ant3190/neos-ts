@@ -1,7 +1,0 @@
-FROM node:24-alpine
-
-WORKDIR /app
-COPY resources ./resources
-ENV NEOS_RESOURCE_DIR=/data NEOS_RESOURCE_PORT=8788 NODE_USE_ENV_PROXY=1
-EXPOSE 8788
-CMD ["node", "resources/server.mjs"]

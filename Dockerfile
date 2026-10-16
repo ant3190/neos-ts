@@ -9,7 +9,8 @@ RUN npm run build
 
 FROM nginx:stable-alpine
 
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+ENV NEOS_RESOURCE_URL=http://neos-resources:8788 NGINX_ENVSUBST_FILTER=^NEOS_RESOURCE_URL$
+COPY docker/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist/ /usr/share/nginx/html/
 
 EXPOSE 80
