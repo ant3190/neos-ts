@@ -8,6 +8,7 @@ import {
   statSync,
   unlinkSync,
   utimesSync,
+  writeFileSync,
 } from "node:fs";
 import { createServer } from "node:http";
 import os from "node:os";
@@ -17,6 +18,7 @@ import test from "node:test";
 
 import { makeConfig } from "../resources/config.mjs";
 import { ResourceManager } from "../resources/manager.mjs";
+import { manifestKey } from "../resources/manifest.mjs";
 import { createResourceServer } from "../resources/server.mjs";
 import { NotFound, ResourceStore } from "../resources/store.mjs";
 
@@ -285,7 +287,7 @@ test("full synchronization covers both image languages, prerelease cards and fon
   });
   const firstCount = requests.length,
     version = manager.status().version;
-  await manager.check();
+  await manager.check({ full: true });
   await manager.mirrorTask;
   assert.equal(manager.status().version, version);
   assert.equal(requests.length, firstCount * 2);
@@ -306,19 +308,224 @@ test("missing source art is reported without losing other resources or repeatedl
   ]);
   assert.equal(manager.store.has("images/ygopro-images-en-US/201.jpg"), true);
   const count = requests.length;
+  await manager.check();
+  assert.equal(manager.status().update.missing, 1);
+  assert.equal(requests.length, count);
   await assert.rejects(
     manager.ensure("images/ygopro-images-zh-CN/102.jpg"),
     NotFound,
   );
   assert.equal(requests.length, count);
   set("/pics/zh-CN/102.jpg", Buffer.from([255, 216, 255, 102, 255, 217]));
-  await manager.check();
+  await manager.check({ retry: true });
   assert.equal(manager.status().update.missing, 0);
   assert.deepEqual(manager.status().update.missingResources, []);
   assert.equal(manager.store.has("images/ygopro-images-zh-CN/102.jpg"), true);
   assert.deepEqual(
     manager.status("cn", missingJob.id).update.missingResources,
     missingJob.missingResources,
+  );
+});
+
+test("warm page checks reuse persisted validators, expired core checks stay small, and lost files repair immediately", async (t) => {
+  const f = await managerFixture(t);
+  await f.manager.check();
+  await f.manager.close();
+  const manager = new ResourceManager(f.config);
+  t.after(() => manager.close());
+  const count = f.requests.length;
+  await manager.check();
+  assert.equal(
+    f.requests.length,
+    count,
+    "a restart must not invalidate freshness",
+  );
+  assert.equal(manager.status().update.assets.cached, 9);
+  for (const asset of f.config.core)
+    manager.store.db
+      .prepare("UPDATE resources SET checked=? WHERE key=?")
+      .run(Date.now() - f.config.coreMaxAgeMs - 1, asset.key);
+  await manager.check();
+  assert.equal(f.requests.length - count, f.config.core.length);
+  assert.ok(
+    f.requests
+      .slice(count)
+      .every((request) => request.headers["if-none-match"]),
+  );
+  const key = "images/ygopro-images-zh-CN/101.jpg";
+  unlinkSync(manager.store.file(key));
+  const beforeRepair = f.requests.length;
+  await manager.check();
+  assert.equal(f.requests.length - beforeRepair, 1);
+  assert.equal(manager.store.has(key), true);
+});
+
+test("new database cards download immediately and existing artwork is periodically revalidated", async (t) => {
+  const f = await managerFixture(t);
+  await f.manager.check();
+  f.set("/db/zh-CN/cards.cdb", database(f.root, [101, 102, 401]));
+  f.manager.store.db
+    .prepare("UPDATE resources SET checked=0 WHERE key=?")
+    .run("ygopro-database/zh-CN/cards.cdb");
+  for (const locale of ["zh-CN", "en-US"])
+    f.set(`/pics/${locale}/401.jpg`, Buffer.from([255, 216, 255, 4, 255, 217]));
+  const count = f.requests.length;
+  await f.manager.check();
+  assert.equal(f.requests.length - count, 3, "one database and two new images");
+  assert.equal(f.manager.status().update.changed, 3);
+  const key = "images/ygopro-images-zh-CN/101.jpg";
+  f.set("/pics/zh-CN/101.jpg", Buffer.from([255, 216, 255, 5, 255, 217]));
+  await f.manager.check();
+  assert.equal(f.manager.status().update.changed, 0);
+  f.manager.store.db
+    .prepare("UPDATE resources SET checked=? WHERE key=?")
+    .run(Date.now() - f.config.assetMaxAgeMs - 1, key);
+  const beforeAudit = f.requests.length;
+  await f.manager.check();
+  assert.equal(f.requests.length - beforeAudit, 1);
+  assert.equal(f.manager.status().update.changed, 1);
+});
+
+function publishManifest(f, overrides = {}) {
+  const assets = [
+    ...f.config.core,
+    ...f.manager.images.values(),
+    ...f.manager.fonts(),
+  ];
+  const files = Object.fromEntries(
+    assets.map((asset) => [
+      asset.key,
+      createHash("sha256")
+        .update(f.files.get(new URL(asset.url).pathname).body)
+        .digest("hex"),
+    ]),
+  );
+  f.set(
+    "/manifest.json",
+    JSON.stringify({ schema: 1, files: { ...files, ...overrides } }),
+  );
+}
+
+async function indexedManager(f, t) {
+  await f.manager.close();
+  const manager = new ResourceManager({
+    ...f.config,
+    manifestUrl: `${f.base}/manifest.json`,
+  });
+  t.after(() => manager.close());
+  return manager;
+}
+
+test("a remote hash manifest checks all saved resources in one request, including image-only changes", async (t) => {
+  const f = await managerFixture(t);
+  await f.manager.check();
+  publishManifest(f);
+  const manager = await indexedManager(f, t);
+  let count = f.requests.length;
+  await manager.check();
+  assert.equal(f.requests.length - count, 1);
+  assert.equal(
+    manager.status().update.hasUpdates,
+    false,
+    "a new index is not a playable update",
+  );
+  count = f.requests.length;
+  await manager.check();
+  assert.equal(f.requests.length - count, 1);
+  assert.ok(
+    f.requests.at(-1).headers["if-none-match"],
+    "the manifest itself is conditionally checked",
+  );
+  f.set("/pics/zh-CN/101.jpg", Buffer.from([255, 216, 255, 9, 255, 217]));
+  publishManifest(f);
+  count = f.requests.length;
+  await manager.check();
+  assert.equal(
+    f.requests.length - count,
+    2,
+    "one manifest and only the changed image",
+  );
+  assert.equal(manager.status().update.changed, 1);
+  assert.equal(
+    f.requests.at(-1).headers["if-none-match"],
+    undefined,
+    "a known changed hash bypasses stale validators",
+  );
+  assert.deepEqual(
+    readFileSync(manager.store.file("images/ygopro-images-zh-CN/101.jpg")),
+    f.files.get("/pics/zh-CN/101.jpg").body,
+  );
+});
+
+test("manifest hash mismatches preserve saved files and invalid or unavailable indexes fall back without claiming success", async (t) => {
+  const f = await managerFixture(t);
+  await f.manager.check();
+  const key = "images/ygopro-images-zh-CN/101.jpg";
+  const saved = readFileSync(f.manager.store.file(key));
+  publishManifest(f, { [key]: "a".repeat(64) });
+  const manager = await indexedManager(f, t);
+  await manager.check();
+  assert.equal(manager.status().update.phase, "partial");
+  assert.equal(manager.status().update.failed, 1);
+  assert.deepEqual(readFileSync(manager.store.file(key)), saved);
+  const valid = manager.store.read(manifestKey);
+  f.set(
+    "/manifest.json",
+    JSON.stringify({ schema: 1, files: { "../invalid.jpg": "a".repeat(64) } }),
+  );
+  await manager.check();
+  assert.equal(manager.status().update.phase, "partial");
+  assert.equal(
+    manager.store.read(manifestKey),
+    valid,
+    "invalid indexes never replace the saved one",
+  );
+  assert.ok(
+    manager.status().warnings.some((warning) => warning.includes("清单")),
+  );
+  f.files.get("/manifest.json").status = 503;
+  await manager.check();
+  assert.equal(manager.status().update.phase, "partial");
+  assert.equal(
+    manager.manifest.size,
+    0,
+    "an old index is not proof of current remote contents",
+  );
+});
+
+test("manual full checks bypass freshness and a simultaneous quick job upgrades without changing its ID", async (t) => {
+  const f = await managerFixture(t);
+  await f.manager.check();
+  publishManifest(f);
+  const manager = await indexedManager(f, t);
+  await manager.check();
+  f.files.get("/manifest.json").delay = 25;
+  const count = f.requests.length;
+  const quick = manager.check();
+  const id = manager.status().update.id;
+  const full = manager.check({ full: true });
+  await Promise.all([quick, full]);
+  assert.equal(manager.status().update.id, id);
+  assert.equal(manager.status().update.phase, "complete");
+  assert.equal(manager.status().update.hasUpdates, false);
+  assert.equal(manager.status().update.failed, 0);
+  const checked = new Set(
+    f.requests.slice(count).map((request) => request.url),
+  );
+  for (const asset of [
+    ...f.config.core,
+    ...f.manager.images.values(),
+    ...f.manager.fonts(),
+  ])
+    assert.ok(checked.has(new URL(asset.url).pathname), asset.key);
+
+  const key = "images/ygopro-images-zh-CN/101.jpg";
+  writeFileSync(manager.store.file(key), "damaged local image");
+  await manager.check({ full: true });
+  assert.equal(manager.status().update.changed, 1);
+  assert.deepEqual(
+    readFileSync(manager.store.file(key)),
+    f.files.get("/pics/zh-CN/101.jpg").body,
   );
 });
 
@@ -407,7 +614,7 @@ test("offline refresh and process restart can serve saved resources without cont
   await f.manager.check();
   await f.manager.mirrorTask;
   for (const entry of f.files.values()) entry.status = 503;
-  await f.manager.check();
+  await f.manager.check({ full: true });
   await f.manager.mirrorTask;
   assert.equal(f.manager.status().ready, true);
   assert.ok(f.manager.status().warnings.length > 0);
@@ -493,6 +700,17 @@ test("HTTP assets stream independently of the frontend filesystem and reject unk
   assert.equal(original.phase, "complete");
   assert.equal(original.hasUpdates, true);
   assert.equal(f.manager.status().update.hasUpdates, false);
+  const beforeFull = f.requests.length;
+  const full = await fetch(`${base}/api/resources/check?full=1`, {
+    method: "POST",
+  });
+  assert.equal(full.status, 202);
+  await full.json();
+  await f.manager.checkTask;
+  assert.equal(
+    f.requests.length - beforeFull,
+    f.config.core.length + f.manager.images.size + f.manager.fonts().length,
+  );
 });
 
 test("explicit offline mode serves saved files without any update or download traffic", async (t) => {
@@ -605,20 +823,20 @@ test("update status reports live bytes and one shared job, and unchanged scans f
 
 test("rotated validators and unversioned unchanged bodies do not announce updates, but changed art does", async (t) => {
   const f = await managerFixture(t);
-  await f.manager.check();
+  await f.manager.check({ full: true });
   const version = f.manager.status().version;
   for (const entry of f.files.values()) entry.etag = '"rotated"';
-  await f.manager.check();
+  await f.manager.check({ full: true });
   assert.equal(f.manager.status().update.hasUpdates, false);
   assert.equal(f.manager.status().update.changed, 0);
   assert.ok(f.manager.status().update.downloadedBytes > 0);
   for (const entry of f.files.values()) entry.noValidators = true;
-  await f.manager.check();
+  await f.manager.check({ full: true });
   assert.equal(f.manager.status().update.hasUpdates, false);
   f.set("/pics/zh-CN/101.jpg", Buffer.from([255, 216, 255, 77, 255, 217]), {
     noValidators: true,
   });
-  await f.manager.check();
+  await f.manager.check({ full: true });
   assert.equal(f.manager.status().version, version);
   assert.equal(f.manager.status().update.hasUpdates, true);
   assert.equal(f.manager.status().update.changed, 1);
@@ -629,7 +847,7 @@ test("failed downloads report partial completion and a new check can finish with
   await f.manager.check();
   f.set("/ban.conf", "!New list\n101 2\n");
   f.files.get("/pics/zh-CN/101.jpg").status = 503;
-  await f.manager.check();
+  await f.manager.check({ full: true });
   const partial = f.manager.status().update;
   assert.equal(partial.phase, "partial");
   assert.equal(partial.hasUpdates, true);

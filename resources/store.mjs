@@ -6,11 +6,26 @@ import {
   readFileSync,
   statSync,
 } from "node:fs";
-import { rename, rm, utimes, writeFile } from "node:fs/promises";
+import {
+  readFile,
+  readdir,
+  rename,
+  rm,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+import { parseManifest } from "./manifest.mjs";
+
 export class NotFound extends Error {}
+
+const missingMaxAgeMs = 3600_000;
+
+function fresh(row, maxAgeMs, now = Date.now()) {
+  return row?.checked > 0 && now >= row.checked && now - row.checked < maxAgeMs;
+}
 
 class Slots {
   constructor(limit) {
@@ -84,6 +99,8 @@ function validate(bytes, kind) {
   } else if (kind === "css") {
     if (!text().includes("@font-face"))
       throw new Error("Invalid font stylesheet");
+  } else if (kind === "manifest") {
+    parseManifest(text());
   }
 }
 
@@ -143,18 +160,82 @@ export class ResourceStore {
   read(key) {
     return readFileSync(this.file(key), "utf8");
   }
-  async update(asset, { priority = false, cached = false } = {}) {
+  async plan(assets, { full = false, retry = false, maxAgeMs = 0 } = {}) {
+    if (full) return { pending: assets, cached: 0, missing: [] };
+    // One SQLite query and directory listing instead of a query/stat per card.
+    const rows = new Map(
+      this.db
+        .prepare("SELECT key,url,checked,status,hash FROM resources")
+        .all()
+        .map((row) => [row.key, row]),
+    );
+    const files = new Set(
+      (await readdir(this.files, { recursive: true, withFileTypes: true }))
+        .filter((entry) => entry.isFile())
+        .map((entry) =>
+          path
+            .relative(this.files, path.join(entry.parentPath, entry.name))
+            .split(path.sep)
+            .join("/"),
+        ),
+    );
+    const pending = [],
+      missing = [];
+    const now = Date.now();
+    let cached = 0;
+    for (const asset of assets) {
+      const row = rows.get(asset.key);
+      if (row?.url === asset.url) {
+        if (
+          files.has(asset.key) &&
+          row.status === 200 &&
+          (asset.sha256 ? row.hash === asset.sha256 : fresh(row, maxAgeMs, now))
+        ) {
+          cached++;
+          continue;
+        }
+        if (
+          !retry &&
+          !files.has(asset.key) &&
+          row.status === 404 &&
+          (!asset.sha256 || row.hash === asset.sha256) &&
+          fresh(row, missingMaxAgeMs, now)
+        ) {
+          missing.push(asset);
+          continue;
+        }
+      }
+      pending.push(asset);
+    }
+    return { pending, cached, missing };
+  }
+  async update(
+    asset,
+    { priority = false, cached = false, maxAgeMs = 0, full = false } = {},
+  ) {
     const existing = this.inflight.get(asset.key);
     if (existing) return existing;
     if (cached && this.has(asset.key)) return { changed: false, cached: true };
     const previous = this.get(asset.key);
     if (
+      previous?.url === asset.url &&
+      previous.status === 200 &&
+      !full &&
+      (asset.sha256
+        ? previous.hash === asset.sha256
+        : fresh(previous, maxAgeMs)) &&
+      this.has(asset.key)
+    )
+      return { changed: false, cached: true };
+    if (
       cached &&
+      previous?.url === asset.url &&
       previous?.status === 404 &&
-      Date.now() - previous.checked < 3600_000
+      (!asset.sha256 || previous.hash === asset.sha256) &&
+      fresh(previous, missingMaxAgeMs)
     )
       throw new NotFound(asset.key);
-    const task = this.download(asset, priority).finally(() =>
+    const task = this.download(asset, priority, full).finally(() =>
       this.inflight.delete(asset.key),
     );
     this.inflight.set(asset.key, task);
@@ -263,17 +344,28 @@ export class ResourceStore {
     }
     throw lastError;
   }
-  async download(asset, priority) {
+  async download(asset, priority, full = false) {
     await this.slots.acquire(priority);
     const temporary = path.join(this.work, randomUUID());
     try {
       const old = this.get(asset.key),
         local = this.has(asset.key),
+        localHash =
+          full && local
+            ? createHash("sha256")
+                .update(await readFile(this.file(asset.key)))
+                .digest("hex")
+            : old?.hash,
         headers = {
           "Accept-Encoding": "identity",
           "User-Agent": "NeosLocalResources/1.0",
         };
-      if (local && old?.url === asset.url) {
+      if (
+        local &&
+        old?.url === asset.url &&
+        localHash === old.hash &&
+        (!asset.sha256 || old.hash === asset.sha256)
+      ) {
         if (old.etag) headers["If-None-Match"] = old.etag;
         if (old.modified) headers["If-Modified-Since"] = old.modified;
       }
@@ -285,17 +377,24 @@ export class ResourceStore {
         return { changed: false };
       }
       if (response.status === 404) {
-        if (local) return { changed: false, stale: true };
+        if (local) {
+          this.db
+            .prepare("UPDATE resources SET checked=0 WHERE key=?")
+            .run(asset.key);
+          return { changed: false, stale: true };
+        }
         this.db
           .prepare(
-            "INSERT OR REPLACE INTO resources (key,url,checked,status) VALUES (?,?,?,404)",
+            "INSERT OR REPLACE INTO resources (key,url,hash,checked,status) VALUES (?,?,?,?,404)",
           )
-          .run(asset.key, asset.url, Date.now());
+          .run(asset.key, asset.url, asset.sha256 || null, Date.now());
         throw new NotFound(asset.key);
       }
       const size = bytes.length;
       const hash = createHash("sha256").update(bytes).digest("hex");
-      const changed = !local || old?.hash !== hash;
+      if (asset.sha256 && hash !== asset.sha256)
+        throw new Error("Resource does not match manifest SHA-256");
+      const changed = !local || localHash !== hash;
       if (changed) {
         await writeFile(temporary, bytes);
         if (asset.kind === "database") {
@@ -338,8 +437,13 @@ export class ResourceStore {
       if (changed) this.onProgress?.({ type: "changed", key: asset.key });
       return { changed };
     } catch (error) {
-      if (this.has(asset.key) && !this.abort.signal.aborted)
+      if (this.has(asset.key) && !this.abort.signal.aborted) {
+        // A failed forced check must not leave an older success looking fresh.
+        this.db
+          .prepare("UPDATE resources SET checked=0 WHERE key=?")
+          .run(asset.key);
         return { changed: false, stale: true, error: error.message };
+      }
       // An inconclusive check must not leave an old 404 suppressing retries.
       if (!(error instanceof NotFound))
         this.db

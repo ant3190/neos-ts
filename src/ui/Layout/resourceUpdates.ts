@@ -5,7 +5,7 @@ export interface ResourceUpdate {
   phase: "checking" | "syncing" | "complete" | "partial";
   hasUpdates: boolean;
   core: { total: number; completed: number };
-  assets: { total: number; completed: number };
+  assets: { total: number; completed: number; cached?: number };
   changed: number;
   downloadedBytes: number;
   failed: number;
@@ -19,6 +19,7 @@ export const resourceUpdates = proxy({
   connectionError: "",
   requesting: false,
   reloadAvailable: false,
+  openRequest: 0,
 });
 
 let generation = 0;
@@ -67,8 +68,14 @@ async function poll(token: number) {
 }
 
 /** Check once during initialization; continue watching the shared server job in the background. */
-export function checkResourceUpdates(): Promise<void> {
-  if (pending) return pending;
+export function checkResourceUpdates(
+  options: { full?: boolean; retry?: boolean } = {},
+): Promise<void> {
+  if (pending)
+    return options.full || options.retry
+      ? pending.catch(() => undefined).then(() => checkResourceUpdates(options))
+      : pending;
+  if (options.full) resourceUpdates.openRequest++;
   const token = ++generation;
   window.clearTimeout(timer);
   resourceUpdates.requesting = true;
@@ -76,7 +83,9 @@ export function checkResourceUpdates(): Promise<void> {
     try {
       const language = localStorage.getItem("language") || "cn";
       const response = await fetch(
-        `/api/resources/check?language=${encodeURIComponent(language)}`,
+        `/api/resources/check?language=${encodeURIComponent(language)}${
+          options.full ? "&full=1" : options.retry ? "&retry=1" : ""
+        }`,
         {
           method: "POST",
           cache: "no-store",

@@ -72,12 +72,14 @@ docker compose cp resources:/data/. /srv/neos-data/
 ## 自动更新和进度弹窗
 
 - 每次完整打开或刷新网页，检查一次资源更新。确认有变更或缺少资源时弹窗；没有变更时保持静默。
+- 无清单时，成功检查过的卡库、禁限和配置默认复用 5 分钟，已有卡图与字体默认 24 小时复核一次；新资源、本地丢失的文件及上次失败的下载仍会补齐。检查时间保存在数据目录，重启或重建容器继续复用。已确认的 404 缓存 1 小时，避免反复请求不存在的文件。
 - 显示当前阶段、已处理项数、已更新项数、实际下载量和当前文件的下载进度。处理项数包含无需重新下载的文件，百分比表示当前阶段的处理进度。
 - 点击“后台更新”收起弹窗，左下角可重新查看；关闭网页不会取消服务器上的下载。
 - 更新任务由多个页面共享；按任务编号读取进度，其他页面的检查不会覆盖当前窗口正在查看的任务。
 - 使用 ETag、Last-Modified 和 SHA-256 检查变化；验证文件格式与 SQLite 完整性后原子替换，失败时保留旧版本。验证标记变了但内容相同不会误报更新。
 - 下载失败可以重试，连接中断会自动重连。完成后由用户点击“刷新加载新数据”，不会自动刷新或打断当前对局。
 - 卡图 CDN 返回 404 时会继续尝试备用 CDN，只有两个来源都返回 404 才归为缺失；404 与超时、503 等混合出现时按下载失败处理，避免误报缺失。弹窗列出具体缺失文件及卡号，可点击“重新检查”。详情最多展示 100 项，完整缺失文件名会写入资源服务日志。
+- “重新检查 / 重试更新”会立即核对卡库和重试缺失文件，继续复用其他有效资源。系统设置 → 资源 → “完整检查资源”会绕过时间缓存、重新计算本地文件哈希并逐项核对，适合手动修复，也会显示进度；完整检查耗时较长。
 
 日志和状态：
 
@@ -86,7 +88,29 @@ docker compose logs -f resources
 curl http://127.0.0.1:18080/api/resources/status
 ```
 
-状态包含 `ready/phase/version`、文件数量、字节数和本轮同步信息。`update` 为当前或最近一次任务，包含 `id/phase/hasUpdates/core/assets/changed/downloadedBytes/active/failed/missing`。使用 `/api/resources/status?language=cn&job=<id>` 可读取对应任务；最近 8 次已结束任务会暂存于服务内存中。
+状态包含 `ready/phase/version`、文件数量、字节数和本轮同步信息。`update` 为当前或最近一次任务，包含 `id/phase/hasUpdates/core/assets/changed/downloadedBytes/active/failed/missing`。`assets.total/completed` 仅计算本轮需要核对或下载的文件，`assets.cached` 为复用的本地文件数。使用 `/api/resources/status?language=cn&job=<id>` 可读取对应任务；最近 8 次已结束任务会暂存于服务内存中。
+
+也可用 `POST /api/resources/check?retry=1` 重试，或 `POST /api/resources/check?full=1` 完整检查。多个页面仍共享任务，运行中的快速检查可升级为完整检查，任务编号保持不变。
+
+## 使用远端哈希清单快速比较差异
+
+准确又快速的检查需要资源发布方提供与当前下载文件对应的哈希清单。设置 `.env` 中的 `NEOS_RESOURCE_MANIFEST_URL` 后，每次打开网页只需条件请求这份清单，在本地比较已保存的 SHA-256，再下载新增或哈希不同的文件。清单覆盖全部资源且没有变化时只需 **1 个上游请求**；无需逐张请求卡图，也不会每次重新读取整套卡图计算哈希。
+
+清单的 JSON 格式如下，哈希必须是实际文件内容的 64 位 SHA-256，文件名与本地资源键相同：
+
+```json
+{
+  "schema": 1,
+  "files": {
+    "images/ygopro-images-zh-CN/46986414.jpg": "实际文件的64位SHA256",
+    "ygopro-database/zh-CN/cards.cdb": "实际文件的64位SHA256"
+  }
+}
+```
+
+该示例中的哈希需替换后才能使用。发布方应先上传资源，再原子发布新清单，尽量支持 ETag 或 Last-Modified；清单中的哈希也用于下载后的校验，CDN 尚未同步或内容错误时保留原文件并报告失败。清单只能为已有资源指定哈希，不能引入其他下载地址，也不会删除本地文件。
+
+**当前默认 CDN 尚未配置经确认可用的统一清单地址。** 不应把游戏安装包版本或本机旧快照当成该 CDN 的实时清单。未配置清单时采用上面的时间缓存；未被清单覆盖的文件也走时间缓存，因此卡图单独修改可能要到下一次复核才发现。清单失效或格式错误时会报告检查不完整并回退，避免把旧清单误当作“远端没有变化”。所有资源索引、缓存和检查程序仍在原项目中，无需新建第二个项目。
 
 ## 开发和配置
 
@@ -99,16 +123,19 @@ npm run dev
 
 开发命令会同时启动资源服务和 Vite，并自动连接。启动前同样需要在本仓库 `.env` 中显式配置 `NEOS_RESOURCE_DATA_DIR`；未配置时不会自动选择目录或开始下载。日志会打印实际使用的绝对路径。只启动前端使用 `npm run dev:frontend`，只启动资源接口使用 `npm run resources:serve`。下载来源和语言配置在本仓库 `resources/upstream.json`。
 
-| 环境变量                                    | 默认值                         | 用途                                           |
-| ------------------------------------------- | ------------------------------ | ---------------------------------------------- |
-| `NEOS_RESOURCE_DATA_DIR`                    | 必填，无默认值                 | 宿主机或 Node 的数据目录                       |
-| `NEOS_RESOURCE_CONCURRENCY`                 | `6`                            | 下载并发，范围 1–16                            |
-| `NEOS_RESOURCE_AUTO_SYNC`                   | `1`                            | `0` 关闭服务启动时同步，网页仍能触发检查       |
-| `NEOS_RESOURCE_OFFLINE`                     | `0`                            | `1` 禁止访问上游，只使用现有数据               |
-| `NEOS_PORT`                                 | `18080`                        | Docker 网页端口                                |
-| `NEOS_RESOURCE_DIR`                         | Docker 中 `/data`              | Node 数据路径兼容变量，优先于 DATA_DIR         |
-| `NEOS_RESOURCE_HOST` / `NEOS_RESOURCE_PORT` | `0.0.0.0` / `8788`             | Node 资源服务监听地址与端口                    |
-| `NEOS_RESOURCE_URL`                         | Docker `http://resources:8788` | 资源代理兼容变量；统一开发命令自动连接本机服务 |
+| 环境变量                                    | 默认值                         | 用途                                             |
+| ------------------------------------------- | ------------------------------ | ------------------------------------------------ |
+| `NEOS_RESOURCE_DATA_DIR`                    | 必填，无默认值                 | 宿主机或 Node 的数据目录                         |
+| `NEOS_RESOURCE_CONCURRENCY`                 | `6`                            | 下载并发，范围 1–16                              |
+| `NEOS_RESOURCE_CHECK_INTERVAL`              | `300`                          | 无清单覆盖的卡库等检查缓存秒数，`0` 每次核对     |
+| `NEOS_RESOURCE_ASSET_CHECK_INTERVAL`        | `86400`                        | 无清单覆盖的卡图、字体复核间隔秒数，`0` 每次核对 |
+| `NEOS_RESOURCE_MANIFEST_URL`                | 空，不启用                     | 对应当前下载源的权威 SHA-256 清单地址            |
+| `NEOS_RESOURCE_AUTO_SYNC`                   | `1`                            | `0` 关闭服务启动时同步，网页仍能触发检查         |
+| `NEOS_RESOURCE_OFFLINE`                     | `0`                            | `1` 禁止访问上游，只使用现有数据                 |
+| `NEOS_PORT`                                 | `18080`                        | Docker 网页端口                                  |
+| `NEOS_RESOURCE_DIR`                         | Docker 中 `/data`              | Node 数据路径兼容变量，优先于 DATA_DIR           |
+| `NEOS_RESOURCE_HOST` / `NEOS_RESOURCE_PORT` | `0.0.0.0` / `8788`             | Node 资源服务监听地址与端口                      |
+| `NEOS_RESOURCE_URL`                         | Docker `http://resources:8788` | 资源代理兼容变量；统一开发命令自动连接本机服务   |
 
 原 `.env` 中的 `NEOS_RESOURCE_NETWORK` 已不再需要。旧的 `http://neos-resources:8788` 地址保留容器网络别名兼容；无需继续运行独立项目。
 

@@ -27,6 +27,7 @@ async function install(
   await installOfflineDuelResources(page);
   let checks = 0,
     polls = 0;
+  const queries: URLSearchParams[] = [];
   const response = (value: ResourceUpdate | null) => ({
     ready: true,
     phase: value?.phase === "complete" ? "idle" : "mirroring",
@@ -35,13 +36,14 @@ async function install(
   });
   await page.route("**/api/resources/check?*", (route) => {
     checks++;
+    queries.push(new URL(route.request().url()).searchParams);
     return route.fulfill({ status: 202, json: response(check()) });
   });
   await page.route("**/api/resources/status?*", (route) => {
     polls++;
     return route.fulfill({ json: response(status()) });
   });
-  return { checks: () => checks, polls: () => polls };
+  return { checks: () => checks, polls: () => polls, queries };
 }
 
 test("a check with no changed resources stays silent and stops polling", async ({
@@ -198,7 +200,7 @@ test("a partial update can retry and still offers refresh when the retry finds e
   page,
 }) => {
   let checks = 0;
-  await install(
+  const traffic = await install(
     page,
     () =>
       ++checks === 1
@@ -232,6 +234,47 @@ test("a partial update can retry and still offers refresh when the retry finds e
     dialog.getByRole("button", { name: "刷新加载新数据" }),
   ).toBeVisible();
   expect(checks).toBe(2);
+  expect(traffic.queries[1].get("retry")).toBe("1");
+  expect(traffic.queries[1].has("full")).toBe(false);
+});
+
+test("settings can run a full check and show completion even when nothing changed", async ({
+  page,
+}) => {
+  let checks = 0;
+  await page.addInitScript(() => localStorage.setItem("language", "cn"));
+  const traffic = await install(page, () =>
+    update({
+      id: ++checks === 1 ? "quick" : "manual",
+      phase: "complete",
+      hasUpdates: false,
+      changed: 0,
+      downloadedBytes: 0,
+      assets: { total: 0, completed: 0, cached: 32000 },
+    }),
+  );
+  await page.goto("/");
+  await expect.poll(traffic.checks).toBe(1);
+  await page.locator("nav .ant-avatar").hover();
+  await page.getByText("系统设置", { exact: true }).click();
+  await page.getByRole("tab", { name: "资源" }).click();
+  await page.getByRole("button", { name: "完整检查资源" }).click();
+  await expect.poll(traffic.checks).toBe(2);
+  expect(traffic.queries[1].get("full")).toBe("1");
+  const dialog = page
+    .getByRole("dialog")
+    .filter({ has: page.getByTestId("resource-update-dialog") });
+  await expect(dialog).toContainText("资源已是最新");
+  await expect(dialog).toContainText("已复用 32,000 项本地资源");
+  await expect(page.getByRole("tab", { name: "资源" })).toHaveCount(0);
+  await expect(
+    dialog.getByRole("button", { name: "刷新加载新数据" }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: "/tmp/neos-full-check-complete.png" });
+  await dialog.getByRole("button", { name: "关闭", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "查看资源更新进度" }),
+  ).toBeVisible();
 });
 
 test("lost progress connection keeps the last counts and can reconnect", async ({

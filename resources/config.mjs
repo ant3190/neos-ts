@@ -74,6 +74,12 @@ export function makeConfig(overrides = {}) {
       1,
       Math.min(16, Number(process.env.NEOS_RESOURCE_CONCURRENCY) || 6),
     ),
+    coreMaxAgeMs: interval("NEOS_RESOURCE_CHECK_INTERVAL", 300),
+    assetMaxAgeMs: interval("NEOS_RESOURCE_ASSET_CHECK_INTERVAL", 86400),
+    manifestUrl:
+      process.env.NEOS_RESOURCE_MANIFEST_URL?.trim() ||
+      sources.manifestUrl ||
+      "",
     timeoutMs: 30_000,
     sources,
     core,
@@ -81,6 +87,14 @@ export function makeConfig(overrides = {}) {
     offline: process.env.NEOS_RESOURCE_OFFLINE === "1",
     ...overrides,
   };
+}
+
+function interval(name, fallback) {
+  const value = process.env[name]?.trim();
+  const seconds = value ? Number(value) : fallback;
+  if (!Number.isFinite(seconds) || seconds < 0)
+    throw new Error(`${name} 必须是大于等于 0 的秒数`);
+  return seconds * 1000;
 }
 
 export const fontFiles = [

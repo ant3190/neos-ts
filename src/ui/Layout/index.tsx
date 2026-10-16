@@ -175,10 +175,12 @@ export const Component = () => {
                       </>
                     ),
                     onClick: () => {
-                      modal.info({
+                      const settings = modal.info({
                         content: (
                           <>
-                            <Setting />
+                            <Setting
+                              onResourceCheck={() => settings.destroy()}
+                            />
                           </>
                         ),
                         centered: true,

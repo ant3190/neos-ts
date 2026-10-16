@@ -47,7 +47,10 @@ export function createResourceServer(manager) {
             return;
           }
           void manager
-            .check()
+            .check({
+              full: url.searchParams.get("full") === "1",
+              retry: url.searchParams.get("retry") === "1",
+            })
             .catch((error) => console.error("Resource check:", error.message));
           json(response, 202, manager.status(url.searchParams.get("language")));
           return;

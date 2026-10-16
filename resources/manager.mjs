@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 
 import { fontFiles, fontSources, localeFor } from "./config.mjs";
+import { manifestKey, parseManifest } from "./manifest.mjs";
 import { cardIds, NotFound, ResourceStore } from "./store.mjs";
 
 export async function parallel(items, limit, run) {
@@ -20,6 +21,25 @@ export class ResourceManager {
   constructor(config) {
     this.config = config;
     this.store = new ResourceStore(config);
+    this.manifest = new Map();
+    this.manifestAsset = config.manifestUrl
+      ? {
+          key: manifestKey,
+          url: config.manifestUrl,
+          kind: "manifest",
+        }
+      : null;
+    if (
+      this.manifestAsset &&
+      this.store.get(manifestKey)?.url === config.manifestUrl &&
+      this.store.has(manifestKey)
+    ) {
+      try {
+        this.manifest = parseManifest(this.store.read(manifestKey));
+      } catch {
+        /* A damaged saved index is replaced on the next check. */
+      }
+    }
     this.update = null;
     this.updateHistory = new Map();
     this.activeDownloads = new Map();
@@ -69,6 +89,8 @@ export class ResourceManager {
     };
   }
   trackDownload(event) {
+    // Index metadata alone does not mean that playable resources changed.
+    if (event.key === manifestKey) return;
     const update = this.update;
     if (!update || !["checking", "syncing"].includes(update.phase)) return;
     if (event.type === "start") {
@@ -89,10 +111,16 @@ export class ResourceManager {
       update.hasUpdates = true;
     } else if (event.type === "end") this.activeDownloads.delete(event.key);
   }
-  async check() {
+  async check({ full = false, retry = false } = {}) {
     if (this.closed || this.config.offline) return;
+    const mode = full ? 2 : retry ? 1 : 0;
     // Pages joining a running synchronization share its ID, counters and downloads.
-    if (this.checkTask) return this.checkTask;
+    if (this.checkTask) {
+      // Escalate the shared job when a page explicitly requests a full check.
+      this.checkMode = Math.max(this.checkMode, mode);
+      return this.checkTask;
+    }
+    this.checkMode = mode;
     this.activeDownloads.clear();
     this.changedKeys.clear();
     this.missingKeys.clear();
@@ -112,12 +140,29 @@ export class ResourceManager {
     };
     this.checkTask = (async () => {
       try {
-        await this.checkCore();
-        this.update.core.completed = this.update.core.total;
-        this.update.phase = "syncing";
-        this.startMirror();
-        // A repair during the scan can schedule another catalogue pass.
-        while (this.mirrorTask) await this.mirrorTask;
+        let firstPass = true;
+        do {
+          const pass = this.checkMode;
+          if (!firstPass) {
+            this.update.failed = 0;
+            this.update.missing = 0;
+            this.update.missingResources = [];
+            this.update.core.completed = 0;
+            this.missingKeys.clear();
+          }
+          firstPass = false;
+          this.update.phase = "checking";
+          const manifestWarning = await this.checkManifest();
+          await this.checkCore({ full: pass > 0 });
+          if (manifestWarning) this.errors.push(manifestWarning);
+          if (pass < this.checkMode) continue;
+          this.update.core.completed = this.update.core.total;
+          this.update.phase = "syncing";
+          this.startMirror({ full: pass === 2, retry: pass > 0 });
+          // A repair during the scan can schedule another catalogue pass.
+          while (this.mirrorTask) await this.mirrorTask;
+          if (pass === this.checkMode) break;
+        } while (!this.closed);
         this.update.phase =
           this.update.failed ||
           this.closed ||
@@ -142,9 +187,35 @@ export class ResourceManager {
     })();
     return this.checkTask;
   }
-  checkCore() {
+  async checkManifest() {
+    if (!this.manifestAsset) return "";
+    try {
+      const result = await this.store.update(this.manifestAsset, {
+        priority: true,
+      });
+      if (result.stale) throw new Error(result.error || "Upstream HTTP 404");
+      this.manifest = parseManifest(this.store.read(manifestKey));
+      return "";
+    } catch (error) {
+      // An unavailable index is never treated as proof that remote files are current.
+      this.manifest.clear();
+      if (this.update) this.update.failed++;
+      console.warn("Resource manifest:", error.message);
+      return "资源清单暂时不可用，已改用逐项定期检查";
+    }
+  }
+  withHash(asset) {
+    const sha256 = this.manifest.get(asset.key);
+    return sha256 ? { ...asset, sha256 } : asset;
+  }
+  checkCore({ full = false } = {}) {
     if (this.config.offline) return Promise.resolve();
-    if (this.coreTask) return this.coreTask;
+    if (this.coreTask) {
+      if (full && !this.coreFull)
+        return this.coreTask.then(() => this.checkCore({ full: true }));
+      return this.coreTask;
+    }
+    this.coreFull = full;
     const report =
       this.update && ["checking", "syncing"].includes(this.update.phase)
         ? this.update
@@ -156,7 +227,11 @@ export class ResourceManager {
         this.config.concurrency,
         async (asset) => {
           try {
-            const result = await this.store.update(asset, { priority: true });
+            const result = await this.store.update(this.withHash(asset), {
+              priority: true,
+              maxAgeMs: full ? 0 : this.config.coreMaxAgeMs,
+              full,
+            });
             if (result.error || result.stale)
               this.errors.push(`${asset.key}: 使用已保存的版本`);
             if (result.stale && report) report.failed++;
@@ -225,7 +300,7 @@ export class ResourceManager {
       ? fontSources(this.store.read(key), this.config.sources.fontsCss)
       : [];
   }
-  startMirror() {
+  startMirror({ full = false, retry = false } = {}) {
     if (this.closed || this.mirrorTask) return;
     this.rescan = false;
     this.mirrorTask = (async () => {
@@ -238,21 +313,36 @@ export class ResourceManager {
         if (this.update) this.update.failed++;
         console.warn(error.message);
       }
-      const assets = [...fonts, ...this.images.values()];
+      const plan = await this.store.plan(
+        [...fonts, ...this.images.values()].map((asset) =>
+          this.withHash(asset),
+        ),
+        {
+          full,
+          retry,
+          maxAgeMs: this.config.assetMaxAgeMs,
+        },
+      );
+      const assets = plan.pending;
       this.progress = {
         total: assets.length,
         completed: 0,
-        missing: 0,
+        missing: plan.missing.length,
         failed: 0,
       };
       if (this.update)
-        this.update.assets = { total: assets.length, completed: 0 };
+        this.update.assets = {
+          total: assets.length,
+          completed: 0,
+          cached: plan.cached,
+        };
+      for (const asset of plan.missing) this.reportMissing(asset);
       let consecutiveFailures = 0,
         interrupted = false;
       await parallel(assets, this.config.concurrency, async (asset) => {
         if (this.closed || interrupted) return;
         try {
-          const result = await this.store.update(asset);
+          const result = await this.store.update(asset, { full });
           if (result.stale) {
             this.progress.failed++;
             consecutiveFailures++;
@@ -267,15 +357,7 @@ export class ResourceManager {
           if (error instanceof NotFound) {
             this.progress.missing++;
             consecutiveFailures = 0;
-            if (this.update && !this.missingKeys.has(asset.key)) {
-              this.missingKeys.add(asset.key);
-              this.update.missing++;
-              if (this.update.missingResources.length < 100)
-                this.update.missingResources.push({
-                  key: asset.key,
-                  kind: asset.kind,
-                });
-            }
+            this.reportMissing(asset);
             console.warn("Upstream resource not found (404):", asset.key);
           } else {
             this.progress.failed++;
@@ -305,8 +387,15 @@ export class ResourceManager {
       })
       .finally(() => {
         this.mirrorTask = undefined;
-        if (this.rescan && !this.closed) this.startMirror();
+        if (this.rescan && !this.closed) this.startMirror({ full, retry });
       });
+  }
+  reportMissing(asset) {
+    if (!this.update || this.missingKeys.has(asset.key)) return;
+    this.missingKeys.add(asset.key);
+    this.update.missing++;
+    if (this.update.missingResources.length < 100)
+      this.update.missingResources.push({ key: asset.key, kind: asset.kind });
   }
   async ensure(key) {
     // Only configured files and actual card IDs can reach an upstream origin.
@@ -333,7 +422,10 @@ export class ResourceManager {
     }
     if (!asset) throw new NotFound(key);
     if (!existsSync(this.store.file(key)))
-      await this.store.update(asset, { priority: true, cached: true });
+      await this.store.update(this.withHash(asset), {
+        priority: true,
+        cached: true,
+      });
     return key;
   }
   async close() {

@@ -13,7 +13,12 @@ import { makeConfig } from "../resources/config.mjs";
 const project = fileURLToPath(new URL("../", import.meta.url));
 
 test("resource data requires an explicit directory and preserves legacy overrides", () => {
-  const names = ["NEOS_RESOURCE_DIR", "NEOS_RESOURCE_DATA_DIR"];
+  const names = [
+    "NEOS_RESOURCE_DIR",
+    "NEOS_RESOURCE_DATA_DIR",
+    "NEOS_RESOURCE_CHECK_INTERVAL",
+    "NEOS_RESOURCE_ASSET_CHECK_INTERVAL",
+  ];
   const original = names.map((name) => process.env[name]);
   try {
     for (const name of names) delete process.env[name];
@@ -22,6 +27,20 @@ test("resource data requires an explicit directory and preserves legacy override
     assert.throws(() => makeConfig(), /NEOS_RESOURCE_DATA_DIR/);
     const explicitRoot = path.join(os.tmpdir(), "neos-configured-data");
     assert.equal(makeConfig({ root: explicitRoot }).root, explicitRoot);
+    assert.equal(makeConfig({ root: explicitRoot }).coreMaxAgeMs, 300_000);
+    assert.equal(makeConfig({ root: explicitRoot }).assetMaxAgeMs, 86400_000);
+    process.env.NEOS_RESOURCE_CHECK_INTERVAL = "0";
+    process.env.NEOS_RESOURCE_ASSET_CHECK_INTERVAL = "3600";
+    assert.equal(makeConfig({ root: explicitRoot }).coreMaxAgeMs, 0);
+    assert.equal(makeConfig({ root: explicitRoot }).assetMaxAgeMs, 3600_000);
+    for (const value of ["-1", "bad", "Infinity"]) {
+      process.env.NEOS_RESOURCE_CHECK_INTERVAL = value;
+      assert.throws(
+        () => makeConfig({ root: explicitRoot }),
+        /NEOS_RESOURCE_CHECK_INTERVAL/,
+      );
+    }
+    delete process.env.NEOS_RESOURCE_CHECK_INTERVAL;
     process.env.NEOS_RESOURCE_DATA_DIR = path.join(
       os.tmpdir(),
       "neos-custom-data",

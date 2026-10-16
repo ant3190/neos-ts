@@ -35,7 +35,7 @@ function missingLabel(key: string, kind: string) {
 }
 
 export function ResourceUpdateDialog() {
-  const { update, connectionError, requesting, reloadAvailable } =
+  const { update, connectionError, requesting, reloadAvailable, openRequest } =
     useSnapshot(resourceUpdates);
   const [open, setOpen] = useState(false);
   const announced = useRef("");
@@ -49,6 +49,10 @@ export function ResourceUpdateDialog() {
       setOpen(true);
     }
   }, [updateFound, updateId]);
+
+  useEffect(() => {
+    if (openRequest) setOpen(true);
+  }, [openRequest]);
 
   if (!update) return null;
   const complete = update.phase === "complete";
@@ -74,11 +78,19 @@ export function ResourceUpdateDialog() {
     : "发现资源更新";
   const transfer = update.active[0];
   const missingResources = update.missingResources || [];
-  const retry = () => void checkResourceUpdates().catch(() => undefined);
+  const retry = () =>
+    void checkResourceUpdates({ retry: true }).catch(() => undefined);
+  const closeLabel = active
+    ? "后台更新"
+    : complete
+    ? reloadAvailable
+      ? "稍后刷新"
+      : "关闭"
+    : "稍后重试";
   const footer = (
     <div className={styles.footer}>
-      <Button onClick={() => setOpen(false)}>
-        {active ? "后台更新" : complete ? "稍后刷新" : "稍后重试"}
+      <Button aria-label={closeLabel} onClick={() => setOpen(false)}>
+        {closeLabel}
       </Button>
       {(partial || connectionError || (complete && update.missing > 0)) && (
         <Button
@@ -124,7 +136,9 @@ export function ResourceUpdateDialog() {
               : complete
               ? update.missing > 0
                 ? "可用资源已保存到本地，部分文件暂未找到，可稍后重新检查。"
-                : "资源已同步到本地。刷新页面后加载新数据，当前对局不会自动刷新。"
+                : reloadAvailable
+                ? "资源已同步到本地。刷新页面后加载新数据，当前对局不会自动刷新。"
+                : "本次检查已完成，当前资源无需更新。"
               : partial
               ? "部分资源暂时无法下载，已保留可用的本地数据，可以稍后重试。"
               : "正在将更新同步到本地，可以收起窗口在后台继续。"}
@@ -151,6 +165,11 @@ export function ResourceUpdateDialog() {
             }
             aria-label="资源处理进度"
           />
+          {update.phase !== "checking" && (update.assets.cached || 0) > 0 && (
+            <p className={styles.note}>
+              已复用 {update.assets.cached?.toLocaleString()} 项本地资源。
+            </p>
+          )}
           <div className={styles.stats}>
             <div>
               <span>已更新</span>
@@ -242,7 +261,7 @@ export function ResourceUpdateDialog() {
         </div>
       </Modal>
       {!open &&
-        (update.hasUpdates || reloadAvailable) &&
+        (update.hasUpdates || reloadAvailable || openRequest > 0) &&
         createPortal(
           <Button
             className={styles.reopen}
@@ -253,7 +272,9 @@ export function ResourceUpdateDialog() {
             {connectionError || partial
               ? "资源更新未完成"
               : complete
-              ? "资源已更新"
+              ? reloadAvailable
+                ? "资源已更新"
+                : "资源检查完成"
               : `资源更新 · ${percent}%`}
           </Button>,
           document.body,
