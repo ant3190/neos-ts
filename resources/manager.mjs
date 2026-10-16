@@ -24,6 +24,7 @@ export class ResourceManager {
     this.updateHistory = new Map();
     this.activeDownloads = new Map();
     this.changedKeys = new Set();
+    this.missingKeys = new Set();
     this.store.onProgress = (event) => this.trackDownload(event);
     this.core = new Map(config.core.map((asset) => [asset.key, asset]));
     this.images = new Map();
@@ -94,6 +95,7 @@ export class ResourceManager {
     if (this.checkTask) return this.checkTask;
     this.activeDownloads.clear();
     this.changedKeys.clear();
+    this.missingKeys.clear();
     this.update = {
       id: randomUUID(),
       phase: "checking",
@@ -106,6 +108,7 @@ export class ResourceManager {
       downloadedBytes: 0,
       failed: 0,
       missing: 0,
+      missingResources: [],
     };
     this.checkTask = (async () => {
       try {
@@ -254,16 +257,31 @@ export class ResourceManager {
             this.progress.failed++;
             consecutiveFailures++;
             if (this.update) this.update.failed++;
+            console.warn(
+              "Resource update failed; kept local file:",
+              asset.key,
+              result.error || "Upstream HTTP 404",
+            );
           } else consecutiveFailures = 0;
         } catch (error) {
           if (error instanceof NotFound) {
             this.progress.missing++;
             consecutiveFailures = 0;
-            if (this.update) this.update.missing++;
+            if (this.update && !this.missingKeys.has(asset.key)) {
+              this.missingKeys.add(asset.key);
+              this.update.missing++;
+              if (this.update.missingResources.length < 100)
+                this.update.missingResources.push({
+                  key: asset.key,
+                  kind: asset.kind,
+                });
+            }
+            console.warn("Upstream resource not found (404):", asset.key);
           } else {
             this.progress.failed++;
             consecutiveFailures++;
             if (this.update) this.update.failed++;
+            console.warn("Resource download failed:", asset.key, error.message);
           }
         } finally {
           this.progress.completed++;

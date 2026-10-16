@@ -10,6 +10,7 @@ export interface ResourceUpdate {
   downloadedBytes: number;
   failed: number;
   missing: number;
+  missingResources?: { key: string; kind: string }[];
   active: { key: string; kind: string; received: number; total: number }[];
 }
 

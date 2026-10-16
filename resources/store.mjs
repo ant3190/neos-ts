@@ -171,9 +171,12 @@ export class ResourceStore {
       : asset.url;
     const preferred =
       canUseFallback && this.setting("preferredCdn") === fallback;
-    const urls = preferred
-      ? [alternative, asset.url]
-      : [asset.url, alternative];
+    const urls = [
+      ...new Set(
+        preferred ? [alternative, asset.url] : [asset.url, alternative],
+      ),
+    ];
+    const notFound = new Set();
     let lastError;
     for (let attempt = 0; attempt < 2; attempt++) {
       if (this.abort.signal.aborted) throw this.abort.signal.reason;
@@ -182,14 +185,21 @@ export class ResourceStore {
           this.abort.signal,
           AbortSignal.timeout(this.config.timeoutMs),
         ]);
-        const response = await fetch(urls[attempt], { headers, signal });
-        if ([304, 404].includes(response.status)) {
+        const url = urls[attempt % urls.length];
+        const response = await fetch(url, { headers, signal });
+        if (response.status === 404) {
+          await response.body?.cancel();
+          notFound.add(url);
+          // A single CDN can lag behind. Only classify a missing resource
+          // when every configured origin has actually returned 404.
+          if (notFound.size === urls.length)
+            return { response, bytes: undefined };
+          continue;
+        }
+        if (response.status === 304) {
           await response.body?.cancel();
           if (canUseFallback)
-            this.setting(
-              "preferredCdn",
-              urls[attempt] === alternative ? fallback : "",
-            );
+            this.setting("preferredCdn", url === alternative ? fallback : "");
           return { response, bytes: undefined };
         }
         if (!response.ok) {
@@ -240,10 +250,7 @@ export class ResourceStore {
           throw error;
         }
         if (canUseFallback)
-          this.setting(
-            "preferredCdn",
-            urls[attempt] === alternative ? fallback : "",
-          );
+          this.setting("preferredCdn", url === alternative ? fallback : "");
         return { response, bytes };
       } catch (error) {
         lastError = error;
@@ -333,6 +340,11 @@ export class ResourceStore {
     } catch (error) {
       if (this.has(asset.key) && !this.abort.signal.aborted)
         return { changed: false, stale: true, error: error.message };
+      // An inconclusive check must not leave an old 404 suppressing retries.
+      if (!(error instanceof NotFound))
+        this.db
+          .prepare("DELETE FROM resources WHERE key=? AND status=404")
+          .run(asset.key);
       throw error;
     } finally {
       await rm(temporary, { force: true });

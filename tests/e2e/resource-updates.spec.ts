@@ -275,6 +275,10 @@ test("update window stays readable and inside a narrow viewport with reduced mot
       phase: "partial",
       failed: 30,
       missing: 1200,
+      missingResources: Array.from({ length: 10 }, (_, i) => ({
+        kind: "image",
+        key: `images/ygopro-images-zh-CN/${46986414 + i}.jpg`,
+      })),
       assets: { total: 32000, completed: 20000 },
     }),
   );
@@ -287,4 +291,43 @@ test("update window stays readable and inside a narrow viewport with reduced mot
   expect(box!.y + box!.height).toBeLessThanOrEqual(680);
   await expect(dialog.getByRole("button", { name: "重试更新" })).toBeVisible();
   await page.screenshot({ path: "/tmp/neos-update-modal-mobile.png" });
+});
+
+test("completed updates identify missing files and offer rechecking without hiding refresh", async ({
+  page,
+}) => {
+  let checks = 0;
+  await install(page, () =>
+    ++checks === 1
+      ? update({
+          phase: "complete",
+          missing: 1,
+          assets: { total: 100, completed: 100 },
+          missingResources: [
+            { kind: "image", key: "images/ygopro-images-zh-CN/46986414.jpg" },
+          ],
+        })
+      : update({
+          id: "repaired",
+          phase: "complete",
+          assets: { total: 100, completed: 100 },
+        }),
+  );
+  await page.goto("/");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("资源同步完成，部分文件缺失");
+  const missing = dialog.getByTestId("resource-update-missing");
+  await expect(missing).toContainText("1 项资源暂未找到（404）");
+  await expect(missing).toContainText("中文卡图 · 卡号 46986414");
+  await expect(missing).toContainText(
+    "images/ygopro-images-zh-CN/46986414.jpg",
+  );
+  await expect(
+    dialog.getByRole("button", { name: "刷新加载新数据" }),
+  ).toBeVisible();
+  await page.screenshot({ path: "/tmp/neos-update-missing-desktop.png" });
+  await dialog.getByRole("button", { name: "重新检查", exact: true }).click();
+  await expect(missing).toHaveCount(0);
+  await expect(dialog).toContainText("资源更新完成");
+  expect(checks).toBe(2);
 });

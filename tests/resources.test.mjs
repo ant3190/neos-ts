@@ -295,11 +295,15 @@ test("full synchronization covers both image languages, prerelease cards and fon
 });
 
 test("missing source art is reported without losing other resources or repeatedly fetching on demand", async (t) => {
-  const { manager, files, requests } = await managerFixture(t);
+  const { manager, files, requests, set } = await managerFixture(t);
   files.delete("/pics/zh-CN/102.jpg");
   await manager.check();
   await manager.mirrorTask;
   assert.equal(manager.progress.missing, 1);
+  const missingJob = manager.status().update;
+  assert.deepEqual(missingJob.missingResources, [
+    { key: "images/ygopro-images-zh-CN/102.jpg", kind: "image" },
+  ]);
   assert.equal(manager.store.has("images/ygopro-images-en-US/201.jpg"), true);
   const count = requests.length;
   await assert.rejects(
@@ -307,6 +311,95 @@ test("missing source art is reported without losing other resources or repeatedl
     NotFound,
   );
   assert.equal(requests.length, count);
+  set("/pics/zh-CN/102.jpg", Buffer.from([255, 216, 255, 102, 255, 217]));
+  await manager.check();
+  assert.equal(manager.status().update.missing, 0);
+  assert.deepEqual(manager.status().update.missingResources, []);
+  assert.equal(manager.store.has("images/ygopro-images-zh-CN/102.jpg"), true);
+  assert.deepEqual(
+    manager.status("cn", missingJob.id).update.missingResources,
+    missingJob.missingResources,
+  );
+});
+
+async function cdnFixture(t) {
+  const f = await fixture(t);
+  const config = {
+    ...f.config,
+    sources: { ...f.config.sources, fallbackBase: "https://backup.example" },
+  };
+  const store = new ResourceStore(config);
+  t.after(() => store.close());
+  const realFetch = globalThis.fetch;
+  t.mock.method(globalThis, "fetch", (input, options) => {
+    const url = new URL(input);
+    if (url.hostname === "cdn02.moecube.com")
+      return realFetch(`${f.base}/primary${url.pathname}`, options);
+    if (url.hostname === "backup.example")
+      return realFetch(`${f.base}/backup${url.pathname}`, options);
+    return realFetch(input, options);
+  });
+  return {
+    ...f,
+    store,
+    asset: {
+      key: "strings.conf",
+      url: "https://cdn02.moecube.com:444/strings.conf",
+      kind: "strings",
+    },
+  };
+}
+
+test("a primary CDN 404 uses the backup, and a preferred backup 404 uses the primary", async (t) => {
+  const f = await cdnFixture(t);
+  f.set("/backup/strings.conf", "!system 1 Backup\n");
+  assert.equal((await f.store.update(f.asset)).changed, true);
+  assert.equal(f.store.get(f.asset.key).status, 200);
+  assert.equal(f.store.setting("preferredCdn"), "https://backup.example");
+  assert.deepEqual(
+    f.requests.map((request) => request.url),
+    ["/primary/strings.conf", "/backup/strings.conf"],
+  );
+  f.files.delete("/backup/strings.conf");
+  f.set("/primary/strings.conf", "!system 1 Primary\n");
+  assert.equal((await f.store.update(f.asset)).changed, true);
+  assert.equal(f.store.read(f.asset.key), "!system 1 Primary\n");
+  assert.equal(f.store.setting("preferredCdn"), "");
+  assert.deepEqual(
+    f.requests.slice(2).map((request) => request.url),
+    ["/backup/strings.conf", "/primary/strings.conf"],
+  );
+});
+
+test("only a 404 from every CDN creates a negative cache entry", async (t) => {
+  const f = await cdnFixture(t);
+  await assert.rejects(f.store.update(f.asset), NotFound);
+  assert.equal(f.store.get(f.asset.key).status, 404);
+  assert.equal(f.requests.length, 2);
+  await assert.rejects(f.store.update(f.asset, { cached: true }), NotFound);
+  assert.equal(f.requests.length, 2);
+  f.set("/backup/strings.conf", "!system 1 Now available\n");
+  assert.equal((await f.store.update(f.asset)).changed, true);
+  assert.equal(f.store.get(f.asset.key).status, 200);
+});
+
+test("one CDN 404 and another CDN failure remain a download failure in either order", async (t) => {
+  const f = await cdnFixture(t);
+  await assert.rejects(f.store.update(f.asset), NotFound);
+  assert.equal(f.store.get(f.asset.key).status, 404);
+  for (const [primary, backup] of [
+    [404, 503],
+    [503, 404],
+  ]) {
+    f.set("/primary/strings.conf", "", { status: primary });
+    f.set("/backup/strings.conf", "", { status: backup });
+    await assert.rejects(
+      f.store.update(f.asset),
+      (error) => !(error instanceof NotFound) && /503/.test(error.message),
+    );
+    assert.equal(f.store.get(f.asset.key), undefined);
+  }
+  assert.equal(f.requests.length, 6);
 });
 
 test("offline refresh and process restart can serve saved resources without contacting the upstream", async (t) => {

@@ -23,6 +23,17 @@ const labels: Record<string, string> = {
   image: "卡图",
 };
 
+function missingLabel(key: string, kind: string) {
+  const id = key.match(/\/(\d+)\.(?:jpg|png|webp)$/)?.[1];
+  if (kind !== "image" || !id) return labels[kind] || "资源";
+  const language = key.includes("ygopro-images-zh-CN/")
+    ? "中文卡图"
+    : key.includes("ygopro-images-en-US/")
+    ? "英文卡图"
+    : "先行卡图";
+  return `${language} · 卡号 ${id}`;
+}
+
 export function ResourceUpdateDialog() {
   const { update, connectionError, requesting, reloadAvailable } =
     useSnapshot(resourceUpdates);
@@ -53,28 +64,42 @@ export function ResourceUpdateDialog() {
   const title = connectionError
     ? "资源更新进度"
     : complete
-    ? reloadAvailable
+    ? update.missing > 0
+      ? "资源同步完成，部分文件缺失"
+      : reloadAvailable
       ? "资源更新完成"
       : "资源已是最新"
     : partial
     ? "部分资源更新失败"
     : "发现资源更新";
   const transfer = update.active[0];
+  const missingResources = update.missingResources || [];
   const retry = () => void checkResourceUpdates().catch(() => undefined);
   const footer = (
     <div className={styles.footer}>
       <Button onClick={() => setOpen(false)}>
         {active ? "后台更新" : complete ? "稍后刷新" : "稍后重试"}
       </Button>
-      {partial || connectionError ? (
-        <Button type="primary" loading={requesting} onClick={retry}>
-          {connectionError ? "重新检查" : "重试更新"}
+      {(partial || connectionError || (complete && update.missing > 0)) && (
+        <Button
+          type={
+            complete && reloadAvailable && !connectionError
+              ? "default"
+              : "primary"
+          }
+          loading={requesting}
+          onClick={retry}
+        >
+          {connectionError || (complete && update.missing > 0)
+            ? "重新检查"
+            : "重试更新"}
         </Button>
-      ) : complete && reloadAvailable ? (
+      )}
+      {complete && reloadAvailable && !connectionError && (
         <Button type="primary" onClick={() => window.location.reload()}>
           刷新加载新数据
         </Button>
-      ) : null}
+      )}
     </div>
   );
 
@@ -97,7 +122,9 @@ export function ResourceUpdateDialog() {
             {connectionError
               ? "暂时无法获取最新进度，可重新检查或继续使用已保存的资源。"
               : complete
-              ? "资源已同步到本地。刷新页面后加载新数据，当前对局不会自动刷新。"
+              ? update.missing > 0
+                ? "可用资源已保存到本地，部分文件暂未找到，可稍后重新检查。"
+                : "资源已同步到本地。刷新页面后加载新数据，当前对局不会自动刷新。"
               : partial
               ? "部分资源暂时无法下载，已保留可用的本地数据，可以稍后重试。"
               : "正在将更新同步到本地，可以收起窗口在后台继续。"}
@@ -170,10 +197,32 @@ export function ResourceUpdateDialog() {
             </div>
           )}
           {update.missing > 0 && (
-            <p className={styles.note}>
-              有 {update.missing.toLocaleString()}{" "}
-              项上游暂未提供的资源，已跳过。
-            </p>
+            <div
+              className={styles.missing}
+              data-testid="resource-update-missing"
+            >
+              <p>
+                有 {update.missing.toLocaleString()}{" "}
+                项资源暂未找到（404），详情如下。
+              </p>
+              {missingResources.length > 0 && (
+                <ul tabIndex={0} aria-label="缺失资源列表">
+                  {missingResources.map((asset) => (
+                    <li key={asset.key}>
+                      <span>{missingLabel(asset.key, asset.kind)}</span>
+                      <code>{asset.key}</code>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {update.missing > missingResources.length &&
+                missingResources.length > 0 && (
+                  <p className={styles.note}>
+                    另有 {update.missing - missingResources.length}{" "}
+                    项未在列表中显示，可在服务日志中查看。
+                  </p>
+                )}
+            </div>
           )}
           {partial && (
             <Alert
