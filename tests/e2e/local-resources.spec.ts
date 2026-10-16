@@ -7,10 +7,13 @@ test("each page load checks updates and all card data and images use the local o
 }) => {
   await installOfflineDuelResources(page);
   const checks: string[] = [],
-    assets: string[] = [];
+    assets: string[] = [],
+    setups: string[] = [];
   page.on("request", (request) => {
     if (request.url().includes("/api/resources/check"))
       checks.push(request.method());
+    if (request.url().includes("/api/resources/setup"))
+      setups.push(request.method());
     if (/\.(cdb|conf|ttf|jpg)(\?|$)|test-release-v2\.json/.test(request.url()))
       assets.push(request.url());
   });
@@ -27,6 +30,8 @@ test("each page load checks updates and all card data and images use the local o
       (await import("/src/stores/index.ts")).initStore.resources.ready,
   );
   expect(checks).toEqual(["POST", "POST"]);
+  expect(setups).toEqual([]);
+  await expect(page.getByTestId("resource-storage-setup")).toHaveCount(0);
   const origin = new URL(page.url()).origin;
   expect(assets.length).toBeGreaterThan(5);
   expect(assets.every((url) => new URL(url).origin === origin)).toBe(true);

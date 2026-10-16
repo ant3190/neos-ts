@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -12,14 +12,14 @@ import { makeConfig } from "../resources/config.mjs";
 
 const project = fileURLToPath(new URL("../", import.meta.url));
 
-test("resource data has a first-run suggestion and preserves legacy overrides", () => {
+test("resource data requires an explicit directory and preserves legacy overrides", () => {
   const names = ["NEOS_RESOURCE_DIR", "NEOS_RESOURCE_DATA_DIR"];
   const original = names.map((name) => process.env[name]);
   try {
     for (const name of names) delete process.env[name];
-    assert.equal(makeConfig().root, path.resolve(project, "../neos-data"));
+    assert.throws(() => makeConfig(), /NEOS_RESOURCE_DATA_DIR/);
     process.env.NEOS_RESOURCE_DATA_DIR = "  ";
-    assert.equal(makeConfig().root, path.resolve(project, "../neos-data"));
+    assert.throws(() => makeConfig(), /NEOS_RESOURCE_DATA_DIR/);
     const explicitRoot = path.join(os.tmpdir(), "neos-configured-data");
     assert.equal(makeConfig({ root: explicitRoot }).root, explicitRoot);
     process.env.NEOS_RESOURCE_DATA_DIR = path.join(
@@ -42,6 +42,14 @@ test(
   { timeout: 30000 },
   async (t) => {
     const root = mkdtempSync(path.join(os.tmpdir(), "neos-external-data-"));
+    const oldConfig = mkdtempSync(
+      path.join(os.tmpdir(), "neos-obsolete-config-"),
+    );
+    const obsoleteRoot = path.join(oldConfig, "unused-data");
+    writeFileSync(
+      path.join(oldConfig, "storage.json"),
+      JSON.stringify({ version: 1, directory: obsoleteRoot }),
+    );
     const reserve = createServer();
     await new Promise((resolve) => reserve.listen(0, "127.0.0.1", resolve));
     const port = reserve.address().port;
@@ -62,12 +70,7 @@ test(
           ...process.env,
           NEOS_RESOURCE_DIR: "",
           NEOS_RESOURCE_DATA_DIR: root,
-          NEOS_RESOURCE_CONFIG_DIR: path.join(
-            root,
-            "../",
-            path.basename(root) + "-config",
-          ),
-          NEOS_RESOURCE_STORAGE_BASE: "",
+          NEOS_RESOURCE_CONFIG_DIR: oldConfig,
           NEOS_RESOURCE_PORT: "0",
           NEOS_RESOURCE_HOST: "127.0.0.1",
           NEOS_RESOURCE_AUTO_SYNC: "0",
@@ -93,10 +96,7 @@ test(
         clearTimeout(limit);
       }
       rmSync(root, { recursive: true, force: true });
-      rmSync(path.join(root, "../", path.basename(root) + "-config"), {
-        recursive: true,
-        force: true,
-      });
+      rmSync(oldConfig, { recursive: true, force: true });
     });
     let status;
     const deadline = Date.now() + 15000;
@@ -116,24 +116,19 @@ test(
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     assert.ok(status, output);
-    assert.equal(status.phase, "setup");
-    assert.equal(status.setupRequired, true);
-    assert.equal(existsSync(path.join(root, "state.sqlite")), false);
-    const setup = await fetch(`http://127.0.0.1:${port}/api/resources/setup`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ directory: root }),
-    });
-    assert.equal(setup.status, 200);
-    assert.equal((await setup.json()).directory, root);
-    status = await (
-      await fetch(`http://127.0.0.1:${port}/api/resources/status`)
-    ).json();
+    assert.ok(output.includes(`Resource data directory: ${root}`), output);
     assert.equal(status.phase, "idle");
     assert.equal(status.update, null);
     assert.equal(status.ready, false);
     assert.ok(existsSync(path.join(root, "state.sqlite")));
     assert.ok(existsSync(path.join(root, "files")));
+    assert.equal(existsSync(obsoleteRoot), false);
+    const setupUrl = `http://127.0.0.1:${port}/api/resources/setup`;
+    for (const method of ["GET", "POST"]) {
+      const removedSetup = await fetch(setupUrl, { method });
+      assert.equal(removedSetup.status, 404);
+      await removedSetup.text();
+    }
     const check = await fetch(
       `http://127.0.0.1:${port}/api/resources/check?language=cn`,
       { method: "POST" },

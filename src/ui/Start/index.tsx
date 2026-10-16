@@ -7,7 +7,6 @@ import { getSSOSignInUrl } from "@/api";
 import { useConfig } from "@/config";
 import { AudioActionType, changeScene } from "@/infra/audio";
 import { accountStore, initStore } from "@/stores";
-import { resourceStorage } from "@/ui/Layout/resourceStorage";
 import { Background, Loading, SpecialButton } from "@/ui/Shared";
 
 import styles from "./index.module.scss";
@@ -25,7 +24,6 @@ export const Component: React.FC = () => {
   const { user } = useSnapshot(accountStore);
   const { progress } = useSnapshot(initStore.sqlite);
   const resources = useSnapshot(initStore.resources);
-  const storage = useSnapshot(resourceStorage);
   return (
     <>
       <Background />
@@ -61,11 +59,7 @@ export const Component: React.FC = () => {
           >
             <Loading progress={progress * 100} />
             <p>
-              {storage.status?.configured === false
-                ? "请先设置数据存储目录"
-                : resources.error
-                ? "等待重试"
-                : "正在准备本地资源并检查更新…"}
+              {resources.error ? "等待重试" : "正在准备本地资源并检查更新…"}
             </p>
           </div>
         )}

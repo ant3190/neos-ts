@@ -53,8 +53,8 @@ body {
   left: 0;
   right: 0;
   font-family: var(--theme-font);
-  --theme-font: sans-serif;
-  --nato-serif-font: serif;
+  --theme-font: "Electrolize", sans-serif;
+  --nato-serif-font: "Noto Serif SC", serif;
   --header-height: 3.5rem;
   #root {
     position: fixed;
@@ -67,12 +67,6 @@ body {
     transform-origin: center center;
     will-change: transform;
   }
-}
-
-/* Fonts are requested only after first-run storage has been confirmed. */
-html[data-resource-storage-ready="true"] body {
-  --theme-font: "Electrolize", sans-serif;
-  --nato-serif-font: "Noto Serif SC", serif;
 }
 
 img {

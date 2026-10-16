@@ -4,7 +4,13 @@
 
 ## 部署
 
-直接在 neos-ts 目录运行，无需先创建或编辑 `.env`：
+先在 neos-ts 的 `.env` 中显式设置数据目录。首次部署可参考 `.env.example`，已有 `.env` 直接编辑：
+
+```dotenv
+NEOS_RESOURCE_DATA_DIR=/mnt/data/neos-data
+```
+
+该项必填，无默认目录；未设置或留空时，Docker Compose 和本地资源服务都会提示并停止启动。然后只在 neos-ts 目录运行：
 
 ```bash
 git switch feat/mdpro3-duel-parity
@@ -14,21 +20,11 @@ docker compose up --build -d --remove-orphans
 
 同一个 Compose 项目会启动前端和资源服务。网页仍为 `http://服务器IP:18080`，资源服务仅在内部网络提供接口，不需要单独克隆、启动或更新 neos-resources 项目，也不需要预先创建外部 Docker 网络。
 
-## 首次打开网页设置
-
-1. 打开网页，弹出“首次设置 · 数据存储”。服务在确认前保持待配置状态，不会下载卡库、卡图或字体。
-2. 填写数据存储目录，点击“保存并开始下载”。Docker 下可填 `/data` 或其子目录，例如 `/data/cards`；Node 直接运行时填写运行 Neos 的设备上的绝对路径，例如 `/mnt/data/neos-data`。
-3. 服务验证目录和写入权限，保存设置后接续资源同步与进度弹窗。目录不可用时会在原窗口提示，可修改后重试，不丢失填写内容。
-
-数据保存在**部署 Neos 的设备**上，访问该服务的所有页面共用，并非每个访问者的电脑。设置持久化保存，刷新页面或重启、重建容器不需要重填。系统设置的“资源存储”页可查看当前目录。
-
-确认后优先下载必要卡库，再在后台同步全量卡图。数据目录建议预留 4 GB；浏览器只加载实际使用的资源。
+首次启动会优先下载必要卡库，再在后台同步全量卡图。数据目录建议预留 4 GB；浏览器只加载实际使用的资源。
 
 ## 数据放在哪里
 
-Docker 默认将仓库同级的 `../neos-data` 挂载为资源容器中的 `/data`。例如代码在 `/srv/neos-ts`，首次设置选择 `/data/cards`，实际数据就在宿主机 `/srv/neos-data/cards`。仅启动服务会创建挂载点，确认网页设置后才创建卡库和同步元数据。
-
-首次设置单独保存在宿主机 `../neos-config/storage.json`（容器内 `/config/storage.json`），不进入 Git 或镜像。Node 直接运行也默认使用仓库同级的 `../neos-config` 保存设置。
+数据位置完全由 **`NEOS_RESOURCE_DATA_DIR`** 决定。例如设为 `/mnt/data/neos-data`，所有数据就在该宿主机目录。Docker 会自动创建所选目录，并挂载到资源容器的 `/data`；资源服务启动日志会打印容器内的数据路径，宿主机路径可通过 `docker compose config` 查看：
 
 | 宿主机数据目录内容 | 用途                                         |
 | ------------------ | -------------------------------------------- |
@@ -36,17 +32,28 @@ Docker 默认将仓库同级的 `../neos-data` 挂载为资源容器中的 `/dat
 | `state.sqlite`     | 上游校验标记、文件哈希、检查时间等同步元数据 |
 | `work/`            | 临时下载文件                                 |
 
-### Docker 使用其他磁盘（可选）
-
-网页只能访问已经挂载进容器的目录，无法直接访问宿主机的未挂载磁盘。默认部署不需要 `.env`；如需换一块宿主机磁盘，可选设置挂载根目录后重建容器：
+要换到其他目录或磁盘，修改本仓库 `.env` 中的路径：
 
 ```dotenv
 NEOS_RESOURCE_DATA_DIR=/mnt/data/neos-data
 ```
 
-容器内仍使用 `/data`，首次网页设置仍然在 `/data` 下选择实际数据目录。该可选变量只控制 Docker 的宿主机挂载，不会绕过网页确认。已有数据时，先停止资源服务并完整复制旧挂载目录内容，再更换挂载；保留 `neos-config` 后，容器内相同路径会继续复用数据。
+路径可以是仓库外的相对路径，也可以是绝对路径。更换路径前先停止资源服务并将旧数据完整复制到新位置，再启动；否则空目录会触发首次同步。
 
-重建镜像、重启、`docker compose down` 甚至 `down -v` 都不会删除这两个宿主机目录。备份时先运行 `docker compose stop resources`，完整复制数据目录和 `neos-config` 配置目录，再运行 `docker compose start resources`。
+重建镜像、重启、`docker compose down` 甚至 `down -v` 都不会删除这个宿主机目录。备份时先运行 `docker compose stop resources`，完整复制数据目录，再运行 `docker compose start resources`。
+
+## 从网页目录设置切换到 .env
+
+数据路径统一由本仓库 `.env` 决定。网页目录设置、设置接口和 `/config` 挂载已移除；服务不再读取 `neos-config/storage.json`，也不会创建 `neos-config` 目录。原 `.env` 中的 `NEOS_RESOURCE_CONFIG_DIR` 和 `NEOS_RESOURCE_STORAGE_BASE` 可以移除。
+
+复用已有数据时，将 `NEOS_RESOURCE_DATA_DIR` 直接指向包含 `files/` 和 `state.sqlite` 的宿主机目录。假设原 Docker 数据挂载根为 `/mnt/data/neos-data`：
+
+| 原网页选择的路径 | 新 `.env` 中的 `NEOS_RESOURCE_DATA_DIR` |
+| ---------------- | --------------------------------------- |
+| `/data`          | `/mnt/data/neos-data`                   |
+| `/data/cards`    | `/mnt/data/neos-data/cards`             |
+
+原网页选择可以从旧配置目录里的 `storage.json` 的 `directory` 字段查看。Node 直接运行时，将该字段中的绝对路径原样写入 `.env` 即可。设置正确的原数据路径后重建容器，旧卡图、卡库和同步标记会继续复用，无需移动或重新下载相同文件。旧配置目录会留在宿主机，程序不再使用它。
 
 ## 从之前的独立资源项目迁回
 
@@ -58,9 +65,9 @@ mkdir -p /srv/neos-data
 docker compose cp resources:/data/. /srv/neos-data/
 ```
 
-如果代码位于 `/srv/neos-ts`，上述数据目录正好是默认挂载位置。其他位置可按上文调整挂载。按单项目命令启动后，在首次网页设置中选择 `/data`，新服务就会复用其中的 `files/` 和 `state.sqlite`，无需重新下载相同内容。保持旧资源服务停止，避免两套服务同时操作同一份数据。后续只更新和部署 neos-ts。
+然后在 neos-ts 的 `.env` 设置 `NEOS_RESOURCE_DATA_DIR=/srv/neos-data`，按上面的单项目命令启动。复制完整的 `files/` 和 `state.sqlite` 后，新服务会复用卡图及同步标记，无需重新下载。保持旧资源服务停止，避免两套服务同时操作同一份数据。后续只更新和部署 neos-ts。
 
-若更早使用的是 neos-ts 内置命名卷，同样先停止旧资源容器并复制 `/data` 的完整内容，再切换配置。若此前已用 `.env` 指定 Docker 数据盘，原挂载路径会继续兼容；首次网页设置中选择 `/data` 即可确认复用。Node 直接运行时在网页填写原数据目录；原数据还在仓库内时先停止服务并将整个目录移到仓库外。
+若更早使用的是 neos-ts 内置命名卷，同样先停止旧资源容器并执行 `docker compose cp resources:/data/. /srv/neos-data/`，再切换配置。若使用 Node 直接运行，原数据已在仓库外时可将 `NEOS_RESOURCE_DATA_DIR` 指向原目录；原数据还在仓库内时，先停止服务并将整个数据目录移到仓库外，再设置新路径。
 
 ## 自动更新和进度弹窗
 
@@ -78,9 +85,7 @@ docker compose logs -f resources
 curl http://127.0.0.1:18080/api/resources/status
 ```
 
-状态包含 `ready/phase/version`、文件数量、字节数和本轮同步信息。未完成首次设置时 `phase=setup`、`setupRequired=true`，下载和检查接口返回 428，不产生上游请求。`GET /api/resources/setup` 读取存储设置；`POST /api/resources/setup` 以 JSON `{ "directory": "/data/cards" }` 完成首次设置，保存后不会接受其他页面改写为不同目录。
-
-`update` 为当前或最近一次任务，包含 `id/phase/hasUpdates/core/assets/changed/downloadedBytes/active/failed/missing`。使用 `/api/resources/status?language=cn&job=<id>` 可读取对应任务；最近 8 次已结束任务会暂存于服务内存中。
+状态包含 `ready/phase/version`、文件数量、字节数和本轮同步信息。`update` 为当前或最近一次任务，包含 `id/phase/hasUpdates/core/assets/changed/downloadedBytes/active/failed/missing`。使用 `/api/resources/status?language=cn&job=<id>` 可读取对应任务；最近 8 次已结束任务会暂存于服务内存中。
 
 ## 开发和配置
 
@@ -91,20 +96,18 @@ npm ci
 npm run dev
 ```
 
-开发命令会同时启动资源服务和 Vite，并自动连接。首次打开网页填写仓库外的数据目录后才开始下载。无需先填写 `.env`；如已有旧路径变量，仅作为首次设置的预填建议，仍需网页确认。日志会打印实际使用的绝对路径。只启动前端使用 `npm run dev:frontend`，只启动资源接口使用 `npm run resources:serve`。下载来源和语言配置在本仓库 `resources/upstream.json`。
+开发命令会同时启动资源服务和 Vite，并自动连接。启动前同样需要在本仓库 `.env` 中显式配置 `NEOS_RESOURCE_DATA_DIR`；未配置时不会自动选择目录或开始下载。日志会打印实际使用的绝对路径。只启动前端使用 `npm run dev:frontend`，只启动资源接口使用 `npm run resources:serve`。下载来源和语言配置在本仓库 `resources/upstream.json`。
 
-| 环境变量                                    | 默认值                         | 用途                                              |
-| ------------------------------------------- | ------------------------------ | ------------------------------------------------- |
-| `NEOS_RESOURCE_DATA_DIR`                    | Docker `../neos-data`          | 可选宿主机挂载根；Node 下作为首次设置的目录建议   |
-| `NEOS_RESOURCE_CONFIG_DIR`                  | `../neos-config`               | 首次设置的持久化配置目录；Docker 容器内 `/config` |
-| `NEOS_RESOURCE_STORAGE_BASE`                | Docker `/data`，Node 不限制    | 网页可选目录范围；Docker 挂载边界                 |
-| `NEOS_RESOURCE_CONCURRENCY`                 | `6`                            | 下载并发，范围 1–16                               |
-| `NEOS_RESOURCE_AUTO_SYNC`                   | `1`                            | 已确认存储后自动同步；`0` 仅由网页触发检查        |
-| `NEOS_RESOURCE_OFFLINE`                     | `0`                            | `1` 禁止访问上游，只使用现有数据                  |
-| `NEOS_PORT`                                 | `18080`                        | Docker 网页端口                                   |
-| `NEOS_RESOURCE_DIR`                         | Docker 中 `/data`              | 首次设置的目录建议兼容变量，优先于 DATA_DIR       |
-| `NEOS_RESOURCE_HOST` / `NEOS_RESOURCE_PORT` | `0.0.0.0` / `8788`             | Node 资源服务监听地址与端口                       |
-| `NEOS_RESOURCE_URL`                         | Docker `http://resources:8788` | 资源代理兼容变量；统一开发命令自动连接本机服务    |
+| 环境变量                                    | 默认值                         | 用途                                           |
+| ------------------------------------------- | ------------------------------ | ---------------------------------------------- |
+| `NEOS_RESOURCE_DATA_DIR`                    | 必填，无默认值                 | 宿主机或 Node 的数据目录                       |
+| `NEOS_RESOURCE_CONCURRENCY`                 | `6`                            | 下载并发，范围 1–16                            |
+| `NEOS_RESOURCE_AUTO_SYNC`                   | `1`                            | `0` 关闭服务启动时同步，网页仍能触发检查       |
+| `NEOS_RESOURCE_OFFLINE`                     | `0`                            | `1` 禁止访问上游，只使用现有数据               |
+| `NEOS_PORT`                                 | `18080`                        | Docker 网页端口                                |
+| `NEOS_RESOURCE_DIR`                         | Docker 中 `/data`              | Node 数据路径兼容变量，优先于 DATA_DIR         |
+| `NEOS_RESOURCE_HOST` / `NEOS_RESOURCE_PORT` | `0.0.0.0` / `8788`             | Node 资源服务监听地址与端口                    |
+| `NEOS_RESOURCE_URL`                         | Docker `http://resources:8788` | 资源代理兼容变量；统一开发命令自动连接本机服务 |
 
 原 `.env` 中的 `NEOS_RESOURCE_NETWORK` 已不再需要。旧的 `http://neos-resources:8788` 地址保留容器网络别名兼容；无需继续运行独立项目。
 
@@ -115,7 +118,7 @@ npm run test:resources
 npx tsc --noEmit
 npm run lint
 npm run build
-npm run test:e2e -- tests/e2e/local-resources.spec.ts tests/e2e/resource-updates.spec.ts tests/e2e/resource-storage.spec.ts --workers=1
+npm run test:e2e -- tests/e2e/local-resources.spec.ts tests/e2e/resource-updates.spec.ts --workers=1
 ```
 
-默认浏览器测试通过模拟资源接口验证交互；内置资源服务使用离线模式，测试数据和配置分别指向系统临时目录中的 `neos-ts-e2e-resources` 和 `neos-ts-e2e-config`，不会下载完整卡图库或使用正式数据。实时测试可通过 `PLAYWRIGHT_LIVE=1` 启用实际资源连接，需要先在网页完成存储设置。
+默认浏览器测试通过模拟资源接口验证交互；内置资源服务使用离线模式，测试数据显式写入系统临时目录中的 `neos-ts-e2e-resources`，不会下载完整卡图库或使用配置的正式数据。实时测试可通过 `PLAYWRIGHT_LIVE=1` 启用实际资源连接，并需要配置正式数据目录。

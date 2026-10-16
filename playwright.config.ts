@@ -40,7 +40,6 @@ export default defineConfig({
         env: {
           ...(process.env.PLAYWRIGHT_LIVE !== "1" && {
             NEOS_RESOURCE_DIR: path.join(tmpdir(), "neos-ts-e2e-resources"),
-            NEOS_RESOURCE_CONFIG_DIR: path.join(tmpdir(), "neos-ts-e2e-config"),
           }),
           NEOS_RESOURCE_AUTO_SYNC: "0",
           NEOS_RESOURCE_OFFLINE:

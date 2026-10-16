@@ -42,7 +42,7 @@
     "dev": "node resources/dev.mjs",
     "dev:frontend": "vite",
     "resources:serve": "node --env-file-if-exists=.env resources/server.mjs",
-    "test:resources": "node --test tests/resources.test.mjs tests/resources-bootstrap.test.mjs tests/resources-setup.test.mjs",
+    "test:resources": "node --test tests/resources.test.mjs tests/resources-bootstrap.test.mjs",
     "build": "vite build && cp -r neos-assets dist/",
     "build:prod": "npm run build",
     "preview": "vite preview",

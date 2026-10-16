@@ -46,7 +46,13 @@ NEOS现在开启公测啦，详情请移步[萌卡社区帖子](https://ygobbs.c
 
 ### 本地部署（Docker）
 
-安装 Docker 和 Compose 后，直接在本仓库目录运行，无需先填写 `.env`：
+安装 Docker 和 Compose 后，先在本仓库 `.env` 中显式设置数据目录（首次部署可参考 `.env.example`，已有 `.env` 直接编辑）：
+
+```dotenv
+NEOS_RESOURCE_DATA_DIR=/mnt/data/neos-data
+```
+
+再在本仓库目录运行：
 
 ```bash
 docker compose up --build -d --remove-orphans
@@ -54,7 +60,7 @@ docker compose up --build -d --remove-orphans
 
 本机打开 http://localhost:18080，其他设备可通过 `http://服务器公网IP:18080` 访问。容器监听宿主机所有 IPv4 接口；公网访问还需要在主机防火墙和云服务商入站规则中放行 TCP 18080。更新代码后再次运行同一命令即可重建；停止服务使用 `docker compose down`。
 
-**首次打开网页会弹出“数据存储”设置**，填写并保存目录后才开始下载卡库、卡图和禁限表，并显示更新进度。设置保存在服务端，刷新页面或重建容器后继续使用；系统设置的“资源存储”页可查看当前目录。数据始终保存在仓库外。Docker 默认将仓库同级 `neos-data/` 挂载为 `/data`，网页中可选择 `/data` 或其子目录；配置保存在仓库同级 `neos-config/`。数据位置、其他磁盘挂载、旧数据迁移及备份见[本地资源说明](docs/local-resources.md)。账号、匹配和联机对战仍使用原有在线服务。
+卡图、卡片数据库（含效果文本）和禁限表由本项目的资源服务保存和更新，实际数据放在 `NEOS_RESOURCE_DATA_DIR` 指定的仓库外目录；未设置或留空时会提示并停止启动。网页发现更新会显示进度弹窗。数据位置、旧数据迁移及备份见[本地资源说明](docs/local-resources.md)。账号、匹配和联机对战仍使用原有在线服务。
 
 ## 截图
 

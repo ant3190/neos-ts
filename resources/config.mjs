@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 export const upstream = JSON.parse(
   readFileSync(
@@ -25,8 +24,11 @@ export function makeConfig(overrides = {}) {
   const root =
     overrides.root ||
     process.env.NEOS_RESOURCE_DIR?.trim() ||
-    process.env.NEOS_RESOURCE_DATA_DIR?.trim() ||
-    fileURLToPath(new URL("../../neos-data", import.meta.url));
+    process.env.NEOS_RESOURCE_DATA_DIR?.trim();
+  if (!root)
+    throw new Error(
+      "请在 .env 中显式设置 NEOS_RESOURCE_DATA_DIR，例如 /mnt/data/neos-data",
+    );
   const sources = overrides.sources || upstream;
   const core = [];
   for (const locale of sources.languages) {
@@ -66,11 +68,6 @@ export function makeConfig(overrides = {}) {
   );
   return {
     root: path.resolve(root),
-    configDir: path.resolve(
-      process.env.NEOS_RESOURCE_CONFIG_DIR ||
-        fileURLToPath(new URL("../../neos-config", import.meta.url)),
-    ),
-    storageBase: process.env.NEOS_RESOURCE_STORAGE_BASE || "",
     host: process.env.NEOS_RESOURCE_HOST || "0.0.0.0",
     port: Number(process.env.NEOS_RESOURCE_PORT || 8788),
     concurrency: Math.max(

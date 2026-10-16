@@ -5,20 +5,13 @@ services:
       dockerfile: resources/Dockerfile
     environment:
       NEOS_RESOURCE_DIR: /data
-      NEOS_RESOURCE_CONFIG_DIR: /config
-      NEOS_RESOURCE_STORAGE_BASE: /data
       NEOS_RESOURCE_CONCURRENCY: ${NEOS_RESOURCE_CONCURRENCY:-6}
       NEOS_RESOURCE_AUTO_SYNC: ${NEOS_RESOURCE_AUTO_SYNC:-1}
       NEOS_RESOURCE_OFFLINE: ${NEOS_RESOURCE_OFFLINE:-0}
     volumes:
       - type: bind
-        source: ${NEOS_RESOURCE_DATA_DIR:-../neos-data}
+        source: ${NEOS_RESOURCE_DATA_DIR:?请在 .env 中显式设置 NEOS_RESOURCE_DATA_DIR，例如 /mnt/data/neos-data}
         target: /data
-        bind:
-          create_host_path: true
-      - type: bind
-        source: ${NEOS_RESOURCE_CONFIG_DIR:-../neos-config}
-        target: /config
         bind:
           create_host_path: true
     networks:
