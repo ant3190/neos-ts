@@ -94,6 +94,7 @@ export async function startResources(config = makeConfig()) {
   console.info(
     `Local resources listening on ${JSON.stringify(server.address())}`,
   );
+  console.info(`Resource data directory: ${config.root}`);
   if (config.autoSync)
     void manager.check().catch((error) => console.error(error.message));
   const close = async () => {

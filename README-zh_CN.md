@@ -46,7 +46,13 @@ NEOS现在开启公测啦，详情请移步[萌卡社区帖子](https://ygobbs.c
 
 ### 本地部署（Docker）
 
-安装 Docker 和 Compose 后，只需在本仓库目录运行：
+安装 Docker 和 Compose 后，先在本仓库 `.env` 中显式设置数据目录（首次部署可参考 `.env.example`，已有 `.env` 直接编辑）：
+
+```dotenv
+NEOS_RESOURCE_DATA_DIR=/mnt/data/neos-data
+```
+
+再在本仓库目录运行：
 
 ```bash
 docker compose up --build -d --remove-orphans
@@ -54,7 +60,7 @@ docker compose up --build -d --remove-orphans
 
 本机打开 http://localhost:18080，其他设备可通过 `http://服务器公网IP:18080` 访问。容器监听宿主机所有 IPv4 接口；公网访问还需要在主机防火墙和云服务商入站规则中放行 TCP 18080。更新代码后再次运行同一命令即可重建；停止服务使用 `docker compose down`。
 
-卡图、卡片数据库（含效果文本）和禁限表由本项目的资源服务保存和更新，实际数据默认放在仓库同级的 `neos-data/` 目录，可通过 `.env` 的 `NEOS_RESOURCE_DATA_DIR` 改为其他位置。网页发现更新会显示进度弹窗。数据位置、旧数据迁移及备份见[本地资源说明](docs/local-resources.md)。账号、匹配和联机对战仍使用原有在线服务。
+卡图、卡片数据库（含效果文本）和禁限表由本项目的资源服务保存和更新，实际数据放在 `NEOS_RESOURCE_DATA_DIR` 指定的仓库外目录；未设置或留空时会提示并停止启动。网页发现更新会显示进度弹窗。数据位置、旧数据迁移及备份见[本地资源说明](docs/local-resources.md)。账号、匹配和联机对战仍使用原有在线服务。
 
 ## 截图
 

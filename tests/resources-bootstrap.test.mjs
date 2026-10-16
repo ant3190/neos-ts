@@ -12,12 +12,16 @@ import { makeConfig } from "../resources/config.mjs";
 
 const project = fileURLToPath(new URL("../", import.meta.url));
 
-test("resource data defaults outside the repository and accepts a custom directory", () => {
+test("resource data requires an explicit directory and preserves legacy overrides", () => {
   const names = ["NEOS_RESOURCE_DIR", "NEOS_RESOURCE_DATA_DIR"];
   const original = names.map((name) => process.env[name]);
   try {
     for (const name of names) delete process.env[name];
-    assert.equal(makeConfig().root, path.resolve(project, "../neos-data"));
+    assert.throws(() => makeConfig(), /NEOS_RESOURCE_DATA_DIR/);
+    process.env.NEOS_RESOURCE_DATA_DIR = "  ";
+    assert.throws(() => makeConfig(), /NEOS_RESOURCE_DATA_DIR/);
+    const explicitRoot = path.join(os.tmpdir(), "neos-configured-data");
+    assert.equal(makeConfig({ root: explicitRoot }).root, explicitRoot);
     process.env.NEOS_RESOURCE_DATA_DIR = path.join(
       os.tmpdir(),
       "neos-custom-data",
@@ -56,7 +60,8 @@ test(
         cwd: project,
         env: {
           ...process.env,
-          NEOS_RESOURCE_DIR: root,
+          NEOS_RESOURCE_DIR: "",
+          NEOS_RESOURCE_DATA_DIR: root,
           NEOS_RESOURCE_PORT: "0",
           NEOS_RESOURCE_HOST: "127.0.0.1",
           NEOS_RESOURCE_AUTO_SYNC: "0",
@@ -101,6 +106,7 @@ test(
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     assert.ok(status, output);
+    assert.ok(output.includes(`Resource data directory: ${root}`), output);
     assert.equal(status.phase, "idle");
     assert.equal(status.update, null);
     assert.equal(status.ready, false);

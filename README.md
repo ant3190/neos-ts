@@ -88,4 +88,4 @@ of this license document, but changing it is not allowed.
 
 # Local resources
 
-This repository includes the frontend and resource service under one Compose project. Card databases, artwork, banlists and fonts are stored outside the repository, in the sibling `neos-data/` directory by default. Each page load checks for updates and shows download progress when needed. See [data directory setup and migration](docs/local-resources.md).
+This repository includes the frontend and resource service under one Compose project. Explicitly set `NEOS_RESOURCE_DATA_DIR` in `.env` to a directory outside the repository, for example `/mnt/data/neos-data`, before starting Docker Compose or `npm run dev`. Card databases, artwork, banlists and fonts are stored there. An unset or empty directory setting stops startup with a configuration message. Each page load checks for updates and shows download progress when needed. See [data directory setup and migration](docs/local-resources.md).

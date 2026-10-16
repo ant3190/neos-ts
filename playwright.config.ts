@@ -1,4 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:5173";
 const base = new URL(baseURL);
@@ -36,6 +38,9 @@ export default defineConfig({
     ? undefined
     : {
         env: {
+          ...(process.env.PLAYWRIGHT_LIVE !== "1" && {
+            NEOS_RESOURCE_DIR: path.join(tmpdir(), "neos-ts-e2e-resources"),
+          }),
           NEOS_RESOURCE_AUTO_SYNC: "0",
           NEOS_RESOURCE_OFFLINE:
             process.env.PLAYWRIGHT_LIVE === "1" ? "0" : "1",

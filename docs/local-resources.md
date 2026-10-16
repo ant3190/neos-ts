@@ -4,7 +4,13 @@
 
 ## 部署
 
-只在 neos-ts 目录运行：
+先在 neos-ts 的 `.env` 中显式设置数据目录。首次部署可参考 `.env.example`，已有 `.env` 直接编辑：
+
+```dotenv
+NEOS_RESOURCE_DATA_DIR=/mnt/data/neos-data
+```
+
+该项必填，无默认目录；未设置或留空时，Docker Compose 和本地资源服务都会提示并停止启动。然后只在 neos-ts 目录运行：
 
 ```bash
 git switch feat/mdpro3-duel-parity
@@ -18,7 +24,7 @@ docker compose up --build -d --remove-orphans
 
 ## 数据放在哪里
 
-默认使用 **仓库同级的 `../neos-data/` 目录**。例如代码在 `/srv/neos-ts`，数据就在 `/srv/neos-data`。Docker 会自动创建该目录，并挂载到资源容器的 `/data`：
+数据位置完全由 **`NEOS_RESOURCE_DATA_DIR`** 决定。例如设为 `/mnt/data/neos-data`，所有数据就在该宿主机目录。Docker 会自动创建所选目录，并挂载到资源容器的 `/data`；资源服务启动日志会打印容器内的数据路径，宿主机路径可通过 `docker compose config` 查看：
 
 | 宿主机数据目录内容 | 用途                                         |
 | ------------------ | -------------------------------------------- |
@@ -26,7 +32,7 @@ docker compose up --build -d --remove-orphans
 | `state.sqlite`     | 上游校验标记、文件哈希、检查时间等同步元数据 |
 | `work/`            | 临时下载文件                                 |
 
-要换到其他目录或磁盘，在本仓库 `.env` 中设置路径，重建容器即可：
+要换到其他目录或磁盘，修改本仓库 `.env` 中的路径：
 
 ```dotenv
 NEOS_RESOURCE_DATA_DIR=/mnt/data/neos-data
@@ -77,11 +83,11 @@ npm ci
 npm run dev
 ```
 
-开发命令会同时启动资源服务和 Vite，并自动连接。数据默认同样保存到仓库外的 `../neos-data/`；本仓库 `.env` 可配置数据目录。只启动前端使用 `npm run dev:frontend`，只启动资源接口使用 `npm run resources:serve`。下载来源和语言配置在本仓库 `resources/upstream.json`。
+开发命令会同时启动资源服务和 Vite，并自动连接。启动前同样需要在本仓库 `.env` 中显式配置 `NEOS_RESOURCE_DATA_DIR`；未配置时不会自动选择目录或开始下载。日志会打印实际使用的绝对路径。只启动前端使用 `npm run dev:frontend`，只启动资源接口使用 `npm run resources:serve`。下载来源和语言配置在本仓库 `resources/upstream.json`。
 
 | 环境变量                                    | 默认值                         | 用途                                           |
 | ------------------------------------------- | ------------------------------ | ---------------------------------------------- |
-| `NEOS_RESOURCE_DATA_DIR`                    | `../neos-data`                 | 宿主机或 Node 的数据目录                       |
+| `NEOS_RESOURCE_DATA_DIR`                    | 必填，无默认值                 | 宿主机或 Node 的数据目录                       |
 | `NEOS_RESOURCE_CONCURRENCY`                 | `6`                            | 下载并发，范围 1–16                            |
 | `NEOS_RESOURCE_AUTO_SYNC`                   | `1`                            | `0` 关闭服务启动时同步，网页仍能触发检查       |
 | `NEOS_RESOURCE_OFFLINE`                     | `0`                            | `1` 禁止访问上游，只使用现有数据               |
@@ -102,4 +108,4 @@ npm run build
 npm run test:e2e -- tests/e2e/local-resources.spec.ts tests/e2e/resource-updates.spec.ts --workers=1
 ```
 
-默认浏览器测试通过模拟资源接口验证交互；内置资源服务使用离线模式，不会意外下载完整卡图库。实时测试可通过 `PLAYWRIGHT_LIVE=1` 启用实际资源连接。
+默认浏览器测试通过模拟资源接口验证交互；内置资源服务使用离线模式，测试数据显式写入系统临时目录中的 `neos-ts-e2e-resources`，不会下载完整卡图库或使用配置的正式数据。实时测试可通过 `PLAYWRIGHT_LIVE=1` 启用实际资源连接，并需要配置正式数据目录。
