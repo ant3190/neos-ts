@@ -23,11 +23,12 @@ export const Component: React.FC = () => {
   const { t } = useTranslation("Start");
   const { user } = useSnapshot(accountStore);
   const { progress } = useSnapshot(initStore.sqlite);
+  const resources = useSnapshot(initStore.resources);
   return (
     <>
       <Background />
       <div className={styles.wrap}>
-        {progress === 1 ? (
+        {progress === 1 && resources.ready ? (
           <main className={styles.main}>
             <div className={styles.left}>
               <img
@@ -52,7 +53,15 @@ export const Component: React.FC = () => {
             </div>
           </main>
         ) : (
-          <Loading progress={progress * 100} />
+          <div
+            className={styles.resourceLoading}
+            data-testid="local-resource-loading"
+          >
+            <Loading progress={progress * 100} />
+            <p>
+              {resources.error ? "等待重试" : "正在准备本地资源并检查更新…"}
+            </p>
+          </div>
         )}
       </div>
     </>

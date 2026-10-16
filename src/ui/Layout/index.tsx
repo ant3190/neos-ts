@@ -7,7 +7,7 @@ import {
   TeamOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { App, Avatar, Dropdown } from "antd";
+import { Alert, App, Avatar, Button, Dropdown } from "antd";
 import classNames from "classnames";
 import React, { useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,7 +27,7 @@ import {
 } from "@/api";
 import { useConfig } from "@/config";
 import { useAdaptiveViewportScale } from "@/hook";
-import { accountStore } from "@/stores";
+import { accountStore, initStore } from "@/stores";
 
 import { updateMdproDeck } from "../BuildDeck/DeckDatabase/DeckResults";
 import { setCssProperties } from "../Duel/PlayMat/css";
@@ -37,10 +37,7 @@ import {
   getLoginStatus,
   handleSSOLogin,
   initDeck,
-  initForbidden,
-  initI18N,
-  initSqlite,
-  initSuper,
+  initializeResources,
 } from "./utils";
 
 const NeosConfig = useConfig();
@@ -55,10 +52,7 @@ const DUEL_VIEWPORT_SCALE = {
 export const loader: LoaderFunction = async () => {
   getLoginStatus();
   initDeck();
-  initSqlite();
-  initForbidden();
-  initI18N();
-  initSuper();
+  void initializeResources();
   // TODO: should avoid reloading mdpro deck again
   updateMdproDeck();
 
@@ -84,6 +78,7 @@ const HeaderBtn: React.FC<
 
 export const Component = () => {
   const { t: i18n } = useTranslation("Header");
+  const resources = useSnapshot(initStore.resources);
 
   // 捕获SSO登录
   const routerLocation = useLocation();
@@ -229,6 +224,30 @@ export const Component = () => {
         </nav>
       )}
       <main className={styles.main}>
+        {resources.error && (
+          <Alert
+            type="error"
+            showIcon
+            message={resources.error}
+            style={{
+              position: "absolute",
+              top: 8,
+              left: 16,
+              right: 16,
+              zIndex: 2000,
+            }}
+            action={
+              <Button
+                aria-label="重试"
+                size="small"
+                onClick={() => void initializeResources()}
+              >
+                重试
+              </Button>
+            }
+            data-testid="local-resource-error"
+          />
+        )}
         <Outlet />
       </main>
     </>

@@ -1,5 +1,18 @@
 @charset "utf-8";
-@import url("https://fonts.font.im/css2?family=Electrolize&family=Noto+Serif+SC:wght@700&display=swap");
+@font-face {
+  font-family: "Electrolize";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/local-resources/fonts/Electrolize.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Noto Serif SC";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/local-resources/fonts/NotoSerifSC-Bold.ttf") format("truetype");
+}
 
 /* 默认字体大小，适用于PC端 */
 html {

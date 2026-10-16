@@ -29,7 +29,9 @@ export async function initStrings() {
       break;
   }
 
-  const strings = await (await fetch(stringsUrl)).text();
+  const response = await fetch(stringsUrl);
+  if (!response.ok) throw new Error(`Strings HTTP ${response.status}`);
+  const strings = await response.text();
 
   const lineIter = strings.split("\n");
   for (const line of lineIter) {

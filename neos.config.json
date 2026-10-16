@@ -29,20 +29,20 @@
   ],
   "assetsPath": "/neos-assets",
   "releaseResource": {
-    "img": "https://cdn02.moecube.com:444/images/ygopro-images-zh-CN",
-    "cdb": "https://cdn02.moecube.com:444/ygopro-database/zh-CN/cards.cdb",
-    "lflist": "https://cdn02.moecube.com:444/ygopro-database/zh-CN/lflist.conf"
+    "img": "/local-resources/images/ygopro-images-zh-CN",
+    "cdb": "/local-resources/ygopro-database/zh-CN/cards.cdb",
+    "lflist": "/local-resources/ygopro-database/zh-CN/lflist.conf"
   },
   "preReleaseResource": {
-    "img": "https://cdn02.moecube.com:444/ygopro-super-pre/data/pics",
-    "cdb": "https://cdn02.moecube.com:444/ygopro-super-pre/data/test-release.cdb",
-    "lflist": "https://cdn02.moecube.com:444/ygopro-database/zh-CN/lflist.conf",
-    "config": "https://cdn02.moecube.com:444/ygopro-super-pre/data/test-release-v2.json"
+    "img": "/local-resources/ygopro-super-pre/data/pics",
+    "cdb": "/local-resources/ygopro-super-pre/data/test-release.cdb",
+    "lflist": "/local-resources/ygopro-database/zh-CN/lflist.conf",
+    "config": "/local-resources/ygopro-super-pre/data/test-release-v2.json"
   },
   "env408Resource": {
-    "lflist": "https://cdn02.moecube.com:444/cn-database/env408-zh-CN/expansions/lflist.conf"
+    "lflist": "/local-resources/cn-database/env408-zh-CN/expansions/lflist.conf"
   },
-  "stringsUrl": "https://cdn02.moecube.com:444/ygopro-database/zh-CN/strings.conf",
+  "stringsUrl": "/local-resources/ygopro-database/zh-CN/strings.conf",
   "loginUrl": "https://accounts.moecube.com/signin",
   "logoutUrl": "https://accounts.moecube.com/signout",
   "profileUrl": "https://accounts.moecube.com/profiles",

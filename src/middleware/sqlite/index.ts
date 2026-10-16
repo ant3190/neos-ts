@@ -92,10 +92,17 @@ function helper<T extends sqliteCmd>(action: sqliteAction<T>) {
 
         const releasePromise = pfetch(info.releaseDbUrl, {
           progressCallback: action.initInfo?.progressCallback,
-        }).then((res) => res.arrayBuffer()); // TODO: i18n
+        }).then((res) => {
+          if (!res.ok) throw new Error(`Card database HTTP ${res.status}`);
+          return res.arrayBuffer();
+        }); // TODO: i18n
         const preReleasePromise = pfetch(info.preReleaseDbUrl, {
           progressCallback: action.initInfo?.progressCallback,
-        }).then((res) => res.arrayBuffer());
+        }).then((res) => {
+          if (!res.ok)
+            throw new Error(`Prerelease database HTTP ${res.status}`);
+          return res.arrayBuffer();
+        });
 
         return Promise.all([
           sqlPromise,

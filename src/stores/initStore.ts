@@ -3,6 +3,11 @@ import { proxy } from "valtio";
 import { type NeosStore } from "./shared";
 
 export const initStore = proxy({
+  resources: {
+    checking: false,
+    ready: false,
+    error: "",
+  },
   sqlite: {
     progress: 0, // 0 -> 1
   }, // ygodb

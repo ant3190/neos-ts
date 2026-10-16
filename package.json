@@ -39,9 +39,11 @@
     "ygopro-deck-encode": "^1.0.14"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "node resources/dev.mjs",
+    "resources:serve": "node resources/server.mjs",
+    "test:resources": "node --test tests/resources.test.mjs",
     "build": "vite build && cp -r neos-assets dist/",
-    "build:prod": "vite build --base=https://cdn02.moecube.com:444/neos/",
+    "build:prod": "npm run build",
     "preview": "vite preview",
     "agent": "node agent/src/cli.ts",
     "agent:auth": "node agent/src/cli.ts auth",

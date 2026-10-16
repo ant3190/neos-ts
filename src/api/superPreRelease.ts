@@ -14,7 +14,10 @@ interface SuperPreInfo {
 let superPreList: SuperPreInfo[] = [];
 
 export async function initSuperPrerelease() {
-  const json = await (await fetch(config)).text();
+  const response = await fetch(config);
+  if (!response.ok)
+    throw new Error(`Prerelease configuration HTTP ${response.status}`);
+  const json = await response.text();
   const list: SuperPreInfo[] = JSON.parse(json);
   superPreList = list;
 }

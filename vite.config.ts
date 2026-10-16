@@ -9,6 +9,12 @@ import arraybuffer from "vite-plugin-arraybuffer";
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  server: {
+    proxy: {
+      "/local-resources": "http://127.0.0.1:8788",
+      "/api/resources": "http://127.0.0.1:8788",
+    },
+  },
   plugins: [
     react(),
     svgr(),

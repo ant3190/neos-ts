@@ -13,23 +13,80 @@ import { accountStore, deckStore, initStore, type User } from "@/stores";
 
 const { releaseResource, preReleaseResource, env408Resource } = useConfig();
 
-/** 加载ygodb */
-export const initSqlite = async () => {
-  if (!initStore.sqlite.progress) {
-    const { sqlite } = initStore;
-    const progressCallback = (progress: number) =>
-      (sqlite.progress = progress * 0.9);
-    sqlite.progress = 0.01;
-    await sqliteMiddleWare({
-      cmd: sqliteCmd.INIT,
-      initInfo: {
-        releaseDbUrl: releaseResource.cdb,
-        preReleaseDbUrl: preReleaseResource.cdb,
-        progressCallback,
-      },
+let initialization: Promise<void> | undefined;
+
+/** One check per page load; navigation shares it and failed initialization can be retried. */
+export const initializeResources = () => {
+  if (initialization) return initialization;
+  const state = initStore.resources;
+  state.checking = true;
+  state.error = "";
+  initialization = (async () => {
+    const language = localStorage.getItem("language") || "cn";
+    try {
+      const response = await fetch(
+        `/api/resources/check?language=${encodeURIComponent(language)}`,
+        {
+          method: "POST",
+          cache: "no-store",
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
+      if (!response.ok)
+        throw new Error(`Resource service HTTP ${response.status}`);
+    } catch (error) {
+      // Existing local files remain usable when an update check is unavailable.
+      console.warn("Resource update check:", error);
+    }
+    await Promise.all([initSqlite(), initForbidden(), initI18N(), initSuper()]);
+    state.ready = true;
+  })()
+    .catch((error) => {
+      console.error("Local resources:", error);
+      state.error =
+        "本地资源加载失败，请稍后重试。首次启动时服务器需要下载卡库。";
+      if (initStore.sqlite.progress < 1) initStore.sqlite.progress = 0;
+      initialization = undefined;
+    })
+    .finally(() => {
+      state.checking = false;
     });
-    sqlite.progress = 1;
-  }
+  return initialization;
+};
+
+let sqliteInitialization: Promise<void> | undefined;
+let sqliteRequest: symbol | undefined;
+
+/** Shared initialization also guards late progress callbacks after a failed request. */
+export const initSqlite = (): Promise<void> => {
+  if (initStore.sqlite.progress === 1) return Promise.resolve();
+  if (sqliteInitialization) return sqliteInitialization;
+  const request = Symbol("sqlite-load");
+  sqliteRequest = request;
+  initStore.sqlite.progress = 0.01;
+  sqliteInitialization = sqliteMiddleWare({
+    cmd: sqliteCmd.INIT,
+    initInfo: {
+      releaseDbUrl: releaseResource.cdb,
+      preReleaseDbUrl: preReleaseResource.cdb,
+      progressCallback: (progress) => {
+        if (sqliteRequest === request)
+          initStore.sqlite.progress = progress * 0.9;
+      },
+    },
+  })
+    .then(() => {
+      if (sqliteRequest === request) initStore.sqlite.progress = 1;
+    })
+    .catch((error) => {
+      if (sqliteRequest === request) initStore.sqlite.progress = 0;
+      throw error;
+    })
+    .finally(() => {
+      if (sqliteRequest === request) sqliteRequest = undefined;
+      sqliteInitialization = undefined;
+    });
+  return sqliteInitialization;
 };
 
 /** 加载卡组 */

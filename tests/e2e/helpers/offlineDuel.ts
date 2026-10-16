@@ -5,6 +5,22 @@ import initSqlJs from "sql.js";
 
 /** Tiny fixture database and art keep interaction regressions independent of CDN availability. */
 export async function installOfflineDuelResources(page: Page) {
+  await page.route("**/api/resources/check?*", (route) =>
+    route.fulfill({
+      status: 202,
+      json: { ready: true, phase: "idle", version: "fixture" },
+    }),
+  );
+  await page.route("**/local-resources/fonts/*", (route) => route.abort());
+  await page.route(/\/lflist\.conf$/, (route) =>
+    route.fulfill({
+      body: "!2026-10\n46986414 3\n",
+      contentType: "text/plain",
+    }),
+  );
+  await page.route(/\/test-release-v2\.json$/, (route) =>
+    route.fulfill({ json: [] }),
+  );
   const SQL = await initSqlJs({
     locateFile: (file) => path.resolve("node_modules/sql.js/dist", file),
   });

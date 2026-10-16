@@ -1,0 +1,21 @@
+{
+  "releaseResource": {
+    "img": "https://cdn02.moecube.com:444/images/ygopro-images-zh-CN",
+    "cdb": "https://cdn02.moecube.com:444/ygopro-database/zh-CN/cards.cdb",
+    "lflist": "https://cdn02.moecube.com:444/ygopro-database/zh-CN/lflist.conf"
+  },
+  "preReleaseResource": {
+    "img": "https://cdn02.moecube.com:444/ygopro-super-pre/data/pics",
+    "cdb": "https://cdn02.moecube.com:444/ygopro-super-pre/data/test-release.cdb",
+    "lflist": "https://cdn02.moecube.com:444/ygopro-database/zh-CN/lflist.conf",
+    "config": "https://cdn02.moecube.com:444/ygopro-super-pre/data/test-release-v2.json"
+  },
+  "env408Resource": {
+    "lflist": "https://cdn02.moecube.com:444/cn-database/env408-zh-CN/expansions/lflist.conf"
+  },
+  "stringsUrl": "https://cdn02.moecube.com:444/ygopro-database/zh-CN/strings.conf",
+  "languages": ["zh-CN", "en-US", "es-ES", "ja-JP", "ko-KR"],
+  "imageLanguages": ["zh-CN", "en-US"],
+  "fontsCss": "https://fonts.font.im/css2?family=Electrolize&family=Noto+Serif+SC:wght@700&display=swap",
+  "fallbackBase": "https://cdncf.moecube.com"
+}

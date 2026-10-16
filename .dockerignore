@@ -10,3 +10,4 @@ playwright-report
 neos-protobuf
 *.log
 .env*
+resource-data

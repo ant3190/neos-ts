@@ -73,3 +73,13 @@
     }
   }
 }
+.resourceLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  p {
+    color: #aebdca;
+    font-size: 14px;
+  }
+}
