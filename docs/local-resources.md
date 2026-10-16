@@ -1,14 +1,16 @@
 # 独立资源服务
 
-卡片数据库（含效果文本）、卡图、禁限表、先行卡配置、提示文本和字体由独立项目 **neos-resources** 保存和更新。本仓库只构建前端及其反向代理，不再包含资源同步程序，不再创建或挂载资源数据卷。音乐、音效、界面素材及 SQL.js WASM 仍随前端打包。
+卡片数据库（含效果文本）、卡图、禁限表、先行卡配置、提示文本和字体由独立项目 [neos-resources](https://github.com/ant3190/neos-resources) 保存和更新。本仓库只构建前端及其反向代理，不再包含资源同步程序，不再创建或挂载资源数据卷。音乐、音效、界面素材及 SQL.js WASM 仍随前端打包。
 
 浏览器继续访问当前站点的 `/local-resources/` 和 `/api/resources/`，由反向代理连接独立服务。每次完整打开或刷新网页仍会检查更新；资源服务后台同步，失败时保留已保存文件，正在进行的对局不会强制刷新。
 
 ## 首次部署
 
-先在 neos-resources 项目目录运行：
+先克隆并启动独立资源服务：
 
 ```bash
+git clone https://github.com/ant3190/neos-resources.git
+cd neos-resources
 cp .env.example .env
 docker compose up --build -d
 ```
@@ -85,4 +87,4 @@ curl http://127.0.0.1:8788/api/resources/status
 
 也可通过前端地址访问 `/api/resources/status`。状态包含 `ready`、`phase`、`version`、文件数量和字节数，以及本轮 `total/completed/missing/failed`。`ready` 表示必要卡库已准备好，`phase=idle` 表示当前没有同步任务，`missing` 表示上游返回 404。
 
-备份及恢复在资源项目执行：先停止服务，再复制 `/data`，完成后重新启动。具体上游配置、更新策略、环境变量及备份命令见 neos-resources 项目的 README。前端代码和部署不再管理资源数据生命周期。
+备份及恢复在资源项目执行：先停止服务，再复制 `/data`，完成后重新启动。具体上游配置、更新策略、环境变量及备份命令见 [neos-resources 的 README](https://github.com/ant3190/neos-resources#readme)。前端代码和部署不再管理资源数据生命周期。
