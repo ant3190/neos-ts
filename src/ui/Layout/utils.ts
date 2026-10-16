@@ -11,6 +11,8 @@ import { useConfig } from "@/config";
 import sqliteMiddleWare, { sqliteCmd } from "@/middleware/sqlite";
 import { accountStore, deckStore, initStore, type User } from "@/stores";
 
+import { checkResourceUpdates } from "./resourceUpdates";
+
 const { releaseResource, preReleaseResource, env408Resource } = useConfig();
 
 let initialization: Promise<void> | undefined;
@@ -22,18 +24,8 @@ export const initializeResources = () => {
   state.checking = true;
   state.error = "";
   initialization = (async () => {
-    const language = localStorage.getItem("language") || "cn";
     try {
-      const response = await fetch(
-        `/api/resources/check?language=${encodeURIComponent(language)}`,
-        {
-          method: "POST",
-          cache: "no-store",
-          signal: AbortSignal.timeout(10_000),
-        },
-      );
-      if (!response.ok)
-        throw new Error(`Resource service HTTP ${response.status}`);
+      await checkResourceUpdates();
     } catch (error) {
       // Existing local files remain usable when an update check is unavailable.
       console.warn("Resource update check:", error);
