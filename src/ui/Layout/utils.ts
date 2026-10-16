@@ -11,6 +11,7 @@ import { useConfig } from "@/config";
 import sqliteMiddleWare, { sqliteCmd } from "@/middleware/sqlite";
 import { accountStore, deckStore, initStore, type User } from "@/stores";
 
+import { checkResourceStorage } from "./resourceStorage";
 import { checkResourceUpdates } from "./resourceUpdates";
 
 const { releaseResource, preReleaseResource, env408Resource } = useConfig();
@@ -24,6 +25,7 @@ export const initializeResources = () => {
   state.checking = true;
   state.error = "";
   initialization = (async () => {
+    if (!(await checkResourceStorage())) return;
     try {
       await checkResourceUpdates();
     } catch (error) {
@@ -42,6 +44,7 @@ export const initializeResources = () => {
     })
     .finally(() => {
       state.checking = false;
+      if (!state.ready) initialization = undefined;
     });
   return initialization;
 };

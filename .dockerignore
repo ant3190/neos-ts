@@ -12,3 +12,4 @@ neos-protobuf
 .env*
 resource-data
 neos-data
+neos-config

@@ -5,6 +5,11 @@ import initSqlJs from "sql.js";
 
 /** Tiny fixture database and art keep interaction regressions independent of CDN availability. */
 export async function installOfflineDuelResources(page: Page) {
+  await page.route("**/api/resources/setup", (route) =>
+    route.fulfill({
+      json: { configured: true, directory: "/fixture/neos-data" },
+    }),
+  );
   await page.route("**/api/resources/check?*", (route) =>
     route.fulfill({
       status: 202,

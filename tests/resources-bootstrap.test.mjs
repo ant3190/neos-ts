@@ -12,14 +12,14 @@ import { makeConfig } from "../resources/config.mjs";
 
 const project = fileURLToPath(new URL("../", import.meta.url));
 
-test("resource data requires an explicit directory and preserves legacy overrides", () => {
+test("resource data has a first-run suggestion and preserves legacy overrides", () => {
   const names = ["NEOS_RESOURCE_DIR", "NEOS_RESOURCE_DATA_DIR"];
   const original = names.map((name) => process.env[name]);
   try {
     for (const name of names) delete process.env[name];
-    assert.throws(() => makeConfig(), /NEOS_RESOURCE_DATA_DIR/);
+    assert.equal(makeConfig().root, path.resolve(project, "../neos-data"));
     process.env.NEOS_RESOURCE_DATA_DIR = "  ";
-    assert.throws(() => makeConfig(), /NEOS_RESOURCE_DATA_DIR/);
+    assert.equal(makeConfig().root, path.resolve(project, "../neos-data"));
     const explicitRoot = path.join(os.tmpdir(), "neos-configured-data");
     assert.equal(makeConfig({ root: explicitRoot }).root, explicitRoot);
     process.env.NEOS_RESOURCE_DATA_DIR = path.join(
@@ -62,6 +62,12 @@ test(
           ...process.env,
           NEOS_RESOURCE_DIR: "",
           NEOS_RESOURCE_DATA_DIR: root,
+          NEOS_RESOURCE_CONFIG_DIR: path.join(
+            root,
+            "../",
+            path.basename(root) + "-config",
+          ),
+          NEOS_RESOURCE_STORAGE_BASE: "",
           NEOS_RESOURCE_PORT: "0",
           NEOS_RESOURCE_HOST: "127.0.0.1",
           NEOS_RESOURCE_AUTO_SYNC: "0",
@@ -87,6 +93,10 @@ test(
         clearTimeout(limit);
       }
       rmSync(root, { recursive: true, force: true });
+      rmSync(path.join(root, "../", path.basename(root) + "-config"), {
+        recursive: true,
+        force: true,
+      });
     });
     let status;
     const deadline = Date.now() + 15000;
@@ -106,7 +116,19 @@ test(
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     assert.ok(status, output);
-    assert.ok(output.includes(`Resource data directory: ${root}`), output);
+    assert.equal(status.phase, "setup");
+    assert.equal(status.setupRequired, true);
+    assert.equal(existsSync(path.join(root, "state.sqlite")), false);
+    const setup = await fetch(`http://127.0.0.1:${port}/api/resources/setup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ directory: root }),
+    });
+    assert.equal(setup.status, 200);
+    assert.equal((await setup.json()).directory, root);
+    status = await (
+      await fetch(`http://127.0.0.1:${port}/api/resources/status`)
+    ).json();
     assert.equal(status.phase, "idle");
     assert.equal(status.update, null);
     assert.equal(status.ready, false);

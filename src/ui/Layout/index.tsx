@@ -33,6 +33,7 @@ import { updateMdproDeck } from "../BuildDeck/DeckDatabase/DeckResults";
 import { setCssProperties } from "../Duel/PlayMat/css";
 import { Setting } from "../Setting";
 import styles from "./index.module.scss";
+import { ResourceStorageDialog } from "./ResourceStorageDialog";
 import { ResourceUpdateDialog } from "./ResourceUpdateDialog";
 import {
   getLoginStatus,
@@ -252,6 +253,7 @@ export const Component = () => {
         <Outlet />
       </main>
       <ResourceUpdateDialog />
+      <ResourceStorageDialog />
     </>
   );
 };

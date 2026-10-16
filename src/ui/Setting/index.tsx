@@ -1,5 +1,6 @@
 import {
   AudioFilled,
+  FolderOpenOutlined,
   PlayCircleOutlined,
   TranslationOutlined,
 } from "@ant-design/icons";
@@ -10,6 +11,7 @@ import { render, unmountComponentAtNode } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import { I18NSelector } from "../I18N";
+import { ResourceStorageInfo } from "../Layout/ResourceStorageDialog";
 import { theme } from "../theme";
 import { AnimationSetting } from "./Animation";
 import { AudioSetting } from "./Audio";
@@ -42,6 +44,15 @@ export const Setting = (props: SettingProps) => {
         </>
       ),
       children: <I18NSelector />,
+    },
+    {
+      key: "storage",
+      label: (
+        <>
+          资源存储 <FolderOpenOutlined />
+        </>
+      ),
+      children: <ResourceStorageInfo />,
     },
     {
       key: "animation",

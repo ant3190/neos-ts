@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 
 import { makeConfig, publicPrefix } from "./config.mjs";
-import { ResourceManager } from "./manager.mjs";
+import { ResourceService, StorageSetupError } from "./service.mjs";
 import { NotFound, sendFile } from "./store.mjs";
 
 function json(response, status, body) {
@@ -23,6 +23,50 @@ export function createResourceServer(manager) {
           json(response, 200, { ok: true });
           return;
         }
+        if (request.method === "POST") {
+          const origin = request.headers.origin;
+          if (origin && new URL(origin).host !== request.headers.host) {
+            json(response, 403, { error: "Origin mismatch" });
+            return;
+          }
+        }
+        if (url.pathname === "/api/resources/setup") {
+          if (request.method === "GET") {
+            json(
+              response,
+              200,
+              manager.storageStatus?.() || {
+                configured: true,
+                directory: manager.config.root,
+              },
+            );
+            return;
+          }
+          if (request.method === "POST" && manager.configure) {
+            if (
+              !request.headers["content-type"]?.startsWith("application/json")
+            )
+              throw new StorageSetupError("请以 JSON 提交存储设置。", 415);
+            const chunks = [];
+            let size = 0;
+            if (Number(request.headers["content-length"]) > 8192)
+              throw new StorageSetupError("设置内容过长。", 413);
+            for await (const chunk of request) {
+              size += chunk.length;
+              if (size > 8192)
+                throw new StorageSetupError("设置内容过长。", 413);
+              chunks.push(chunk);
+            }
+            let settings;
+            try {
+              settings = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+            } catch {
+              throw new StorageSetupError("存储设置格式无效。");
+            }
+            json(response, 200, await manager.configure(settings?.directory));
+            return;
+          }
+        }
         if (
           url.pathname === "/api/resources/status" &&
           request.method === "GET"
@@ -41,11 +85,6 @@ export function createResourceServer(manager) {
           url.pathname === "/api/resources/check" &&
           request.method === "POST"
         ) {
-          const origin = request.headers.origin;
-          if (origin && new URL(origin).host !== request.headers.host) {
-            json(response, 403, { error: "Origin mismatch" });
-            return;
-          }
           void manager
             .check()
             .catch((error) => console.error("Resource check:", error.message));
@@ -71,6 +110,13 @@ export function createResourceServer(manager) {
           response.destroy();
           return;
         }
+        if (error instanceof StorageSetupError) {
+          json(response, error.status, {
+            error: error.message,
+            setupRequired: !manager.manager,
+          });
+          return;
+        }
         if (!(error instanceof NotFound))
           console.warn("Resource request:", error.message);
         json(response, error instanceof NotFound ? 404 : 503, {
@@ -85,8 +131,9 @@ export function createResourceServer(manager) {
 }
 
 export async function startResources(config = makeConfig()) {
-  const manager = new ResourceManager(config),
-    server = createResourceServer(manager);
+  const manager = new ResourceService(config);
+  await manager.initialize();
+  const server = createResourceServer(manager);
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(config.port, config.host, resolve);
@@ -94,9 +141,8 @@ export async function startResources(config = makeConfig()) {
   console.info(
     `Local resources listening on ${JSON.stringify(server.address())}`,
   );
-  console.info(`Resource data directory: ${config.root}`);
-  if (config.autoSync)
-    void manager.check().catch((error) => console.error(error.message));
+  if (!manager.manager)
+    console.info("Resource storage awaits first-run setup in the webpage.");
   const close = async () => {
     server.close();
     server.closeIdleConnections();

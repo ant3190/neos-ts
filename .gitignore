@@ -37,3 +37,4 @@ yarn-error.log*
 !tests/e2e/fixtures/replays/**/*.yrp3d
 resource-data/
 neos-data/
+neos-config/
