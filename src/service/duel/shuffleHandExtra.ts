@@ -5,7 +5,7 @@ import { CardType } from "@/stores";
 import { callCardMove } from "@/ui/Duel/PlayMat/Card";
 
 type MsgShuffleHandExtra = ygopro.StocGameMessage.MsgShuffleHandExtra;
-const { EXTRA } = ygopro.CardZone;
+const { EXTRA, HAND } = ygopro.CardZone;
 const { FACEUP, FACEUP_ATTACK, FACEUP_DEFENSE } = ygopro.CardPosition;
 
 const emptyMeta = (): CardMeta => ({ id: 0, data: {}, text: {} });
@@ -25,8 +25,8 @@ export default async (
   shuffleHandExtra: MsgShuffleHandExtra,
 ) => {
   const context = container.context;
-  playEffect(AudioActionType.SOUND_SHUFFLE);
   const { cards: codes, player: controller, zone } = shuffleHandExtra;
+  if (zone !== HAND) playEffect(AudioActionType.SOUND_SHUFFLE);
 
   const cards = context.cardStore
     .at(zone, controller)
@@ -46,7 +46,8 @@ export default async (
       }
 
       setCardCode(card, code);
-      await callCardMove(card.uuid);
+      // Keep protocol slots and revealed faces in sync without animating the hand.
+      await callCardMove(card.uuid, { instant: zone === HAND });
     }),
   );
 };

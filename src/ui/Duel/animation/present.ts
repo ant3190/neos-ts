@@ -586,19 +586,6 @@ export function presentGameMessage(
         ),
       );
       break;
-    case "shuffle_deck":
-      emitDuelCue(
-        {
-          kind: "shuffle",
-          point: measureCard(undefined, `${msg.shuffle_deck.player}:${DECK}`),
-          label: "洗切",
-        },
-        550,
-      );
-      break;
-    case "shuffle_hand_extra":
-      emitDuelCue({ kind: "shuffle", label: "卡片洗切" }, 450);
-      break;
     case "update_hp": {
       const event = msg.update_hp;
       const recover =

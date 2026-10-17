@@ -25,7 +25,6 @@ export interface DuelCue {
     | "target"
     | "position"
     | "impact"
-    | "shuffle"
     | "activate"
     | "reveal"
     | "resolve"
