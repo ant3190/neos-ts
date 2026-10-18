@@ -12,6 +12,7 @@ import {
 import { getUIContainer } from "@/container/compat";
 import { cardStore, type CardType, InteractType } from "@/stores";
 
+import { actionSprite } from "../animation/assets";
 import { displayOptionModal, displaySimpleSelectCardsModal } from "../Message";
 import { getDuelEpoch, hasDuelPrompt } from "../Message/session";
 import {
@@ -199,6 +200,7 @@ export function CardActions() {
         const candidate = cards
           .flatMap((card) => card.idleInteractivities)
           .filter((entry) => entry.interactType === action);
+        const sprite = actionSprite(action, cards[0]?.location.position);
         return (
           <button
             key={action}
@@ -222,7 +224,11 @@ export function CardActions() {
             onClick={() => void runAction(action, cards)}
           >
             <span>
-              {interactTypeToIcon(action, cards[0]?.location.position)}
+              {sprite ? (
+                <img src={sprite} alt="" draggable={false} />
+              ) : (
+                interactTypeToIcon(action, cards[0]?.location.position)
+              )}
             </span>
             <small>{interactTypeToString(action)}</small>
           </button>

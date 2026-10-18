@@ -47,6 +47,16 @@ export async function installOfflineDuelResources(page: Page) {
       `INSERT INTO texts (id, name, desc) VALUES (${code}, '测试魔法${index}', '连锁时序回归测试')`,
     );
   }
+  const summons = [0x41, 0x2001, 0x800001, 0x4000001, 0x81, 0x1000001, 0x4001];
+  summons.forEach((type, index) => {
+    const code = 110000001 + index;
+    db.run(
+      `INSERT INTO datas VALUES (${code}, 3, 0, 0, ${type}, 2800, 2000, 8, 2, 32)`,
+    );
+    db.run(
+      `INSERT INTO texts (id, name, desc) VALUES (${code}, '召唤测试${index}', '召唤分类与动画时序测试')`,
+    );
+  });
   const bytes = Buffer.from(db.export());
   db.close();
   await page.route(/\.cdb(?:\?.*)?$/, (route) =>

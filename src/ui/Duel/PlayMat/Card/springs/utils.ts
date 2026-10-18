@@ -3,8 +3,7 @@ import { settingStore } from "@/stores/settingStore";
 export { asyncStart } from "./asyncStart";
 
 export function getDuration(baseMs = 250): number {
-  const MAX_DURATION = 400;
   const { speed } = settingStore.animation;
-
-  return ((MAX_DURATION - speed * 300) * baseMs) / 250;
+  // The existing default slider position (0.7) is MDPro3's original duration.
+  return baseMs * (1.7 - Math.max(0, Math.min(1, speed)));
 }

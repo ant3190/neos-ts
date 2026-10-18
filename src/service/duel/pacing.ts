@@ -4,48 +4,55 @@ export interface DuelPacing {
   settleMs: number;
 }
 
-/** Short reading beats, following YGOPro's event-specific WaitFrameSignal use. */
+/** MDPro3 message waits include movement already awaited by each handler. */
 export function getDuelPacing(
   event: string,
   chainLength = 0,
+  token = false,
 ): DuelPacing | undefined {
   switch (event) {
     case "move":
+      return { minimumMs: 400, settleMs: 0 };
     case "pos_change":
+      return { minimumMs: 500, settleMs: 0 };
     case "swap":
-      return { minimumMs: 300, settleMs: 80 };
+      return { minimumMs: 200, settleMs: 0 };
     case "draw":
-      return { minimumMs: 380, settleMs: 100 };
+      return { minimumMs: 500, settleMs: 200 };
     case "summoning":
     case "sp_summoning":
+      return { minimumMs: token ? 200 : 1000, settleMs: 0 };
     case "flip_summoning":
-      return { minimumMs: 220, settleMs: 0 };
+      return { minimumMs: 200, settleMs: 0 };
     case "summoned":
     case "sp_summoned":
     case "flip_summoned":
     case "set":
       return { minimumMs: 0, settleMs: 80 };
     case "chaining":
-      return { minimumMs: 600, settleMs: 80 };
+      return { minimumMs: 1100, settleMs: 0 };
     case "chained":
       return chainLength > 1 ? { minimumMs: 320, settleMs: 0 } : undefined;
     case "solving":
       return chainLength > 1 ? { minimumMs: 240, settleMs: 0 } : undefined;
     case "negated":
     case "disabled":
-      return { minimumMs: 300, settleMs: 0 };
+      return { minimumMs: 1000, settleMs: 0 };
     case "attack":
-      return { minimumMs: 400, settleMs: 0 };
+      return { minimumMs: 200, settleMs: 0 };
     case "battle":
-      return { minimumMs: 480, settleMs: 0 };
+      return undefined; // the complete attack promise is awaited directly
     case "become_target":
-      return { minimumMs: 160, settleMs: 0 };
+      return { minimumMs: 500, settleMs: 0 };
+    case "update_hp":
+    case "lp_update":
+      return { minimumMs: 500, settleMs: 0 };
     case "new_turn":
       return { minimumMs: 380, settleMs: 0 };
     case "new_phase":
       return { minimumMs: 300, settleMs: 0 };
     case "confirm_cards":
-      return { minimumMs: 600, settleMs: 80 };
+      return undefined; // each card reveal is awaited separately
     // State queries, input prompts and chain cleanup have no extra wait.
     default:
       return undefined;

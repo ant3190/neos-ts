@@ -3,7 +3,9 @@ import { useSnapshot } from "valtio";
 
 import { matStore, roomStore } from "@/stores";
 
+import { MDPRO3 } from "../../animation/mdpro3";
 import { animationQuality } from "../../animation/runtime";
+import { getDuration } from "../Card/springs/utils";
 import styles from "./index.module.scss";
 
 export const LifeBar = () => {
@@ -123,19 +125,22 @@ function useLifeNumber(life: number) {
       finish();
       return;
     }
-    const start = performance.now();
+    if (from === life) return;
+    const delay =
+      animationQuality() === "full" ? getDuration(MDPRO3.lpFloat) : 0;
+    const duration =
+      animationQuality() === "full" ? getDuration(MDPRO3.lpRoll) : 250;
+    const start = performance.now() + delay;
     const tick = (now: number) => {
       if (settled) return;
-      const progress = Math.min(1, (now - start) / 500);
-      current.current = Math.round(
-        from + (life - from) * (1 - (1 - progress) ** 3),
-      );
+      const progress = Math.max(0, Math.min(1, (now - start) / duration));
+      current.current = Math.round(from + (life - from) * progress);
       setShown(current.current);
       if (progress < 1) frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     // Wall time settles a suspended/slow renderer too; the number cannot stay stale.
-    const deadline = setTimeout(finish, 550);
+    const deadline = setTimeout(finish, delay + duration + 100);
     const visibility = () => {
       if (document.hidden) finish();
     };

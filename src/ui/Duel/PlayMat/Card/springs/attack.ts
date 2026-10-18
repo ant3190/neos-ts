@@ -1,15 +1,20 @@
-// 暂时先简单实现攻击动画，后面有时间再慢慢优化
 import { easings } from "@react-spring/web";
 
 import { isMe } from "@/stores";
 
+import { battleTiming } from "../../../animation/mdpro3";
+import { animationQuality, waitForAnimation } from "../../../animation/runtime";
 import { tablePose } from "../../../layout/geometry";
+import { getDuelEpoch } from "../../../Message/session";
 import type { AttackFunc } from "./types";
-import { asyncStart } from "./utils";
+import { asyncStart, getDuration } from "./utils";
 
 export const attack: AttackFunc = async (props) => {
   const { card, api, options } = props;
-  const current = api.current[0].get();
+  if (animationQuality() === "off") return;
+  const current = { ...api.current[0].get() };
+  const epoch = getDuelEpoch();
+  const timing = battleTiming(card.meta.data.atk ?? 0);
 
   let x = current.x;
   let y = current.y;
@@ -32,35 +37,37 @@ export const attack: AttackFunc = async (props) => {
     return;
   }
 
-  // 先浮空
+  const dx = x - current.x,
+    dy = y - current.y;
+  const distance = Math.max(1, Math.hypot(dx, dy));
+  // MDPro3: wind-up, strike, hit pause, then restore the complete source pose.
   await asyncStart(api)({
-    z: 80,
-    config: { duration: 70 },
-  });
-  // 后撤半个卡位，并调整倾斜角
-  await asyncStart(api)({
-    y: current.y + 86 * (isMe(card.location.controller) ? 1 : -1),
+    x: current.x - (dx / distance) * 65,
+    y: current.y - (dy / distance) * 65,
+    z: current.z + 50,
     rz,
-    config: { duration: 80 },
+    config: { duration: getDuration(timing.windup) },
   });
+  if (epoch !== getDuelEpoch()) return;
   // 加速前冲
   await asyncStart(api)({
     x,
     y,
     config: {
       easing: easings.easeInOutSine,
-      duration: 130,
+      duration: getDuration(timing.strike),
     },
   });
+  if (epoch !== getDuelEpoch()) return;
+  options.onHit?.();
+  await waitForAnimation(getDuration(timing.hit));
+  if (epoch !== getDuelEpoch()) return;
   // 减速归位
   await asyncStart(api)({
-    x: current.x,
-    y: current.y,
-    z: current.z,
-    rz: current.rz,
+    ...current,
     config: {
       easing: easings.easeInOutQuad,
-      duration: 180,
+      duration: getDuration(timing.return),
     },
   });
 };

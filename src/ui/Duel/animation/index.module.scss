@@ -328,6 +328,11 @@
   .aim line {
     animation: none;
   }
+  .coinPiece,
+  .dicePiece,
+  .toss {
+    animation: none;
+  }
 }
 @media (max-height: 550px) {
   .reveal {
@@ -415,6 +420,210 @@
 @media (prefers-reduced-motion: reduce) {
   .linkGate,
   .materialArt {
+    animation: none;
+  }
+}
+
+.draw .ring,
+.return .ring {
+  animation-name: sink;
+  border-style: dotted;
+}
+.banish .ring {
+  border-radius: 20%;
+  animation-name: banishGate;
+}
+.destroy .innerRing {
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+.release .ray,
+.material .ray {
+  animation-direction: reverse;
+}
+.ritual .innerRing {
+  border-radius: 0;
+  border-width: 2px;
+}
+.pendulum .ring {
+  border-left-width: 7px;
+  border-right-width: 7px;
+}
+@keyframes banishGate {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(0);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1) rotate(90deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.1) rotate(180deg);
+  }
+}
+.damageFrame {
+  position: absolute;
+  width: 210%;
+  height: 130%;
+  left: -55%;
+  top: -25%;
+  object-fit: fill;
+  opacity: 0.6;
+  z-index: -1;
+}
+.summonScene {
+  position: absolute;
+  z-index: -1;
+  width: clamp(200px, 34vw, 390px);
+  height: clamp(200px, 34vw, 390px);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--tone);
+  filter: drop-shadow(0 0 7px currentColor);
+  overflow: visible;
+}
+.vortex {
+  animation: vortex var(--duration) ease-in-out both;
+}
+.portal {
+  animation: portal var(--duration) ease-out both;
+}
+.orbits {
+  animation: orbits var(--duration) ease-in-out both;
+}
+.pendulums {
+  animation: portal var(--duration) ease-in-out both;
+}
+.summonLabel {
+  font-size: clamp(16px, 2vw, 23px);
+  letter-spacing: 0.15em;
+  color: var(--tone);
+  text-shadow: 0 2px 5px #000;
+}
+.reveal[data-summon-type="xyz"] .current {
+  box-shadow: 0 0 30px #efc95988;
+}
+.reveal[data-summon-type="synchro"] .current {
+  box-shadow: 0 0 30px #cafff2aa;
+}
+.reveal[data-summon-type="link"] .current {
+  box-shadow: 0 0 30px #6ad7ff88;
+}
+@keyframes vortex {
+  from {
+    opacity: 0;
+    transform: scale(0.3) rotate(0);
+  }
+  25% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.1) rotate(300deg);
+  }
+}
+@keyframes portal {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  30%,
+  75% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+@keyframes orbits {
+  from {
+    opacity: 0;
+    transform: scale(1.5) rotate(-90deg);
+  }
+  30%,
+  75% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.2) rotate(90deg);
+  }
+}
+.toss {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  justify-content: center;
+  align-content: center;
+  animation: cueFade var(--duration) ease-out both;
+}
+.coinPiece,
+.dicePiece {
+  display: grid;
+  place-items: center;
+  width: clamp(48px, 7vw, 80px);
+  height: clamp(48px, 7vw, 80px);
+  font-size: clamp(40px, 6vw, 68px);
+  font-weight: bold;
+  box-shadow: 0 6px 20px #0008;
+}
+.coinPiece {
+  border: 4px double #ffedaa;
+  border-radius: 50%;
+  font-size: clamp(22px, 4vw, 36px);
+  color: #604012;
+  background: radial-gradient(circle at 30% 25%, #ffedbd, #d49a33);
+  animation: coinSpin var(--duration) ease-out both;
+}
+.dicePiece {
+  border-radius: 12px;
+  color: #1b2532;
+  background: #f0f3f8;
+  animation: diceRoll var(--duration) ease-out both;
+}
+@keyframes coinSpin {
+  from {
+    transform: translateY(90px) rotateX(0);
+  }
+  25% {
+    transform: translateY(-110px) rotateX(720deg);
+  }
+  65%,
+  to {
+    transform: translateY(0) rotateX(1440deg);
+  }
+}
+@keyframes diceRoll {
+  from {
+    transform: translateY(-130px) rotate(-350deg) scale(0.6);
+  }
+  40% {
+    transform: translateY(15px) rotate(10deg) scale(1);
+  }
+  60%,
+  to {
+    transform: translateY(0) rotate(0);
+  }
+}
+.layer[data-duel-animation-quality="lite"] .coinPiece,
+.layer[data-duel-animation-quality="lite"] .dicePiece {
+  animation-name: cueFade;
+}
+@media (prefers-reduced-motion: reduce) {
+  .coinPiece,
+  .dicePiece,
+  .toss {
     animation: none;
   }
 }

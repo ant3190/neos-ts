@@ -1,8 +1,10 @@
 import { fetchStrings, Region, ygopro } from "@/api";
-import { sleep } from "@/infra";
 import MsgToss = ygopro.StocGameMessage.MsgToss;
 import { Container } from "@/container";
 import { AudioActionType, playEffect } from "@/infra/audio";
+import { MDPRO3 } from "@/ui/Duel/animation/mdpro3";
+import { emitDuelCue, waitForAnimation } from "@/ui/Duel/animation/runtime";
+import { getDuration } from "@/ui/Duel/PlayMat/Card/springs/utils";
 
 export default async (container: Container, toss: MsgToss) => {
   const context = container.context;
@@ -14,22 +16,19 @@ export default async (container: Container, toss: MsgToss) => {
     context.matStore.isMe(player) ? 102 : 103,
   );
 
-  for (const x of toss.res) {
-    if (tossType === MsgToss.TossType.DICE) {
-      playEffect(AudioActionType.SOUND_DICE);
-      context.matStore.tossResult =
-        prefix + fetchStrings(Region.System, 1624) + x;
-    } else if (tossType === MsgToss.TossType.COIN) {
-      playEffect(AudioActionType.SOUND_COIN);
-      context.matStore.tossResult =
-        prefix +
-        fetchStrings(Region.System, 1623) +
-        fetchStrings(Region.System, 61 - x);
-    } else {
-      console.log(`Unknown tossType = ${tossType}`);
-    }
-
-    // 等待1s，不然多个结果刷新太快了
-    await sleep(1000);
-  }
+  const dice = tossType === MsgToss.TossType.DICE;
+  if (!dice && tossType !== MsgToss.TossType.COIN) return;
+  const results = [...toss.res];
+  if (!results.length) return;
+  playEffect(dice ? AudioActionType.SOUND_DICE : AudioActionType.SOUND_COIN);
+  context.matStore.tossResult =
+    prefix +
+    fetchStrings(Region.System, dice ? 1624 : 1623) +
+    results
+      .map((x) => (dice ? String(x) : fetchStrings(Region.System, 61 - x)))
+      .join(" / ");
+  const duration = getDuration(dice ? MDPRO3.dice : MDPRO3.coin);
+  // All pieces settle together, using only results supplied by the rules core.
+  emitDuelCue({ kind: dice ? "dice" : "coin", results }, duration);
+  await waitForAnimation(duration);
 };

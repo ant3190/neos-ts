@@ -33,6 +33,8 @@ export interface DuelCue {
     | "phase"
     | "turn"
     | "life"
+    | "coin"
+    | "dice"
     | "result";
   duration: number;
   /** Lifetime follows engine messages; duration is only the entrance animation. */
@@ -58,6 +60,8 @@ export interface DuelCue {
     | "ritual"
     | "normal";
   materialCodes?: number[];
+  results?: number[];
+  damage?: boolean;
 }
 
 const MODE_KEY = "neos:duel-animation-mode";
@@ -73,6 +77,35 @@ export const animationSettings = proxy({
 export const duelTimeline = new EffectTimeline<DuelCue>();
 const elements = new Map<string, HTMLElement>();
 const zones = new Map<string, HTMLElement>();
+const animationWaits = new Set<() => void>();
+
+/** Holds/impacts settle on reset and hidden tabs, even without animation frames. */
+export function waitForAnimation(ms: number): Promise<boolean> {
+  if (animationQuality() === "off" || ms <= 0) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (completed: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      animationWaits.delete(cancel);
+      if (typeof document !== "undefined")
+        document.removeEventListener("visibilitychange", visibility);
+      resolve(completed);
+    };
+    const cancel = () => finish(false);
+    const visibility = () => {
+      if (document.hidden) finish(true);
+    };
+    const timer = setTimeout(() => finish(true), ms);
+    animationWaits.add(cancel);
+    if (typeof document !== "undefined")
+      document.addEventListener("visibilitychange", visibility);
+  });
+}
+export function cancelAnimationWaits() {
+  for (const cancel of [...animationWaits]) cancel();
+}
 
 export function registerCardElement(uuid: string, element: HTMLElement | null) {
   if (element) elements.set(uuid, element);

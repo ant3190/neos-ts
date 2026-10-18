@@ -83,9 +83,11 @@ export function zoneWorldPosition(
       z = -14.26;
       break;
     case ZONE.REMOVED:
-      x = 25.74 + 1.842971;
+      // YGOPro MR2020: banished cards sit directly above the graveyard.
+      // The zone hit area and the painted card both consume this same pose.
+      x = 25.74;
       y = 5;
-      z = -14.26 + 6.236011;
+      z = -4.76;
       break;
     case ZONE.MZONE:
       x = sequence > 4 ? (sequence === 5 ? -8.6 : 8.6) : (sequence - 2) * 8.6;
@@ -132,8 +134,6 @@ export function tablePose(
     ? zone === ZONE.DECK
       ? -19.5
       : 19.5
-    : zone === ZONE.REMOVED
-    ? 90
     : defense
     ? 90
     : 0;

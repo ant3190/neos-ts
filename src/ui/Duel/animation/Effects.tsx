@@ -6,6 +6,7 @@ import { fetchCard } from "@/api";
 import { matStore } from "@/stores";
 import { YgoCard } from "@/ui/Shared";
 
+import { mdpro3Asset } from "./assets";
 import styles from "./index.module.scss";
 import { NegationEffect } from "./NegationEffect";
 import { combatPresentation } from "./present";
@@ -18,7 +19,22 @@ import {
 } from "./runtime";
 
 const cueClasses = styles as Record<string, string>;
-const fieldFeedbackKinds = new Set<DuelCue["kind"]>(["target", "impact"]);
+const fieldFeedbackKinds = new Set<DuelCue["kind"]>([
+  "target",
+  "impact",
+  "draw",
+  "summon",
+  "special",
+  "flip",
+  "set",
+  "position",
+  "destroy",
+  "grave",
+  "banish",
+  "return",
+  "material",
+  "release",
+]);
 const captionKinds = new Set<DuelCue["kind"]>([
   "phase",
   "turn",
@@ -100,28 +116,30 @@ export function DuelEffects() {
           width="100%"
           height="100%"
         >
-          <defs>
-            <marker
-              id="duel-aim-tip"
-              markerWidth="9"
-              markerHeight="9"
-              refX="8"
-              refY="4.5"
-              orient="auto"
-            >
-              <path d="M0,0 L9,4.5 L0,9 Z" fill={combat.attack.tone} />
-            </marker>
-          </defs>
-          <line
-            x1={combat.attack.from.x}
-            y1={combat.attack.from.y}
-            x2={combat.attack.to.x}
-            y2={combat.attack.to.y}
-            stroke={combat.attack.tone}
-            strokeWidth="3"
-            strokeDasharray="10 8"
-            markerEnd="url(#duel-aim-tip)"
-          />
+          <g
+            transform={`translate(${combat.attack.from.x} ${
+              combat.attack.from.y
+            }) rotate(${
+              (Math.atan2(
+                combat.attack.to.y - combat.attack.from.y,
+                combat.attack.to.x - combat.attack.from.x,
+              ) *
+                180) /
+              Math.PI
+            })`}
+          >
+            <image
+              href={mdpro3Asset("GUI_Attack_Arrow")}
+              x="0"
+              y="-12"
+              width={Math.hypot(
+                combat.attack.to.x - combat.attack.from.x,
+                combat.attack.to.y - combat.attack.from.y,
+              )}
+              height="24"
+              preserveAspectRatio="none"
+            />
+          </g>
           {combat.attack.direct && (
             <text
               x={combat.attack.to.x}
@@ -137,6 +155,8 @@ export function DuelEffects() {
       {cues.map((cue) =>
         cue.kind === "negate" ? (
           <NegationEffect key={cue.id} cue={cue} quality={quality} />
+        ) : cue.kind === "coin" || cue.kind === "dice" ? (
+          <TossResult key={cue.id} cue={cue} />
         ) : (
           <div
             key={cue.id}
@@ -178,7 +198,13 @@ export function DuelEffects() {
                   </svg>
                 )}
                 {quality === "full" &&
-                  cue.kind === "impact" &&
+                  [
+                    "impact",
+                    "special",
+                    "summon",
+                    "destroy",
+                    "release",
+                  ].includes(cue.kind) &&
                   Array.from({ length: 6 }, (_, i) => (
                     <i
                       key={i}
@@ -190,6 +216,13 @@ export function DuelEffects() {
             )}
             {cue.label && captionKinds.has(cue.kind) && (
               <span className={styles.caption}>{cue.label}</span>
+            )}
+            {cue.kind === "life" && cue.damage && quality === "full" && (
+              <img
+                className={styles.damageFrame}
+                src={mdpro3Asset("DamageFrame")}
+                alt=""
+              />
             )}
           </div>
         ),
@@ -215,6 +248,7 @@ export function DuelEffects() {
           data-effect-live={reveal.live}
           data-chain-index={reveal.index}
           data-card-code={reveal.code}
+          data-summon-type={reveal.summonType}
           style={
             {
               "--tone": cueTone(reveal),
@@ -222,6 +256,9 @@ export function DuelEffects() {
             } as CSSProperties
           }
         >
+          {reveal.kind === "special" && quality === "full" && (
+            <SummonGeometry type={reveal.summonType} />
+          )}
           {reveal.kind === "chain" && (
             <div className={styles.chainWord}>CHAIN</div>
           )}
@@ -298,9 +335,118 @@ export function DuelEffects() {
               </div>
             )}
           </div>
+          {reveal.kind === "special" && (
+            <span className={styles.summonLabel}>{reveal.label}</span>
+          )}
         </div>
       )}
     </div>,
     document.body,
+  );
+}
+
+function TossResult({ cue }: { cue: DuelCue }) {
+  const faces = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+  return (
+    <div
+      className={styles.toss}
+      data-testid="duel-toss-result"
+      data-effect-kind={cue.kind}
+      style={{ "--duration": `${cue.duration}ms` } as CSSProperties}
+    >
+      {cue.results?.map((result, index) => (
+        <div
+          key={index}
+          className={cue.kind === "coin" ? styles.coinPiece : styles.dicePiece}
+          style={{ "--piece-index": index } as CSSProperties}
+          data-result={result}
+        >
+          {cue.kind === "dice" ? faces[result] ?? result : result ? "正" : "反"}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Local browser geometry, following each source summon category, never a field backdrop. */
+function SummonGeometry({ type }: { type: DuelCue["summonType"] }) {
+  return (
+    <svg
+      className={styles.summonScene}
+      viewBox="-100 -100 200 200"
+      data-testid="duel-summon-scene"
+      data-summon-type={type}
+    >
+      {type === "fusion" ? (
+        <g
+          className={styles.vortex}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="4"
+        >
+          <path d="M0-85 C95-85 95 55 0 55 C-65 55-65-30 0-30 C35-30 35 10 0 10" />
+          <path d="M0 85 C-95 85-95-55 0-55 C65-55 65 30 0 30 C-35 30-35-10 0-10" />
+        </g>
+      ) : type === "link" ? (
+        <g
+          className={styles.portal}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M-40-90 H40 L90-40 V40 L40 90 H-40 L-90 40 V-40 Z M-30-70 H30 L70-30 V30 L30 70 H-30 L-70 30 V-30 Z" />
+          {Array.from({ length: 8 }, (_, i) => (
+            <path
+              key={i}
+              transform={`rotate(${i * 45})`}
+              d="M-8-86 L0-99 L8-86 M0-99 V-72"
+              strokeWidth="4"
+            />
+          ))}
+        </g>
+      ) : type === "pendulum" ? (
+        <g
+          className={styles.pendulums}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+        >
+          <path d="M-75-95 V95 M75-95 V95 M-75-65 Q0-120 75-65 M-75 65 Q0 120 75 65" />
+          <path
+            d="M-85-20 L-75-40 L-65-20 L-75 0 Z M65 20 L75 0 L85 20 L75 40 Z"
+            fill="currentColor"
+          />
+        </g>
+      ) : (
+        <g
+          className={styles.orbits}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={type === "xyz" ? 4 : 1.5}
+        >
+          {[0, 60, 120].map((angle) => (
+            <ellipse
+              key={angle}
+              rx="90"
+              ry={type === "ritual" ? 70 : 32}
+              transform={`rotate(${angle})`}
+            />
+          ))}
+          {type === "ritual" ? (
+            <path d="M0-90 L78 45 H-78 Z" />
+          ) : (
+            Array.from({ length: 6 }, (_, i) => (
+              <circle
+                key={i}
+                cx={Math.cos((i * Math.PI) / 3) * 78}
+                cy={Math.sin((i * Math.PI) / 3) * 78}
+                r={type === "synchro" ? 3 : 5}
+                fill="currentColor"
+              />
+            ))
+          )}
+        </g>
+      )}
+    </svg>
   );
 }

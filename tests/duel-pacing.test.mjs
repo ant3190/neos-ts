@@ -10,11 +10,13 @@ import {
 test("reading time includes existing movement and long activations rather than adding a full second wait", () => {
   const move = getDuelPacing("move");
   const activate = getDuelPacing("chaining");
-  assert.equal(190 + remainingDuelPace(move, 190), 300);
-  assert.equal(150 + remainingDuelPace(move, 150), 300);
-  assert.equal(remainingDuelPace(move, 400), 80);
-  assert.equal(380 + remainingDuelPace(activate, 380), 600);
-  assert.equal(remainingDuelPace(activate, 1100), 80);
+  assert.equal(190 + remainingDuelPace(move, 190), 400);
+  assert.equal(150 + remainingDuelPace(move, 150), 400);
+  assert.equal(remainingDuelPace(move, 400), 0);
+  assert.equal(380 + remainingDuelPace(activate, 380), 1100);
+  assert.equal(remainingDuelPace(activate, 1100), 0);
+  assert.equal(getDuelPacing("sp_summoning", 0, true).minimumMs, 200);
+  assert.equal(getDuelPacing("sp_summoning", 0, false).minimumMs, 1000);
 });
 
 test("no frame renderer still yields between meaningful actions using bounded wall-clock timers", async (t) => {
@@ -23,7 +25,7 @@ test("no frame renderer still yields between meaningful actions using bounded wa
   const action = waitForDuelPace(getDuelPacing("draw"), 0).then(() => {
     finished = true;
   });
-  t.mock.timers.tick(379);
+  t.mock.timers.tick(499);
   await Promise.resolve();
   assert.equal(finished, false);
   t.mock.timers.tick(1);

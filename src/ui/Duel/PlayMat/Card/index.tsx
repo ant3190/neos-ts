@@ -54,6 +54,7 @@ import {
   attack,
   type AttackOptions,
   focus,
+  land,
   move,
   type MoveOptions,
 } from "./springs";
@@ -188,12 +189,12 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
 
     const unsubscribeFocus = register(
       Task.Focus,
-      async (options?: { code?: number }) => {
+      async (options?: { code?: number; kind?: "activate" | "confirm" }) => {
         await addToAnimation(async () => {
           const conceal = revealPublicCardFace(card.uuid, options?.code);
           setClassFocus(true);
           try {
-            await focus({ card, api });
+            await focus({ card, api, kind: options?.kind });
           } finally {
             conceal();
             setClassFocus(false);
@@ -208,10 +209,17 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
         await addToAnimation(() => attack({ card, api, options }));
       },
     );
+    const unsubscribeLand = register(
+      Task.Land,
+      async (options?: { strong?: boolean }) => {
+        await addToAnimation(() => land({ api, strong: options?.strong }));
+      },
+    );
     return () => {
       unsubscribeMove();
       unsubscribeFocus();
       unsubscribeAttack();
+      unsubscribeLand();
     };
   }, []);
 
@@ -479,5 +487,9 @@ const call =
     eventbus.call(task, uuid, options);
 
 export const callCardMove = call<MoveOptions>(Task.Move);
-export const callCardFocus = call<{ code?: number }>(Task.Focus);
+export const callCardFocus = call<{
+  code?: number;
+  kind?: "activate" | "confirm";
+}>(Task.Focus);
 export const callCardAttack = call<AttackOptions>(Task.Attack);
+export const callCardLand = call<{ strong?: boolean }>(Task.Land);

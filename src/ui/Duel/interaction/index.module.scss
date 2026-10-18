@@ -50,6 +50,11 @@
 .actions button > span svg {
   display: block;
 }
+.actions button > span > img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
 .actions .gold > span {
   border-color: #f6d37e;
   color: #ffe4a2;

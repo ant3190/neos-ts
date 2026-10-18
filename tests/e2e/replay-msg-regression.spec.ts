@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { installOfflineDuelResources } from "./helpers/offlineDuel";
 
 import {
   advanceReplayTo,
@@ -27,6 +28,7 @@ test("replay handles raw ocgcore move, update-card, and swap messages", async ({
   page,
 }, testInfo) => {
   testInfo.setTimeout(120000);
+  await installOfflineDuelResources(page);
 
   const replayPath = await writeReplayFixture(
     testInfo,

@@ -34,9 +34,10 @@ export interface MoveOptions {
 }
 export type MoveFunc = OptionsToFunc<MoveOptions>;
 
-export type AttackOptions =
+export type AttackOptions = { onHit?: () => void } & (
   | {
       directAttack: true;
     }
-  | { directAttack: false; target: ygopro.CardLocation };
+  | { directAttack: false; target: ygopro.CardLocation }
+);
 export type AttackFunc = OptionsToFunc<AttackOptions>;

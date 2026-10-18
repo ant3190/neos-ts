@@ -11,6 +11,7 @@ export enum Task {
   Move = "move", // 卡片移动
   Focus = "focus", // 卡片聚焦
   Attack = "attack", // 卡片攻击
+  Land = "land", // 召唤落地
   Mora = "mora", // 猜拳
   Tp = "tp", // 选边
 }
@@ -18,7 +19,10 @@ export enum Task {
 const getEnd = (task: Task) => `${task}-end`;
 const cardKey = (task: Task, uuid: string) => `${task}:${uuid}`;
 const isCardTask = (task: Task) =>
-  task === Task.Move || task === Task.Focus || task === Task.Attack;
+  task === Task.Move ||
+  task === Task.Focus ||
+  task === Task.Attack ||
+  task === Task.Land;
 
 /** 在组件之中注册方法，注意注册的方法一旦执行成功，必须返回一个true */
 const register = <T extends unknown[]>(

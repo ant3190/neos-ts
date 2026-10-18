@@ -25,8 +25,8 @@ export const HiddenCard: React.FC<{ idx: number }> = React.memo(({ idx }) => {
       }
       return false;
     };
-    const unsubscribers = [Task.Move, Task.Focus, Task.Attack].map((task) =>
-      eventbus.register(task, complete, card.uuid),
+    const unsubscribers = [Task.Move, Task.Focus, Task.Attack, Task.Land].map(
+      (task) => eventbus.register(task, complete, card.uuid),
     );
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, [card]);

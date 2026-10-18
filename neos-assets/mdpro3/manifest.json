@@ -1,0 +1,102 @@
+{
+  "source": "https://code.moenext.com/sherry_chaos/MDPro3",
+  "commit": "e177cd8d53092ae9249e37b38d3cef0040e41095",
+  "assets": [
+    {
+      "id": "9478c0d80b9c511a669690fd5215b5d57f7922bb",
+      "name": "GUI_T_DuelButtonActIcon01_1.png",
+      "type": "blob",
+      "path": "Assets/Texture/Icons_DuelButton/GUI_T_DuelButtonActIcon01_1.png",
+      "mode": "100644",
+      "bytes": 22140
+    },
+    {
+      "id": "74ac4293d4edac5a9d3ca3e18d3ee2b604766fbd",
+      "name": "GUI_T_DuelButtonActIcon02_1.png",
+      "type": "blob",
+      "path": "Assets/Texture/Icons_DuelButton/GUI_T_DuelButtonActIcon02_1.png",
+      "mode": "100644",
+      "bytes": 19949
+    },
+    {
+      "id": "39793c633afb5eb1802ed1457527f65d72aa1ced",
+      "name": "GUI_T_DuelButtonActIcon03_1.png",
+      "type": "blob",
+      "path": "Assets/Texture/Icons_DuelButton/GUI_T_DuelButtonActIcon03_1.png",
+      "mode": "100644",
+      "bytes": 22490
+    },
+    {
+      "id": "1c11ef6e24bbb20521fc6f7a2fc2eab24a62d88c",
+      "name": "GUI_T_DuelButtonActIcon04_1.png",
+      "type": "blob",
+      "path": "Assets/Texture/Icons_DuelButton/GUI_T_DuelButtonActIcon04_1.png",
+      "mode": "100644",
+      "bytes": 22305
+    },
+    {
+      "id": "1b3f2f754df957d6998c23acbe79736477aaed27",
+      "name": "GUI_T_DuelButtonActIcon05_1.png",
+      "type": "blob",
+      "path": "Assets/Texture/Icons_DuelButton/GUI_T_DuelButtonActIcon05_1.png",
+      "mode": "100644",
+      "bytes": 21962
+    },
+    {
+      "id": "798475d4cbd642aed888f97eae311641a8077171",
+      "name": "GUI_T_DuelButtonActIcon06_1.png",
+      "type": "blob",
+      "path": "Assets/Texture/Icons_DuelButton/GUI_T_DuelButtonActIcon06_1.png",
+      "mode": "100644",
+      "bytes": 22531
+    },
+    {
+      "id": "d695d35be234d000b7bd119511e0c567efca3e83",
+      "name": "GUI_T_DuelButtonActIcon07_1.png",
+      "type": "blob",
+      "path": "Assets/Texture/Icons_DuelButton/GUI_T_DuelButtonActIcon07_1.png",
+      "mode": "100644",
+      "bytes": 26825
+    },
+    {
+      "id": "b3c17c17ab11a0ceea33879bd6c48863916ab13e",
+      "name": "GUI_T_DuelButtonActIcon08_1.png",
+      "type": "blob",
+      "path": "Assets/Texture/Icons_DuelButton/GUI_T_DuelButtonActIcon08_1.png",
+      "mode": "100644",
+      "bytes": 18181
+    },
+    {
+      "id": "c256cfd9743af8522254e9926522d134cb975d74",
+      "name": "GUI_T_DuelButtonActIcon09_1.png",
+      "type": "blob",
+      "path": "Assets/Texture/Icons_DuelButton/GUI_T_DuelButtonActIcon09_1.png",
+      "mode": "100644",
+      "bytes": 19237
+    },
+    {
+      "id": "95db703ad7c5904643fdf3fb6167770cb63a0f0c",
+      "name": "GUI_Attack_Arrow.png",
+      "type": "blob",
+      "path": "Assets/Texture/GUI_Used/GUI_Attack_Arrow.png",
+      "mode": "100644",
+      "bytes": 2585
+    },
+    {
+      "id": "56bea7049d6554b2f906ba7a7e047be5bcc5b751",
+      "name": "GUI_T_DuelButtonActIcon11_1.png",
+      "type": "blob",
+      "path": "Assets/Texture/Icons_DuelButton/GUI_T_DuelButtonActIcon11_1.png",
+      "mode": "100644",
+      "bytes": 25500
+    },
+    {
+      "id": "385f954736ec714de850e8bf13b2a9c21bc08e94",
+      "name": "DamageFrame.png",
+      "type": "blob",
+      "path": "Assets/Texture/GUI_Used/DamageFrame.png",
+      "mode": "100644",
+      "bytes": 13041
+    }
+  ]
+}

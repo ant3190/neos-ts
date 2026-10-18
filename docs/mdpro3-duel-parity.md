@@ -7,6 +7,7 @@
 按最新反馈改为平面场地和平铺手牌，不再使用 MDPro3 的透视相机、扇形手牌、圆形阶段入口或大尺寸阶段弹层。
 
 - 场地采用正交坐标；双方同类卡片尺寸一致，高度只用于遮挡排序，不影响大小。
+- 除外区按 YGOPro 的纵向卡堆位置放在墓地上方，双方镜像排列，取消原来的横置与横向偏移。卡片、区域底框和点击区域共用坐标，其余界面位置不变。
 - 手牌水平排列，无旋转、下垂或悬停位移。抽卡、检索及离开手牌时，已有手牌仅沿水平方向补位，保持牌序和遮挡顺序；超过 10 张时逐步压缩间距。长手牌仍支持横向拖动，拖动结束不发送选卡响应。
 - 阶段入口为紧凑横条，显示回合号和当前阶段，点击打开阶段列表。合法性及 idle/battle 回传编码仍由服务端指令决定。
 - 右下角按钮使用屏幕像素坐标，统一 44×44 点击区、图标、间距和面板风格。菜单与按钮处于相同坐标层，不受场地缩放影响。
@@ -38,9 +39,33 @@
 - 阶段与卡片操作发送前同步消费当前指令，避免重复响应或旧弹窗回答新指令。
 - 新局和退出清理旧弹窗、拖动、临时卡面、附加效果和展示队列。
 
+## 本次接入 neos 的源码对齐
+
+继续使用 neos 的协议、内核适配器、资源服务和现有页面，按 MDPro3 的消息顺序驱动卡片动画。没有接入另一个演示项目的模拟规则或替换现有对局连接。
+
+| 行为 | 当前实现 |
+| --- | --- |
+| 攻击 | 宣言只显示攻击箭头；BATTLE 才播放蓄力、冲击、命中停顿与完整归位，消息队列等待结束后再处理伤害和送墓。攻击力低于 2000 共 1000ms，达到 2000 共 1250ms。 |
+| 召唤 | 保持平面相机，卡片升起、停留、落地；普通落地序列 600ms，强化序列 800ms。强化判定沿用 `Card.IsHighLevel`：等级 7+、阶级 4+ 或连接箭头 3+。落地消息等待 1000ms，衍生物 200ms。 |
+| 特殊召唤 | 按素材记录和类型区分融合、同调、超量、连接、仪式、灵摆；先展示素材与召唤卡，再落地。召唤、破坏、解放、素材、送墓、除外、回卡组与表示形式变化有局部反馈。 |
+| 发动与确认 | 发动卡片使用 200/700/200ms，确认卡片使用 100/800/100ms 的进入、停留、恢复阶段。确认多张卡逐张等待；临时公开卡面不再改写隐藏卡的协议卡号与元数据。 |
+| 无效与对象 | 无效消息等待 1000ms；无效仍作用在原卡片上，保留临时公开与恢复机制；对象指定等待 500ms。 |
+| 硬币与骰子 | 一次同时展示全部内核结果，不在浏览器重新随机；硬币共 3000ms、骰子共 2000ms，随后继续消息。 |
+| 数字变化 | LP 先浮出变化量 1100ms，再线性滚动 1200ms；攻防变化滚动 600ms。LP 规则消息仅等待 500ms，数字动画独立完成。暂停渲染及切换后台均有最终值兜底。 |
+| 选择 | 精确等级素材过滤无法完成的候选，并在达到合法目标时自动提交；弹窗与场上选择使用相同规则。解放保留内核贡献值，一张可满足两份解放。计数物在场上逐次点击、满足数量后自动提交，其他情况使用数字输入；响应保留原始顺序和未选位置的零值。 |
+| 重开与退出 | 取消正在等待的停留、冲击和召唤展示，旧消息不得继续写入新一局的记录；所有提示保留各自的请求编号，防止重复或过期响应。 |
+
+表中时间以原有动画速度设置 `0.7` 为基准；原有速度滑块继续生效。低动态、关闭动画及后台模式保留结果信息与规则状态，减少装饰和动画等待。
+
+原版操作图标、攻击箭头和伤害框共 12 张 PNG 已接入 `neos-assets/mdpro3/`，每张均核对固定提交的 Git blob SHA，详见同目录 `manifest.json` 和 `NOTICE.md`。按钮大小、位置、蓝金色反馈及文字沿用 neos。
+
+**保真范围：**常用操作分支、消息等待、卡片移动与恢复顺序依据源码对齐。Unity Timeline、专属角色/怪兽 Cut-in、特殊胜利演出及原版粒子资产没有移植；六类特殊召唤的局部几何与粒子是浏览器重建，展示段采用 1600ms 基准，不能视为原版 Timeline 的逐帧复制。场地背景和透视相机不在本次迁移范围。
+
+之前已确认的稳定手牌顺序、开局卡组不播放洗牌动画与声音、`.env` 资源地址及 `18080` 部署端口继续保留。
+
 ## 对照来源
 
-操作及事件规则参考 [MDPro3 官方仓库](https://code.moenext.com/sherry_chaos/MDPro3) 的固定提交 [`e177cd8d53092ae9249e37b38d3cef0040e41095`](https://code.moenext.com/sherry_chaos/MDPro3/-/tree/e177cd8d53092ae9249e37b38d3cef0040e41095)，包括 `GameCard.cs`、`DuelButton.cs`、`DuelMessage.cs`、`MessageProcessor.cs`、`CardList.cs`、`OcgCoreUI.cs` 与相关 UI 预制体。没有引入 Unity、模型、粒子或 AssetBundle。
+操作及事件规则参考 [MDPro3 官方仓库](https://code.moenext.com/sherry_chaos/MDPro3) 的固定提交 [`e177cd8d53092ae9249e37b38d3cef0040e41095`](https://code.moenext.com/sherry_chaos/MDPro3/-/tree/e177cd8d53092ae9249e37b38d3cef0040e41095)，包括 `GameCard.cs`、`YGOSharp/Card.cs`、`DuelButton.cs`、`DuelMessage.cs`、`MessageProcessor.cs`、`CardList.cs`、`OcgCoreUI.cs` 与相关 UI 预制体。引入原版 PNG 图标，未引入 Unity、模型、粒子文件或 AssetBundle。
 
 ## 验证
 
@@ -48,9 +73,9 @@
 npx tsc --noEmit
 npm run lint
 npm run build
-./node_modules/.bin/esbuild tests/duel-pacing.test.mjs tests/mdpro3-experience.test.mjs tests/mdpro3-parity.test.mjs tests/card-animation.test.mjs tests/eventbus.test.mjs tests/local-id.test.mjs --bundle --platform=node --format=esm --out-extension:.js=.mjs --outdir=/tmp/neos-parity-tests
+./node_modules/.bin/esbuild tests/duel-pacing.test.mjs tests/mdpro3-experience.test.mjs tests/mdpro3-parity.test.mjs tests/mdpro3-source-behavior.test.mjs tests/card-animation.test.mjs tests/eventbus.test.mjs tests/local-id.test.mjs tests/hand-order.test.mjs --bundle --platform=node --format=esm --out-extension:.js=.mjs --outdir=/tmp/neos-parity-tests
 node --test /tmp/neos-parity-tests/*.test.mjs
-npm run test:e2e -- tests/e2e/duel-polish.spec.ts tests/e2e/duel-selection-polish.spec.ts tests/e2e/duel-effect-text.spec.ts tests/e2e/duel-material-selection.spec.ts tests/e2e/mdpro3-parity.spec.ts tests/e2e/mdpro3-duel.spec.ts tests/e2e/duel-pacing.spec.ts tests/e2e/duel-dialog-regression.spec.ts tests/e2e/adaptive-scale.spec.ts --workers=1
+npm run test:e2e -- tests/e2e/duel-polish.spec.ts tests/e2e/duel-selection-polish.spec.ts tests/e2e/duel-effect-text.spec.ts tests/e2e/duel-material-selection.spec.ts tests/e2e/mdpro3-parity.spec.ts tests/e2e/mdpro3-duel.spec.ts tests/e2e/mdpro3-source-behavior.spec.ts tests/e2e/duel-shuffle-regression.spec.ts tests/e2e/duel-pacing.spec.ts tests/e2e/duel-dialog-regression.spec.ts tests/e2e/adaptive-scale.spec.ts tests/e2e/replay-msg-regression.spec.ts --workers=1
 ```
 
 新增浏览器回归逐帧检查双方抽卡/检索时已有手牌保持同一基线和牌序，检查跨区同排、双方标记、两类滚轮滚动、多排窗口增高及缩放后的效果字号；同时检查召唤路径单调、途中卡片尺寸恒定、结束没有跳回；检查弹窗淡入时边界固定、场地查看不会提交；并在桌面与竖屏验证按钮和菜单的实际屏幕尺寸。其他回归覆盖连锁、无效、选择、卡堆、阶段编码、重开清理和停帧处理。文字回归使用灰流丽、增殖的G、流天类星龙和死亡导游的完整效果文本，并检查缺失静态说明、无卡图确认、卡片效果编号及空描述槽的显示。素材回归覆盖场上/手牌/墓地/叠放素材分流、必选素材与原始响应编号、精确等级自动确认、溢出等级手动确认、逐步选素材的结束和取消、右键层级，以及桌面和竖屏的确认按钮尺寸。没有测量用户设备的实际帧率。
@@ -63,7 +88,7 @@ npm run test:e2e -- tests/e2e/duel-polish.spec.ts tests/e2e/duel-selection-polis
 git fetch origin
 git switch feat/mdpro3-duel-parity
 git pull --ff-only origin feat/mdpro3-duel-parity
-docker compose up --build -d
+docker compose up --build -d --remove-orphans
 ```
 
 端口仍为 `18080`。

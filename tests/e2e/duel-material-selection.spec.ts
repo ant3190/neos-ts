@@ -149,7 +149,7 @@ for (const zone of ["HAND", "GRAVE", "OVERLAY"]) {
       .getByTestId("duel-select-candidates")
       .locator('[data-card-response="7"]')
       .click();
-    await page.getByTestId("duel-select-card-submit").click();
+    // MDPro3 submits exact sums immediately in both the field and popup views.
     await expectPacket(page, [4, 7]);
   });
 }

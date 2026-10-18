@@ -77,7 +77,7 @@ async function beginFixtureChain(page: Page, clearReveal = true) {
     );
     const { duelTimeline } = await import("/src/ui/Duel/animation/runtime.ts");
     const card = cardStore.inner[0];
-    await handleGameMsg(
+    const animation = handleGameMsg(
       getUIContainer(),
       new ygopro.YgoStocMsg({
         stoc_game_msg: new ygopro.StocGameMessage({
@@ -88,13 +88,22 @@ async function beginFixtureChain(page: Page, clearReveal = true) {
         }),
       }),
     );
-    if (clearReveal) duelTimeline.clear();
+    // Inspect the activation while its source animation is still in flight.
+    if (clearReveal) {
+      await animation;
+      duelTimeline.clear();
+    }
   }, clearReveal);
 }
 
-async function chainNotification(page: Page, command: number, index = 1) {
+async function chainNotification(
+  page: Page,
+  command: number,
+  index = 1,
+  waitForEnd = true,
+) {
   await page.evaluate(
-    async ({ command, index }) => {
+    async ({ command, index, waitForEnd }) => {
       const { getUIContainer } = await import("/src/container/compat.ts");
       const { default: handleGameMsg } = await import(
         "/src/service/duel/gameMsg.ts"
@@ -108,9 +117,10 @@ async function chainNotification(page: Page, command: number, index = 1) {
             ? Uint8Array.of(command)
             : Uint8Array.of(command, index),
       } as any).upcast();
-      await handleGameMsg(getUIContainer(), packet);
+      const animation = handleGameMsg(getUIContainer(), packet);
+      if (waitForEnd) await animation;
     },
-    { command, index },
+    { command, index, waitForEnd },
   );
 }
 
@@ -431,7 +441,7 @@ test("activation negation greys the original card, cancels its cut-in and keeps 
   });
   await chainNotification(page, 72);
   await expect(page.getByTestId("duel-card-reveal")).toBeVisible();
-  await chainNotification(page, 75);
+  await chainNotification(page, 75, 1, false);
   const card = page.locator('[data-card-uuid="fixture-monster"]');
   const face = card.locator("[data-card-face]");
   await expect(card).toHaveAttribute("data-card-negation", "activation");
@@ -443,7 +453,7 @@ test("activation negation greys the original card, cancels its cut-in and keeps 
   await expect(page.getByTestId("duel-card-negation")).toHaveCount(0);
   await expect(page.getByTestId("duel-chain-stack")).not.toContainText("无效");
   const token = await card.getAttribute("data-card-negating");
-  await chainNotification(page, 76);
+  await chainNotification(page, 76, 1, false);
   await expect(card).toHaveAttribute("data-card-negating", token!);
   await card.click();
   await page.getByTestId("duel-action-attack").click();
@@ -537,7 +547,7 @@ test("opponent hand negation briefly turns the public source face up and returns
     );
     animationSettings.mode = "full";
   });
-  await chainNotification(page, 75);
+  await chainNotification(page, 75, 1, false);
   const card = page.locator('[data-card-uuid="fixture-monster"]');
   await expect(card.locator("[data-card-face] img")).toHaveAttribute(
     "src",
@@ -606,7 +616,7 @@ test("effect negation follows the same card after movement and reset removes its
       }),
     );
   });
-  await chainNotification(page, 76);
+  await chainNotification(page, 76, 1, false);
   const card = page.locator('[data-card-uuid="fixture-monster"]');
   await expect(card).toHaveAttribute("data-card-sequence", "3");
   await expect(card).toHaveAttribute("data-card-negation", "effect");
@@ -669,7 +679,7 @@ test("negating a card returned deep into the deck shows its public identity at t
     );
   });
   await expect(page.locator('[data-card-uuid="fixture-monster"]')).toBeHidden();
-  await chainNotification(page, 76);
+  await chainNotification(page, 76, 1, false);
   const feedback = page.getByTestId("duel-card-negation");
   await expect(feedback).toBeVisible();
   await expect(feedback).toHaveAttribute("data-card-code", "46986414");
@@ -712,7 +722,7 @@ test("all circular actions center their icons and retain gold/blue command highl
       const circle = node
         .querySelector(":scope > span")!
         .getBoundingClientRect();
-      const icon = node.querySelector("svg")!.getBoundingClientRect();
+      const icon = node.querySelector("img, svg")!.getBoundingClientRect();
       return {
         action: node.getAttribute("data-action-type"),
         dx: Math.abs(icon.x + icon.width / 2 - circle.x - circle.width / 2),

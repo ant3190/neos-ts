@@ -1,10 +1,14 @@
+import { useEffect, useRef, useState } from "react";
 import { useSnapshot } from "valtio";
 
 import { ygopro } from "@/api";
 import { TYPE_LINK } from "@/common";
 import { cardStore, isMe } from "@/stores";
 
+import { MDPRO3 } from "../animation/mdpro3";
 import { cardMotionState } from "../animation/motionState";
+import { animationQuality } from "../animation/runtime";
+import { getDuration } from "../PlayMat/Card/springs/utils";
 import styles from "./fieldInfo.module.scss";
 import {
   isFaceDownPosition,
@@ -53,8 +57,13 @@ export function FieldInfo() {
               data-stats-card-uuid={card.uuid}
             >
               <strong>
-                {card.meta.data.atk ?? "?"}
-                {link ? "" : ` / ${card.meta.data.def ?? "?"}`}
+                <StatNumber value={card.meta.data.atk} />
+                {!link && (
+                  <>
+                    {" "}
+                    / <StatNumber value={card.meta.data.def} />
+                  </>
+                )}
               </strong>
               <small>
                 {link ? "LINK" : "LV"} {(card.meta.data.level ?? 0) & 0xff}
@@ -64,5 +73,59 @@ export function FieldInfo() {
           );
         })}
     </div>
+  );
+}
+
+function StatNumber({ value }: { value?: number }) {
+  const [shown, setShown] = useState(value);
+  const current = useRef(value);
+  useEffect(() => {
+    const from = current.current;
+    let frame = 0,
+      done = false;
+    const finish = () => {
+      done = true;
+      cancelAnimationFrame(frame);
+      current.current = value;
+      setShown(value);
+    };
+    if (from === value) return;
+    if (
+      from === undefined ||
+      value === undefined ||
+      from < 0 ||
+      value < 0 ||
+      animationQuality() === "off"
+    ) {
+      finish();
+      return;
+    }
+    const start = performance.now(),
+      duration =
+        animationQuality() === "full" ? getDuration(MDPRO3.statRoll) : 150;
+    const tick = (now: number) => {
+      if (done) return;
+      const progress = Math.min(1, (now - start) / duration);
+      current.current = Math.round(from + (value - from) * progress);
+      setShown(current.current);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    const deadline = setTimeout(finish, duration + 100);
+    const visibility = () => {
+      if (document.hidden) finish();
+    };
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      done = true;
+      cancelAnimationFrame(frame);
+      clearTimeout(deadline);
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, [value]);
+  return (
+    <span data-stat-target={value}>
+      {shown === undefined || shown < 0 ? "?" : shown}
+    </span>
   );
 }

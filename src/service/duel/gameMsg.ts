@@ -1,10 +1,12 @@
-import { ygopro } from "@/api";
+import { fetchCard, ygopro } from "@/api";
 import { getPresentationMessage } from "@/api/ocgcore/ocgAdapter/stoc/stocGameMsg/presentation";
+import { TYPE_TOKEN } from "@/common";
 import { Container } from "@/container";
 import { isCurrentUIContainer } from "@/container/compat";
 import { replayStore } from "@/stores";
 import { presentGameMessage } from "@/ui/Duel/animation/present";
 import { showWaiting } from "@/ui/Duel/Message";
+import { getDuelEpoch } from "@/ui/Duel/Message/session";
 import { clearAllIdleInteractivities } from "@/ui/Duel/utils";
 
 import onAnnounce from "./announce";
@@ -92,6 +94,8 @@ export default async function handleGameMsg(
   let pacing = getDuelPacing(
     notification?.kind ?? msg.gameMsg,
     container.context.matStore.chainDetails.length,
+    msg.gameMsg === "sp_summoning" &&
+      !!((fetchCard(msg.sp_summoning.code).data.type ?? 0) & TYPE_TOKEN),
   );
   if (msg.gameMsg === "new_phase") {
     const phases = ygopro.StocGameMessage.MsgNewPhase.PhaseType;
@@ -117,8 +121,9 @@ export default async function handleGameMsg(
     pacing = undefined;
 
   const startedAt = performance.now();
+  const epoch = getDuelEpoch();
   await applyGameMsg(container, pb);
-  if (!isCurrentUIContainer(container)) return;
+  if (!isCurrentUIContainer(container) || epoch !== getDuelEpoch()) return;
   // Quality limits GPU work, not reading time. Paused replay steps remain instant.
   await waitForDuelPace(
     pacing,
@@ -132,12 +137,14 @@ async function applyGameMsg(
   pb: ygopro.YgoStocMsg,
 ): Promise<void> {
   const msg = pb.stoc_game_msg;
+  const epoch = getDuelEpoch();
   try {
-    if (presentGameMessage(container, msg)) return;
+    if (await presentGameMessage(container, msg)) return;
   } catch (error) {
     // Optional presentation must never interrupt the duel rules/message stream.
     console.warn("Duel presentation failed", error);
   }
+  if (!isCurrentUIContainer(container) || epoch !== getDuelEpoch()) return;
 
   if (ActiveList.includes(msg.gameMsg)) {
     if (

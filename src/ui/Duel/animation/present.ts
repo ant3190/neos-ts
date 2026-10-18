@@ -15,13 +15,17 @@ import type { Container } from "@/container";
 import { isCurrentUIContainer } from "@/container/compat";
 import { AudioActionType, playEffect } from "@/infra/audio";
 import { cardStore, type CardType } from "@/stores";
-import { callCardAttack } from "@/ui/Duel/PlayMat/Card";
+import { callCardAttack, callCardLand } from "@/ui/Duel/PlayMat/Card";
 
 import { duelPanels } from "../layout/panels";
 import { duelPreferences } from "../layout/preferences";
 import { closeCardListModal } from "../Message/CardListModal";
 import { closeCardModal, showCardModal } from "../Message/CardModal";
+import { getDuelEpoch } from "../Message/session";
+import { getDuration } from "../PlayMat/Card/springs/utils";
+import { highSummon, MDPRO3 } from "./mdpro3";
 import {
+  animationQuality,
   type DuelCue,
   duelTimeline,
   emitDuelCue,
@@ -29,6 +33,7 @@ import {
   type Point,
   revealDuelCue,
   showDuelResolution,
+  waitForAnimation,
 } from "./runtime";
 
 const { HAND, MZONE, SZONE, GRAVE, REMOVED, DECK, EXTRA, EMPTY } =
@@ -106,7 +111,7 @@ export function inspectCardRelations(card: CardType) {
 export function presentGameMessage(
   container: Container,
   msg: ygopro.StocGameMessage,
-): boolean {
+): boolean | Promise<boolean> {
   if (!isCurrentUIContainer(container)) return false;
   const context = container.context;
   const point = (location: ygopro.CardLocation) =>
@@ -202,22 +207,32 @@ export function presentGameMessage(
             ? AudioActionType.SOUND_DIRECT_ATTACK
             : AudioActionType.SOUND_ATTACK,
         );
-        void callCardAttack(
+        const epoch = getDuelEpoch();
+        const impact = () => {
+          if (epoch !== getDuelEpoch() || !isCurrentUIContainer(container))
+            return;
+          emitDuelCue(
+            {
+              kind: "impact",
+              point: direct
+                ? playerPoint(1 - notification.attacker.controller)
+                : measureCard(target?.uuid),
+              tone,
+            },
+            700,
+          );
+        };
+        // Battle must finish before DAMAGE/MOVE can remove its source/target.
+        return callCardAttack(
           attacker.uuid,
           direct
-            ? { directAttack: true }
-            : { directAttack: false, target: notification.target },
-        );
-        emitDuelCue(
-          {
-            kind: "impact",
-            point: direct
-              ? playerPoint(1 - notification.attacker.controller)
-              : measureCard(target?.uuid),
-            tone,
-          },
-          700,
-        );
+            ? { directAttack: true, onHit: impact }
+            : {
+                directAttack: false,
+                target: notification.target,
+                onHit: impact,
+              },
+        ).then(() => true);
       }
     } else if (notification.kind === "damage-end") resetCombatPresentation();
     else if ("index" in notification) {
@@ -450,21 +465,20 @@ export function presentGameMessage(
         pendulum: "灵摆召唤",
         normal: "特殊召唤",
       };
-      emitDuelCue(
-        {
-          kind,
-          point: point(event.location),
-          summonType: type,
-          label:
-            kind === "special"
-              ? titles[type!]
-              : kind === "flip"
-              ? "反转召唤"
-              : "通常召唤",
-        },
-        750,
-      );
-      if (kind === "special" && type !== "normal" && !facedown)
+      const landingCue: Omit<DuelCue, "duration"> = {
+        kind,
+        point: point(event.location),
+        summonType: type,
+        label:
+          kind === "special"
+            ? titles[type!]
+            : kind === "flip"
+            ? "反转召唤"
+            : "通常召唤",
+      };
+      const cutIn = kind === "special" && type !== "normal" && !facedown;
+      const cutInDuration = getDuration(1600);
+      if (cutIn)
         revealDuelCue(
           {
             kind: "special",
@@ -475,10 +489,35 @@ export function presentGameMessage(
             source: source(event.location),
             materialCodes: [...summonMaterials],
           },
-          900,
+          cutInDuration,
         );
       if (kind === "special") summonMaterials = [];
-      break;
+      if (kind === "flip") {
+        emitDuelCue(landingCue, 500);
+        break;
+      }
+      const card = context.cardStore.find(event.location);
+      const epoch = getDuelEpoch();
+      const token = !!((meta.data.type ?? 0) & TYPE_TOKEN);
+      return (async () => {
+        if (cutIn && animationQuality() === "full")
+          if (!(await waitForAnimation(cutInDuration))) return false;
+        if (epoch !== getDuelEpoch() || !isCurrentUIContainer(container))
+          return false;
+        if (card && !token && !facedown)
+          await callCardLand(card.uuid, {
+            strong: highSummon(
+              meta.data.level,
+              summonType(meta.data.type ?? 0),
+              meta.data.def,
+            ),
+          });
+        if (epoch !== getDuelEpoch() || !isCurrentUIContainer(container))
+          return false;
+        emitDuelCue(landingCue, token ? 450 : 750);
+        await waitForAnimation(getDuration(token ? MDPRO3.token : MDPRO3.land));
+        return false; // the service still records the actual summon and its hint
+      })();
     }
     case "set":
       emitDuelCue(
@@ -572,20 +611,7 @@ export function presentGameMessage(
       duelTimeline.discardReveals(isChainReveal);
       break;
     case "confirm_cards":
-      msg.confirm_cards.cards.forEach((card) =>
-        revealDuelCue(
-          {
-            kind: "reveal",
-            code: card.code,
-            label: "卡片确认",
-            source: `${
-              context.matStore.isMe(card.controller) ? "我方" : "对方"
-            }${names[card.location]}`,
-          },
-          850,
-        ),
-      );
-      break;
+      break; // the handler reveals one card at a time and awaits its full display
     case "update_hp": {
       const event = msg.update_hp;
       const recover =
@@ -595,6 +621,7 @@ export function presentGameMessage(
           kind: "life",
           label: `${recover ? "+" : "−"}${event.value}`,
           tone: recover ? "#83f7bf" : "#ff8b83",
+          damage: !recover,
           point: playerPoint(event.player),
         },
         1100,

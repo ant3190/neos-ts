@@ -61,7 +61,7 @@ export function cardMotionPlan({
     };
   if (toZone === HAND) {
     kind = fromZone === DECK ? "draw" : "return";
-    duration = mine ? 500 : 250;
+    duration = mine ? 500 : fromZone === DECK ? 250 : 400;
     arc = fromZone === DECK ? 50 : 200;
   } else if (toZone === DECK || toZone === EXTRA) {
     kind = "return";

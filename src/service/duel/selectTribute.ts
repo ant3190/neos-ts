@@ -3,6 +3,7 @@ import { Container } from "@/container";
 import { displaySelectActionsModal } from "@/ui/Duel/Message/SelectActionsModal";
 
 import { fetchCheckCardMeta } from "../utils";
+import { canSelectOnField } from "./util";
 type MsgSelectTribute = ygopro.StocGameMessage.MsgSelectTribute;
 
 export default async (
@@ -11,10 +12,21 @@ export default async (
 ) => {
   const { selecteds, mustSelects, selectables } = await fetchCheckCardMeta(
     container.context,
-    selectTribute.selectable_cards,
+    selectTribute.selectable_cards.map((card) => ({
+      code: card.code,
+      location: card.location,
+      response: card.response,
+      level1: card.level,
+    })),
   );
-  // TODO: 当玩家选择卡数大于`max`时，是否也合法？
   await displaySelectActionsModal({
+    fieldSelection: canSelectOnField(
+      container.context,
+      selectTribute.selectable_cards.map((c) => c.location),
+    ),
+    autoSubmit: "max",
+    tribute: true,
+    cancelable: selectTribute.cancelable,
     overflow: true,
     totalLevels: 0,
     min: selectTribute.min,

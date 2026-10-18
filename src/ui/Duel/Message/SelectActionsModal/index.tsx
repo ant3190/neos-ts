@@ -22,6 +22,7 @@ const defaultProps: Omit<
   isChain: false,
   fieldSelection: false,
   autoSubmit: undefined,
+  tribute: false,
   min: 0, // 最少选择多少卡
   max: 0, // 最多选择多少卡
   single: false, // 是否只能单选

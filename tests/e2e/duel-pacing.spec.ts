@@ -159,12 +159,12 @@ test("batched engine actions leave reading beats and chain completion immediatel
       (window as any).__paceDone = true;
     });
   });
-  await page.clock.runFor(1200);
+  await page.clock.runFor(2300);
   await expect(page.getByTestId("duel-card-reveal")).toHaveAttribute(
     "data-effect-kind",
     "chain",
   );
-  await page.clock.runFor(1600);
+  await page.clock.runFor(1800);
   await expect
     .poll(() => page.evaluate(() => (window as any).__paceDone))
     .toBe(true);
@@ -186,8 +186,8 @@ test("batched engine actions leave reading beats and chain completion immediatel
   const time = Object.fromEntries(
     trace.map((entry) => [entry.event, entry.time]),
   );
-  expect(time["activate-2"] - time["activate-1"]).toBeGreaterThanOrEqual(550);
-  expect(time["pair"] - time["activate-2"]).toBeGreaterThanOrEqual(550);
+  expect(time["activate-2"] - time["activate-1"]).toBeGreaterThanOrEqual(1050);
+  expect(time["pair"] - time["activate-2"]).toBeGreaterThanOrEqual(1050);
   expect(time["resolve-2"] - time["pair"]).toBeGreaterThanOrEqual(280);
   expect(time["grave"] - time["resolve-2"]).toBeGreaterThanOrEqual(200);
   expect(time["solved-1"] - time["resolve-1"]).toBeGreaterThanOrEqual(200);

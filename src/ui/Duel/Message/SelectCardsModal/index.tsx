@@ -17,7 +17,10 @@ import { closeCardActions } from "../../interaction/CardActions";
 import { registerFieldSelection } from "../../interaction/fieldSelection";
 import { useDuelRightClick } from "../../interaction/rightClick";
 import { SelectionControls } from "../../interaction/SelectionControls";
-import { selectionValid } from "../../interaction/selectionRules";
+import {
+  selectionCanComplete,
+  selectionValid,
+} from "../../interaction/selectionRules";
 import { useHorizontalWheel } from "../../interaction/useHorizontalWheel";
 import { ActionFrame } from "../../PlayMat/ActionFrame";
 import type { ActionHighlight } from "../../utils/actionHighlight";
@@ -41,6 +44,7 @@ export interface SelectCardsModalProps {
   isChain?: boolean;
   fieldSelection?: boolean;
   autoSubmit?: "max" | "sum";
+  tribute?: boolean;
   onSubmit: (options: Snapshot<Option[]>) => void;
   onCancel: () => void;
   onFinish: () => void;
@@ -68,6 +72,7 @@ export function SelectCardsModal({
   isChain = false,
   fieldSelection = false,
   autoSubmit,
+  tribute = false,
   onSubmit,
   onCancel,
   onFinish,
@@ -89,8 +94,21 @@ export function SelectCardsModal({
     single,
     totalLevels,
     overflow,
+    tribute,
   );
+  const selectable = (index: number) =>
+    chosen.includes(index) ||
+    selectionCanComplete(
+      [...options, selectables[index]],
+      selectables.filter((_, i) => i !== index && !chosen.includes(i)),
+      mustSelects,
+      min,
+      max,
+      totalLevels,
+      overflow,
+    );
   const toggle = (index: number) => {
+    if (!selectable(index)) return;
     showCardModal(selectables[index]);
     setChosen((values) =>
       values.includes(index)
@@ -122,7 +140,7 @@ export function SelectCardsModal({
     });
     candidates.forEach((card, index) => {
       if (!card) return;
-      card.selectInfo.selectable = true;
+      card.selectInfo.selectable = selectable(index);
       card.selectInfo.selected = chosen.includes(index);
       card.selectInfo.response = undefined;
     });
@@ -147,13 +165,13 @@ export function SelectCardsModal({
     250,
   );
   useEffect(() => {
-    if (!isOpen || !fieldSelection || !valid) return;
+    if (!isOpen || !valid || isChain) return;
     if (
       (autoSubmit === "max" && chosen.length >= max) ||
       (autoSubmit === "sum" && totalLevels > 0 && !overflow)
     )
       submit();
-  }, [isOpen, fieldSelection, autoSubmit, valid, chosen]);
+  }, [isOpen, fieldSelection, autoSubmit, valid, chosen, isChain]);
   const footer = (
     <div className={styles.footer}>
       {cancelable && (
@@ -229,6 +247,12 @@ export function SelectCardsModal({
           origin ? `，${origin}` : ""
         }`}
         aria-pressed={picked}
+        disabled={
+          !mandatory &&
+          !alreadySelected &&
+          indexes.length === 1 &&
+          !selectable(index)
+        }
         data-testid="duel-select-card-option"
         data-card-code={option.meta.id}
         data-card-controller={option.location?.controller}

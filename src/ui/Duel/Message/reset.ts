@@ -1,7 +1,7 @@
 import { cardMotionState } from "../animation/motionState";
 import { resetCardOrigins } from "../animation/origins";
 import { resetCombatPresentation } from "../animation/present";
-import { duelTimeline } from "../animation/runtime";
+import { cancelAnimationWaits, duelTimeline } from "../animation/runtime";
 import { closeCardActions } from "../interaction/CardActions";
 import { resetFieldSelection } from "../interaction/fieldSelection";
 import { resetHandInteraction } from "../interaction/hand";
@@ -24,6 +24,7 @@ import { resetYesNoModal } from "./YesNoModal";
 /** Close prompts from the previous duel before a new session can render. */
 export function resetDuelDialogs() {
   resetDuelPromptSession();
+  cancelAnimationWaits();
   cardMotionState.moving = {};
   cardMotionState.revealed = {};
   resetHandInteraction();
