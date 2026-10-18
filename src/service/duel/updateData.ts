@@ -27,6 +27,8 @@ export default async (container: Container, updateData: MsgUpdateData) => {
           if (updateAction.clear) {
             continue;
           }
+          const oldCode = target.code;
+          const oldPosition = target.location.position;
 
           // code=0 means the query did not expose identity; movement and
           // position messages decide whether an existing visible card changes.
@@ -47,8 +49,6 @@ export default async (container: Container, updateData: MsgUpdateData) => {
             if (target.location.position !== action.location.position) {
               // Currently only update position
               target.location.position = action.location.position;
-              // animation
-              await callCardMove(target.uuid);
             }
           }
           if (action?.type_ >= 0) {
@@ -75,6 +75,13 @@ export default async (container: Container, updateData: MsgUpdateData) => {
           if (action?.status >= 0) {
             target.status = action.status;
           }
+          const { HAND, DECK, EXTRA } = ygopro.CardZone;
+          const hiddenZone = [HAND, DECK, EXTRA].includes(zone);
+          if (
+            target.location.position !== oldPosition ||
+            (hiddenZone && target.code !== oldCode)
+          )
+            await callCardMove(target.uuid, { instant: hiddenZone });
           // TODO: counters
         } else {
           console.warn(

@@ -11,7 +11,20 @@ export const HiddenCard: React.FC<{ idx: number }> = React.memo(({ idx }) => {
   const snap = useSnapshot(card);
 
   useEffect(() => {
-    const complete = async () => true;
+    const complete = async () => {
+      const { zone, controller, sequence } = card.location;
+      if (zone === ygopro.CardZone.TZONE) return true;
+      if (zone === ygopro.CardZone.DECK || zone === ygopro.CardZone.EXTRA) {
+        const top = Math.max(
+          -1,
+          ...cardStore
+            .at(zone, controller)
+            .map((entry) => entry.location.sequence),
+        );
+        return sequence < top - 2;
+      }
+      return false;
+    };
     const unsubscribers = [Task.Move, Task.Focus, Task.Attack].map((task) =>
       eventbus.register(task, complete, card.uuid),
     );

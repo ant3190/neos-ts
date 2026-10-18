@@ -104,7 +104,6 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       subZ: 0,
       opacity: 1,
     });
-    if (origin) void queueMove({ fromZone: origin.zone });
     return () => {
       api.stop();
     };
@@ -117,18 +116,22 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
   const animationQueue = useRef(Promise.resolve());
   const movingRef = useRef(false);
 
-  const addToAnimation = (p: () => Promise<unknown>) => {
+  const addToAnimation = (p: () => Promise<unknown>, animate = true) => {
     const next = animationQueue.current
       .then(async () => {
-        movingRef.current = true;
-        setMoving(true);
-        cardMotionState.moving[card.uuid] = true;
+        if (animate) {
+          movingRef.current = true;
+          setMoving(true);
+          cardMotionState.moving[card.uuid] = true;
+        }
         try {
           await p();
         } finally {
-          movingRef.current = false;
-          setMoving(false);
-          delete cardMotionState.moving[card.uuid];
+          if (animate) {
+            movingRef.current = false;
+            setMoving(false);
+            delete cardMotionState.moving[card.uuid];
+          }
         }
       })
       .catch((error) => {
@@ -155,21 +158,24 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
   };
 
   const queueMove = (options?: MoveOptions) =>
-    addToAnimation(async () => {
-      const plan = cardMotionPlan({
-        ...options,
-        toZone: card.location.zone,
-        toPosition: card.location.position,
-        mine: isMe(card.location.controller),
-      });
-      // Update arc ownership before starting the frame loop, rather than in a later render.
-      element.current?.style.setProperty(
-        "--move-arc",
-        `${Math.min(24, plan.arc * 0.08)}px`,
-      );
-      setMotion(plan);
-      await move({ card, api, options });
-    });
+    addToAnimation(
+      async () => {
+        const plan = cardMotionPlan({
+          ...options,
+          toZone: card.location.zone,
+          toPosition: card.location.position,
+          mine: isMe(card.location.controller),
+        });
+        // Update arc ownership before starting the frame loop, rather than in a later render.
+        element.current?.style.setProperty(
+          "--move-arc",
+          `${Math.min(24, plan.arc * 0.08)}px`,
+        );
+        setMotion(plan);
+        await move({ card, api, options });
+      },
+      !options?.instant,
+    );
 
   useEffect(() => {
     const unsubscribeMove = register(

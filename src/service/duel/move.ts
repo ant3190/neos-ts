@@ -3,6 +3,7 @@ import { Container } from "@/container";
 import { AudioActionType, playEffect } from "@/infra/audio";
 import { createLocalId } from "@/infra/localId";
 import { CardType } from "@/stores";
+import { nextHandOrder } from "@/stores/handOrder";
 import { rememberCardOrigin } from "@/ui/Duel/animation/origins";
 import { callCardMove } from "@/ui/Duel/PlayMat/Card";
 import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
@@ -166,6 +167,13 @@ export default async (container: Container, move: MsgMove) => {
     ? []
     : context.cardStore.at(from.zone, from.controller);
   const toCards = toEmpty ? [] : context.cardStore.at(to.zone, to.controller);
+  for (const card of [...fromCards, ...toCards]) {
+    if (card.location.zone === HAND) card.handOrder ??= card.location.sequence;
+  }
+  const handOrder =
+    from.zone === HAND && from.controller === to.controller
+      ? target.handOrder
+      : nextHandOrder(toCards.filter((card) => card.uuid !== target.uuid));
 
   if (
     !fromEmpty &&
@@ -199,6 +207,8 @@ export default async (container: Container, move: MsgMove) => {
   target.code = code;
   if (code !== 0) target.meta = meta;
   target.location = to;
+  if (to.zone === HAND) target.handOrder = handOrder;
+  else delete target.handOrder;
   if (fromEmpty) {
     context.cardStore.inner.push(target);
     if (target.isToken)
@@ -241,9 +251,11 @@ export default async (container: Container, move: MsgMove) => {
     playEffect(AudioActionType.SOUND_DESTROYED);
   }
 
-  const p = fromEmpty
-    ? Promise.resolve()
-    : callCardMove(target.uuid, { fromZone: from.zone, reason });
+  const p = callCardMove(target.uuid, {
+    fromZone: from.zone,
+    reason,
+    instant: fromEmpty && !target.isToken,
+  });
   // Reflow both affected hands without replaying the incoming card's lift.
   if ([from.zone, to.zone].includes(HAND)) {
     const handControllers = new Set(

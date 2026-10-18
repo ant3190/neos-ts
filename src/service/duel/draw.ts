@@ -1,6 +1,7 @@
 import { fetchCard, ygopro } from "@/api";
 import { Container } from "@/container";
 import { AudioActionType, playEffect } from "@/infra/audio";
+import { nextHandOrder } from "@/stores/handOrder";
 import { rememberCardOrigin } from "@/ui/Duel/animation/origins";
 import { callCardMove } from "@/ui/Duel/PlayMat/Card";
 import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
@@ -17,14 +18,16 @@ export default async (
   const drawLength = draw.cards.length;
 
   // 将卡从卡组移到手牌：设置zone、occupant、sequence
-  const handsLength = context.cardStore.at(
-    ygopro.CardZone.HAND,
-    draw.player,
-  ).length;
+  const hands = context.cardStore.at(ygopro.CardZone.HAND, draw.player);
+  const handsLength = hands.length;
+  const firstHandOrder = nextHandOrder(hands);
+  hands.forEach((card) => {
+    card.handOrder ??= card.location.sequence;
+  });
   const newHands = context.cardStore
     .at(ygopro.CardZone.DECK, draw.player)
-    .sort((a, b) => a.location.sequence - b.location.sequence)
-    .slice(-drawLength);
+    .sort((a, b) => b.location.sequence - a.location.sequence)
+    .slice(0, drawLength);
 
   // Start image loads without holding the duel message queue on network I/O.
   draw.cards.forEach(requestCardImage);
@@ -41,6 +44,7 @@ export default async (
     card.meta = meta;
     card.location.zone = ygopro.CardZone.HAND;
     card.location.sequence = Number(idx) + handsLength;
+    card.handOrder = firstHandOrder + Number(idx);
   }
 
   playEffect(AudioActionType.SOUND_DRAW);

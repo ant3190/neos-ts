@@ -16,6 +16,7 @@ export interface CardType {
   code: number; // 卡号
   meta: CardMeta; // 卡片元数据
   location: ygopro.CardLocation;
+  handOrder?: number; // 手牌显示顺序，独立于服务器的 sequence
   idleInteractivities: Interactivity<number>[]; // IDLE状态下的互动信息
   counters: { [type: number]: number }; // 指示器
   isToken: boolean; // 是否是token

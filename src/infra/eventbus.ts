@@ -49,27 +49,40 @@ const call = (task: Task, ...args: any[]) => {
   if (isCardTask(task) && typeof args[0] === "string") {
     const key = cardKey(task, args[0]);
     return new Promise<void>((resolve, reject) => {
-      const run = () => {
+      let declined: ReturnType<typeof cardHandlers.get>;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const clearWaiting = () => {
         clearTimeout(timer);
-        pendingCardCalls.get(key)?.delete(run);
-        Promise.resolve(cardHandlers.get(key)!(...args)).then(
-          () => resolve(),
-          reject,
-        );
-      };
-      const handler = cardHandlers.get(key);
-      if (handler) {
-        Promise.resolve(handler(...args)).then(() => resolve(), reject);
-        return;
-      }
-      const timer = setTimeout(() => {
+        timer = undefined;
         pendingCardCalls.get(key)?.delete(run);
         if (pendingCardCalls.get(key)?.size === 0) pendingCardCalls.delete(key);
-        console.warn(`Card animation handler was not mounted: ${key}`);
-        resolve();
-      }, CARD_HANDLER_WAIT_MS);
-      if (!pendingCardCalls.has(key)) pendingCardCalls.set(key, new Set());
-      pendingCardCalls.get(key)!.add(run);
+      };
+      const run = () => {
+        const handler = cardHandlers.get(key);
+        if (!handler || handler === declined) {
+          // A hidden placeholder can hand the task to the visible card on mount.
+          if (timer === undefined)
+            timer = setTimeout(() => {
+              clearWaiting();
+              console.warn(`Card animation handler was not mounted: ${key}`);
+              resolve();
+            }, CARD_HANDLER_WAIT_MS);
+          if (!pendingCardCalls.has(key)) pendingCardCalls.set(key, new Set());
+          pendingCardCalls.get(key)!.add(run);
+          return;
+        }
+        clearWaiting();
+        Promise.resolve()
+          .then(() => handler(...args))
+          .then((handled) => {
+            if (handled) resolve();
+            else {
+              declined = handler;
+              run();
+            }
+          }, reject);
+      };
+      run();
     });
   }
   return new Promise<void>((rs) => {
