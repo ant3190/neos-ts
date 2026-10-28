@@ -42,6 +42,99 @@ test("tokens keep the source 200ms wait without the ordinary summon delay", asyn
   expect(elapsed).toBeLessThan(700);
 });
 
+for (const kind of ["summoning", "sp_summoning"] as const) {
+  for (const controller of [0, 1]) {
+    test(`${kind}: player ${controller}'s landed card stays still during summon feedback`, async ({
+      page,
+    }) => {
+      await mdpro3Fixture(page);
+      await fullMotion(page);
+      const result = await page.evaluate(
+        async ({ kind, controller }) => {
+          const { getUIContainer } = await import("/src/container/compat.ts");
+          const { ygopro } = await import("/src/api/index.ts");
+          const { default: handle } = await import(
+            "/src/service/duel/gameMsg.ts"
+          );
+          const { duelTimeline } = await import(
+            "/src/ui/Duel/animation/runtime.ts"
+          );
+          const card = document.querySelector<HTMLElement>(
+            `[data-card-uuid="p${controller}-MZONE-2"]`,
+          )!;
+          const origin = card.getBoundingClientRect();
+          let maxDrift = 0,
+            frames = 0,
+            frame = 0,
+            moving = false,
+            feedback = false;
+          const sample = () => {
+            const rect = card.getBoundingClientRect();
+            maxDrift = Math.max(
+              maxDrift,
+              Math.abs(rect.x - origin.x),
+              Math.abs(rect.y - origin.y),
+              Math.abs(rect.width - origin.width),
+              Math.abs(rect.height - origin.height),
+            );
+            moving ||= card.dataset.cardInMotion === "true";
+            frames++;
+            frame = requestAnimationFrame(sample);
+          };
+          const release = duelTimeline.subscribe(() => {
+            feedback ||= duelTimeline
+              .getSnapshot()
+              .cues.some(
+                (c) =>
+                  c.kind === (kind === "summoning" ? "summon" : "special") &&
+                  !!c.point,
+              );
+          });
+          frame = requestAnimationFrame(sample);
+          try {
+            const event = {
+              code: 46986414,
+              location: new ygopro.CardLocation({
+                controller,
+                zone: ygopro.CardZone.MZONE,
+                sequence: 2,
+                position: ygopro.CardPosition.FACEUP_ATTACK,
+              }),
+            };
+            await handle(
+              getUIContainer(),
+              new ygopro.YgoStocMsg({
+                stoc_game_msg: new ygopro.StocGameMessage(
+                  kind === "summoning"
+                    ? {
+                        summoning: new ygopro.StocGameMessage.MsgSummoning(
+                          event,
+                        ),
+                      }
+                    : {
+                        sp_summoning: new ygopro.StocGameMessage.MsgSpSummoning(
+                          event,
+                        ),
+                      },
+                ),
+              }),
+            );
+          } finally {
+            cancelAnimationFrame(frame);
+            release();
+          }
+          return { maxDrift, frames, moving, feedback };
+        },
+        { kind, controller },
+      );
+      expect(result.frames).toBeGreaterThan(5);
+      expect(result.maxDrift).toBeLessThan(0.5);
+      expect(result.moving).toBe(false);
+      expect(result.feedback).toBe(true);
+    });
+  }
+}
+
 for (const viewport of [
   { width: 1440, height: 900 },
   { width: 390, height: 844 },

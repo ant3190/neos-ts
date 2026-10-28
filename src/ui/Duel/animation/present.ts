@@ -15,7 +15,7 @@ import type { Container } from "@/container";
 import { isCurrentUIContainer } from "@/container/compat";
 import { AudioActionType, playEffect } from "@/infra/audio";
 import { cardStore, type CardType } from "@/stores";
-import { callCardAttack, callCardLand } from "@/ui/Duel/PlayMat/Card";
+import { callCardAttack } from "@/ui/Duel/PlayMat/Card";
 
 import { duelPanels } from "../layout/panels";
 import { duelPreferences } from "../layout/preferences";
@@ -23,7 +23,7 @@ import { closeCardListModal } from "../Message/CardListModal";
 import { closeCardModal, showCardModal } from "../Message/CardModal";
 import { getDuelEpoch } from "../Message/session";
 import { getDuration } from "../PlayMat/Card/springs/utils";
-import { highSummon, MDPRO3 } from "./mdpro3";
+import { MDPRO3 } from "./mdpro3";
 import {
   animationQuality,
   type DuelCue,
@@ -496,7 +496,6 @@ export function presentGameMessage(
         emitDuelCue(landingCue, 500);
         break;
       }
-      const card = context.cardStore.find(event.location);
       const epoch = getDuelEpoch();
       const token = !!((meta.data.type ?? 0) & TYPE_TOKEN);
       return (async () => {
@@ -504,16 +503,7 @@ export function presentGameMessage(
           if (!(await waitForAnimation(cutInDuration))) return false;
         if (epoch !== getDuelEpoch() || !isCurrentUIContainer(container))
           return false;
-        if (card && !token && !facedown)
-          await callCardLand(card.uuid, {
-            strong: highSummon(
-              meta.data.level,
-              summonType(meta.data.type ?? 0),
-              meta.data.def,
-            ),
-          });
-        if (epoch !== getDuelEpoch() || !isCurrentUIContainer(container))
-          return false;
+        // MOVE already lands the card; summon feedback must not lift it again.
         emitDuelCue(landingCue, token ? 450 : 750);
         await waitForAnimation(getDuration(token ? MDPRO3.token : MDPRO3.land));
         return false; // the service still records the actual summon and its hint
