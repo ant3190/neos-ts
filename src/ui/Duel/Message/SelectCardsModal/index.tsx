@@ -307,7 +307,6 @@ export function SelectCardsModal({
   }));
   return (
     <NeosModal
-      screenSpace={readOnly}
       title={title}
       duelPosition="selection"
       duelWidth={Math.min(
@@ -338,9 +337,7 @@ export function SelectCardsModal({
       }}
     >
       <div
-        className={classnames(styles.content, {
-          [styles.confirmation]: readOnly,
-        })}
+        className={styles.content}
         data-testid={
           readOnly ? "duel-confirm-cards-modal" : "duel-select-cards-modal"
         }

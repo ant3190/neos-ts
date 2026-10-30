@@ -11,13 +11,11 @@ import styles from "./index.module.scss";
 export const NeosModal = ({
   duelPosition = "center",
   duelWidth = 950,
-  screenSpace = false,
   onDuelCancel,
   ...props
 }: ModalProps & {
   duelPosition?: "center" | "selection";
   duelWidth?: number;
-  screenSpace?: boolean;
   onDuelCancel?: () => void;
 }) => {
   const [mini, setMini] = useState(false);
@@ -42,10 +40,8 @@ export const NeosModal = ({
       })}
       centered={false}
       getContainer={() =>
-        screenSpace
-          ? document.body
-          : document.querySelector<HTMLElement>('[data-testid="duel-stage"]') ??
-            document.body
+        document.querySelector<HTMLElement>('[data-testid="duel-stage"]') ??
+        document.body
       }
       maskClosable={false}
       onCancel={() => setMini(!mini)}
@@ -55,7 +51,6 @@ export const NeosModal = ({
       wrapClassName={classNames(styles.wrap, {
         [styles.fieldView]: mini,
         [styles.selectionWrap]: duelPosition === "selection",
-        [styles.screenSpace]: screenSpace,
       })}
       closable={true}
       {...props}
