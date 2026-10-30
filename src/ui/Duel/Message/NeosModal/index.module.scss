@@ -108,3 +108,15 @@
 .modal :global(.ant-modal-footer) {
   flex-shrink: 0;
 }
+.screenSpace {
+  --duel-dialog-height: 100dvh;
+  top: 0;
+  bottom: 0;
+  padding: 16px;
+  .modal {
+    max-width: calc(100vw - 32px);
+  }
+  .modal :global(.ant-modal-content) {
+    max-height: calc(100dvh - 32px);
+  }
+}

@@ -30,7 +30,6 @@ export default async (container: Container, selectSum: MsgSelectSum) => {
         (card) => card.location,
       ),
     ),
-    autoSubmit: "sum",
     overflow: selectSum.overflow !== 0,
     totalLevels: selectSum.level_sum,
     min: selectSum.min < 1 ? 1 : selectSum.min, // ygopro2 implementation

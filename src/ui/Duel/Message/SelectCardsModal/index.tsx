@@ -1,12 +1,6 @@
 import { Button } from "antd";
 import classnames from "classnames";
-import {
-  type ReactNode,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useState,
-} from "react";
+import { type ReactNode, useId, useLayoutEffect, useState } from "react";
 import { type INTERNAL_Snapshot as Snapshot, useSnapshot } from "valtio";
 
 import { type CardMeta, fetchStrings, Region, ygopro } from "@/api";
@@ -43,7 +37,8 @@ export interface SelectCardsModalProps {
   overflow: boolean;
   isChain?: boolean;
   fieldSelection?: boolean;
-  autoSubmit?: "max" | "sum";
+  readOnly?: boolean;
+  title?: string;
   tribute?: boolean;
   onSubmit: (options: Snapshot<Option[]>) => void;
   onCancel: () => void;
@@ -71,7 +66,8 @@ export function SelectCardsModal({
   overflow,
   isChain = false,
   fieldSelection = false,
-  autoSubmit,
+  readOnly = false,
+  title: customTitle,
   tribute = false,
   onSubmit,
   onCancel,
@@ -84,8 +80,10 @@ export function SelectCardsModal({
   useLayoutEffect(() => {
     setChosen(isChain && selectables.length === 1 ? [0] : []);
     setEffectCard(undefined);
-  }, [selectables, isOpen, isChain]);
-  const options = chosen.map((index) => selectables[index]);
+  }, [selectables, selecteds, isOpen, isChain]);
+  const options = chosen.map(
+    (index) => selectables[index] ?? selecteds[index - selectables.length],
+  );
   const valid = selectionValid(
     options,
     mustSelects,
@@ -164,15 +162,15 @@ export function SelectCardsModal({
     },
     250,
   );
-  useEffect(() => {
-    if (!isOpen || !valid || isChain) return;
-    if (
-      (autoSubmit === "max" && chosen.length >= max) ||
-      (autoSubmit === "sum" && totalLevels > 0 && !overflow)
-    )
-      submit();
-  }, [isOpen, fieldSelection, autoSubmit, valid, chosen, isChain]);
-  const footer = (
+  const footer = readOnly ? (
+    <Button
+      type="primary"
+      data-testid="duel-confirm-cards-close"
+      onClick={() => onSubmit([])}
+    >
+      确定
+    </Button>
+  ) : (
     <div className={styles.footer}>
       {cancelable && (
         <Button data-testid="duel-select-card-cancel" onClick={onCancel}>
@@ -194,9 +192,11 @@ export function SelectCardsModal({
       </Button>
     </div>
   );
-  const title = `${hint.esHint ?? ""} ${
-    hint.esSelectHint || (isChain ? "选择要发动的卡片" : "请选择卡片")
-  } (${min === max ? min : `${min}–${max}`} 张)`;
+  const title =
+    customTitle ??
+    `${hint.esHint ?? ""} ${
+      hint.esSelectHint || (isChain ? "选择要发动的卡片" : "请选择卡片")
+    } (${min === max ? min : `${min}–${max}`} 张)`;
   if (fieldSelection)
     return isOpen ? (
       <SelectionControls title={title}>{footer}</SelectionControls>
@@ -216,15 +216,15 @@ export function SelectCardsModal({
     mandatory = false,
   ) => {
     const picked =
-      alreadySelected ||
+      (alreadySelected && !single) ||
       effectCard === key ||
       indexes.some((idx) => chosen.includes(idx));
     const origin = originLabel(option);
     const choose = () => {
       showCardModal(option);
-      if (mandatory) return;
+      if (readOnly || mandatory) return;
       if (alreadySelected && single) {
-        onSubmit([option]);
+        setChosen((values) => (values.includes(index) ? [] : [index]));
         return;
       }
       if (alreadySelected) return;
@@ -246,14 +246,15 @@ export function SelectCardsModal({
         aria-label={`${option.meta.text.name || "卡片"}${
           origin ? `，${origin}` : ""
         }`}
-        aria-pressed={picked}
+        aria-pressed={readOnly ? undefined : picked}
         disabled={
+          !readOnly &&
           !mandatory &&
           !alreadySelected &&
           indexes.length === 1 &&
           !selectable(index)
         }
-        data-testid="duel-select-card-option"
+        data-testid={readOnly ? "duel-confirm-card" : "duel-select-card-option"}
         data-card-code={option.meta.id}
         data-card-controller={option.location?.controller}
         data-card-zone={
@@ -266,23 +267,6 @@ export function SelectCardsModal({
           isChain ? "gold" : option.actionHighlight ?? "none"
         }
         onClick={choose}
-        onDoubleClick={() => {
-          if (mandatory || (alreadySelected && !single)) return;
-          if (
-            (single || max === 1) &&
-            indexes.length === 1 &&
-            selectionValid(
-              [option],
-              mustSelects,
-              min,
-              max,
-              single,
-              totalLevels,
-              overflow,
-            )
-          )
-            onSubmit([...mustSelects, option]);
-        }}
       >
         <YgoCard
           code={option.meta.id}
@@ -313,10 +297,17 @@ export function SelectCardsModal({
   }));
   const selectedCards = selecteds.map((option, index) => ({
     option,
-    node: cardButton(option, index, [index], `selected:${index}`, true),
+    node: cardButton(
+      option,
+      selectables.length + index,
+      [selectables.length + index],
+      `selected:${index}`,
+      true,
+    ),
   }));
   return (
     <NeosModal
+      screenSpace={readOnly}
       title={title}
       duelPosition="selection"
       duelWidth={Math.min(
@@ -329,18 +320,30 @@ export function SelectCardsModal({
         ),
       )}
       open={isOpen}
-      onDuelCancel={cancelable ? onCancel : finishable ? onFinish : undefined}
+      onDuelCancel={
+        readOnly
+          ? undefined
+          : cancelable
+          ? onCancel
+          : finishable
+          ? onFinish
+          : undefined
+      }
       footer={footer}
       afterClose={() => {
-        if (!isOpen) {
+        if (!isOpen && !readOnly) {
           matStore.hint.esHint = undefined;
           matStore.hint.esSelectHint = undefined;
         }
       }}
     >
       <div
-        className={styles.content}
-        data-testid="duel-select-cards-modal"
+        className={classnames(styles.content, {
+          [styles.confirmation]: readOnly,
+        })}
+        data-testid={
+          readOnly ? "duel-confirm-cards-modal" : "duel-select-cards-modal"
+        }
         data-select-min={min}
         data-select-max={max}
         data-select-single={single}
@@ -349,7 +352,7 @@ export function SelectCardsModal({
         data-select-finishable={finishable}
       >
         <CardStrip
-          label="可选卡片"
+          label={readOnly ? "展示卡片" : "可选卡片"}
           testId="duel-select-candidates"
           cards={candidates}
         />
@@ -388,7 +391,7 @@ export function SelectCardsModal({
         )}
         {!!selecteds.length && (
           <section className={styles.section} aria-label="已选择的卡片">
-            <h3>{single ? "已选择（点击取消选择）" : "已选择"}</h3>
+            <h3>{single ? "已选择（选中后确认取消）" : "已选择"}</h3>
             <CardStrip
               label="已选择的卡片"
               testId="duel-select-selected"

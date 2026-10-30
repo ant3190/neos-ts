@@ -87,7 +87,6 @@ export function CheckCounterModal() {
     );
     current.current = values;
     setSelected(values);
-    if (values.reduce((n, v) => n + v, 0) === required) submit(values);
   };
   const counterName =
     fetchStrings(Region.Counter, `0x${snap.counterType?.toString(16)}`) ||
@@ -106,7 +105,7 @@ export function CheckCounterModal() {
     cards.forEach((card, index) => {
       if (card) {
         card.selectInfo.selectable =
-          (selected[index] ?? 0) < options[index].max;
+          count < required && (selected[index] ?? 0) < options[index].max;
         card.selectInfo.selected = (selected[index] ?? 0) > 0;
       }
     });

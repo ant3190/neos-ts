@@ -601,7 +601,7 @@ export function presentGameMessage(
       duelTimeline.discardReveals(isChainReveal);
       break;
     case "confirm_cards":
-      break; // the handler reveals one card at a time and awaits its full display
+      break; // one public list; the handler never animates cards in their hidden zones
     case "update_hp": {
       const event = msg.update_hp;
       const recover =

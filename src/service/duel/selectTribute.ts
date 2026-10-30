@@ -24,7 +24,6 @@ export default async (
       container.context,
       selectTribute.selectable_cards.map((c) => c.location),
     ),
-    autoSubmit: "max",
     tribute: true,
     cancelable: selectTribute.cancelable,
     overflow: true,

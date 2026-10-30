@@ -6,6 +6,7 @@ export function clearSelectInfo() {
     const card = cardStore.find(location);
     if (card) {
       card.selectInfo.selectable = false;
+      card.selectInfo.selected = false;
       card.selectInfo.response = undefined;
     }
   }
@@ -13,6 +14,8 @@ export function clearSelectInfo() {
     const card = cardStore.find(location);
     if (card) {
       card.selectInfo.selected = false;
+      card.selectInfo.selectable = false;
+      card.selectInfo.response = undefined;
     }
   }
 

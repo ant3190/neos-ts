@@ -80,3 +80,4 @@ export const MSG_SHUFFLE_EXTRA = 39;
 export const MSG_SIBYL_NAME = 235;
 export const MSG_CONFIRM_DECKTOP = 30;
 export const MSG_CONFIRM_CARDS = 31;
+export const MSG_CONFIRM_EXTRATOP = 42;

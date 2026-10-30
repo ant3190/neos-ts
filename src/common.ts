@@ -1,6 +1,6 @@
-import { ygopro } from "@/api";
+import { ygopro } from "@/api/ocgcore/idl/ocgcore";
 import PhaseType = ygopro.StocGameMessage.MsgNewPhase.PhaseType;
-import { CardMeta } from "@/api";
+import type { CardMeta } from "@/api";
 //! 一些Neos中基础的数据结构
 
 // Position

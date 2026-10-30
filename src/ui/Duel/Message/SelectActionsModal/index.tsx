@@ -21,7 +21,6 @@ const defaultProps: Omit<
   isOpen: false,
   isChain: false,
   fieldSelection: false,
-  autoSubmit: undefined,
   tribute: false,
   min: 0, // 最少选择多少卡
   max: 0, // 最多选择多少卡
@@ -46,7 +45,11 @@ export const SelectActionsModal: React.FC = () => {
   const onSubmit = (options: Snapshot<Option[]>) => {
     if (!localStore.isOpen || renderedPromptId !== localStore.promptId) return;
     const values = options.map((option) => option.response!);
-    if (!values.length || values.some((value) => value === undefined)) return;
+    if (
+      values.some((value) => value === undefined) ||
+      (localStore.isChain && values.length !== 1)
+    )
+      return;
     localStore.isOpen = false;
     resetFieldSelection();
     if (localStore.isChain) {

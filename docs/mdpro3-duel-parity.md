@@ -1,6 +1,6 @@
 # 对战界面与 MDPro3 操作流程
 
-分支：`feat/mdpro3-duel-parity`，继承原实验分支的对局逻辑与事件表现。
+分支：`feat/mdpro3-neos-animation-parity`，继承原实验分支的对局逻辑与事件表现。
 
 ## 当前界面
 
@@ -13,6 +13,7 @@
 - 右下角按钮使用屏幕像素坐标，统一 44×44 点击区、图标、间距和面板风格。菜单与按钮处于相同坐标层，不受场地缩放影响。
 - 决斗菜单包含动画质量选择、自动说明开关和投降确认，避免缩放后的按钮配上未缩放的默认下拉菜单。
 - 说明、卡堆、日志、聊天和选择窗口保留原有用途；点击空白场地关闭说明与卡堆并恢复日志。
+- 公开展示的手牌、额外牌组与主卡组卡片一次列出，按双方与区域分组，支持滚轮浏览及卡片说明查看。展示窗口使用屏幕尺寸，不跟随场地缩小；用户点击“确定”后继续处理消息，关闭仅确认本地展示，不发送选牌响应。原区域卡片不翻转，隐藏卡号、位置与元数据保持不变。
 - 选牌弹窗取消区域分页，场上、墓地、卡组等候选牌在同一横排展示；相同归属、相同区域的卡片共用一个分组框和标题；我方使用蓝色背景，对方使用红色背景，取消逐张卡片上的归属标签。分组保持首次出现顺序，组内保留服务端顺序，选择回传仍使用原始选项编号。连锁仍先按卡片合并多个效果。
 - 候选、已选择和必选素材的牌列支持鼠标滚轮、触控板及键盘滚动。多排信息出现时弹窗向上增高，屏幕空间足够时完整显示；只有达到可见区域上限后才启用纵向滚动，操作按钮保留在底部。
 - 连锁的多效果与普通效果选择使用一致的可换行大字号，按场地缩放补偿至至少 18 屏幕像素。长效果列表通过鼠标滚轮纵向浏览。
@@ -30,8 +31,8 @@
 ## 保留的操作规则
 
 - 卡片附近的合法操作按发动、攻击、表示形式、特殊召唤、通常召唤、盖放排序；多卡/多效果先选卡，再选效果。
-- 素材选择按 MDPro3 的区域条件分流：候选与必选素材全部在怪兽区、魔陷区且不含叠放素材时直接在场上选；包含手牌、墓地、除外或叠放素材等区域时使用弹窗。无法定位场上卡片时回退弹窗。精确等级选择达到合法目标后自动响应；允许等级溢出时保留确认。
-- 场上的素材确认使用右下角紧凑面板，与其他控制统一为屏幕像素尺寸、44px 高按钮及小圆角。逐步选素材时根据服务端 `finishable` / `cancelable` 决定能否确认、结束或取消，每次点击仍回传原始选项编号。
+- 素材选择按 MDPro3 的区域条件分流：候选与必选素材全部在怪兽区、魔陷区且不含叠放素材时直接在场上选；包含手牌、墓地、除外或叠放素材等区域时使用弹窗。无法定位场上卡片时回退弹窗。普通选牌、等级素材、解放、计数物均在用户点击确认后响应；只有一张候选、选满数量或达到精确等级时也保留确认。
+- 场上的素材确认使用右下角紧凑面板，与其他控制统一为屏幕像素尺寸、44px 高按钮及小圆角。逐步选素材时先在本地暂选，可更改或用右键撤销，再点击确认回传原始选项编号。服务端 `finishable` / `cancelable` 继续决定能否结束或取消。
 - 右键仅处理最上层交互：发动询问回答否，可取消选牌/连锁返回取消，本地操作或效果菜单关闭而不发送协议响应。必须继续的选择保持待答状态；输入框保留原生右键菜单。
 - 超量怪兽可查看素材；卡堆支持单列/三列和滚动。卡堆/附加效果与日志互相让位，关闭后恢复。
 - 连锁时点直接循环智能、全部、忽略；A/S/D 快捷键保留。普通 Tab 保留浏览器焦点导航。
@@ -48,11 +49,11 @@
 | 攻击 | 宣言只显示攻击箭头；BATTLE 才播放蓄力、冲击、命中停顿与完整归位，消息队列等待结束后再处理伤害和送墓。攻击力低于 2000 共 1000ms，达到 2000 共 1250ms。 |
 | 召唤 | 保持平面相机，卡片沿进场路径直接落位；召唤消息只播放局部特效，不再把已落位的卡片抬起、停留、放下。落地消息等待 1000ms，衍生物 200ms。 |
 | 特殊召唤 | 按素材记录和类型区分融合、同调、超量、连接、仪式、灵摆；保留素材与召唤卡展示、落地局部特效，场上的卡片保持落位姿态。召唤、破坏、解放、素材、送墓、除外、回卡组与表示形式变化有局部反馈。 |
-| 发动与确认 | 发动卡片使用 200/700/200ms，确认卡片使用 100/800/100ms 的进入、停留、恢复阶段。确认多张卡逐张等待；临时公开卡面不再改写隐藏卡的协议卡号与元数据。 |
+| 发动与展示 | 发动卡片使用 200/700/200ms。展示卡片统一使用可滚动列表，不播放逐张翻开或抬起动画；使用消息中的公开卡号，即使对应卡堆未渲染或无法定位卡片，也能列出卡面。展示不会改写隐藏卡的协议卡号与元数据。 |
 | 无效与对象 | 无效消息等待 1000ms；无效仍作用在原卡片上，保留临时公开与恢复机制；对象指定等待 500ms。 |
 | 硬币与骰子 | 一次同时展示全部内核结果，不在浏览器重新随机；硬币共 3000ms、骰子共 2000ms，随后继续消息。 |
 | 数字变化 | LP 先浮出变化量 1100ms，再线性滚动 1200ms；攻防变化滚动 600ms。LP 规则消息仅等待 500ms，数字动画独立完成。暂停渲染及切换后台均有最终值兜底。 |
-| 选择 | 精确等级素材过滤无法完成的候选，并在达到合法目标时自动提交；弹窗与场上选择使用相同规则。解放保留内核贡献值，一张可满足两份解放。计数物在场上逐次点击、满足数量后自动提交，其他情况使用数字输入；响应保留原始顺序和未选位置的零值。 |
+| 选择 | 精确等级素材过滤无法完成的候选，满足条件后启用确认按钮；弹窗与场上选择都等待用户确认。解放保留内核贡献值，一张可满足两份解放。计数物在场上逐次点击，其他情况使用数字输入，数量满足后由用户确认；响应保留原始选项编号和未选位置的零值。允许零张选择的请求也可以明确确认空列表。 |
 | 重开与退出 | 取消正在等待的停留、冲击和召唤展示，旧消息不得继续写入新一局的记录；所有提示保留各自的请求编号，防止重复或过期响应。 |
 
 表中时间以原有动画速度设置 `0.7` 为基准；原有速度滑块继续生效。低动态、关闭动画及后台模式保留结果信息与规则状态，减少装饰和动画等待。
@@ -62,6 +63,8 @@
 **保真范围：**常用操作分支、消息等待、卡片移动与恢复顺序依据源码对齐。Unity Timeline、专属角色/怪兽 Cut-in、特殊胜利演出及原版粒子资产没有移植；六类特殊召唤的局部几何与粒子是浏览器重建，展示段采用 1600ms 基准，不能视为原版 Timeline 的逐帧复制。场地背景和透视相机不在本次迁移范围。
 
 之前已确认的稳定手牌顺序、开局卡组不播放洗牌动画与声音、`.env` 资源地址及 `18080` 部署端口继续保留。
+
+展示协议同时支持 `MSG_CONFIRM_CARDS` 的旧版与扩展头，通过完整载荷长度核对卡片数量；`MSG_CONFIRM_DECKTOP`、`MSG_CONFIRM_EXTRATOP` 共用同一列表流程，保留消息中的卡片顺序及实际序号（包括跳过已表侧额外卡片形成的序号间隔）。
 
 ## 对照来源
 
@@ -73,12 +76,12 @@
 npx tsc --noEmit
 npm run lint
 npm run build
-./node_modules/.bin/esbuild tests/duel-pacing.test.mjs tests/mdpro3-experience.test.mjs tests/mdpro3-parity.test.mjs tests/mdpro3-source-behavior.test.mjs tests/card-animation.test.mjs tests/eventbus.test.mjs tests/local-id.test.mjs tests/hand-order.test.mjs --bundle --platform=node --format=esm --out-extension:.js=.mjs --outdir=/tmp/neos-parity-tests
+./node_modules/.bin/esbuild tests/duel-pacing.test.mjs tests/mdpro3-experience.test.mjs tests/mdpro3-parity.test.mjs tests/mdpro3-source-behavior.test.mjs tests/card-animation.test.mjs tests/card-reveal.test.mjs tests/eventbus.test.mjs tests/local-id.test.mjs tests/hand-order.test.mjs --bundle --platform=node --format=esm --out-extension:.js=.mjs --outdir=/tmp/neos-parity-tests
 node --test /tmp/neos-parity-tests/*.test.mjs
-npm run test:e2e -- tests/e2e/duel-polish.spec.ts tests/e2e/duel-selection-polish.spec.ts tests/e2e/duel-effect-text.spec.ts tests/e2e/duel-material-selection.spec.ts tests/e2e/mdpro3-parity.spec.ts tests/e2e/mdpro3-duel.spec.ts tests/e2e/mdpro3-source-behavior.spec.ts tests/e2e/duel-shuffle-regression.spec.ts tests/e2e/duel-pacing.spec.ts tests/e2e/duel-dialog-regression.spec.ts tests/e2e/adaptive-scale.spec.ts tests/e2e/replay-msg-regression.spec.ts --workers=1
+npm run test:e2e -- tests/e2e/duel-polish.spec.ts tests/e2e/duel-selection-polish.spec.ts tests/e2e/duel-effect-text.spec.ts tests/e2e/duel-material-selection.spec.ts tests/e2e/duel-confirmation-and-reveal.spec.ts tests/e2e/mdpro3-parity.spec.ts tests/e2e/mdpro3-duel.spec.ts tests/e2e/mdpro3-source-behavior.spec.ts tests/e2e/duel-shuffle-regression.spec.ts tests/e2e/duel-pacing.spec.ts tests/e2e/duel-dialog-regression.spec.ts tests/e2e/adaptive-scale.spec.ts tests/e2e/replay-msg-regression.spec.ts --workers=1
 ```
 
-新增浏览器回归逐帧检查双方抽卡/检索时已有手牌保持同一基线和牌序，检查跨区同排、双方标记、两类滚轮滚动、多排窗口增高及缩放后的效果字号；同时检查召唤路径单调、途中卡片尺寸恒定、结束没有跳回；检查弹窗淡入时边界固定、场地查看不会提交；并在桌面与竖屏验证按钮和菜单的实际屏幕尺寸。其他回归覆盖连锁、无效、选择、卡堆、阶段编码、重开清理和停帧处理。文字回归使用灰流丽、增殖的G、流天类星龙和死亡导游的完整效果文本，并检查缺失静态说明、无卡图确认、卡片效果编号及空描述槽的显示。素材回归覆盖场上/手牌/墓地/叠放素材分流、必选素材与原始响应编号、精确等级自动确认、溢出等级手动确认、逐步选素材的结束和取消、右键层级，以及桌面和竖屏的确认按钮尺寸。没有测量用户设备的实际帧率。
+浏览器回归逐帧检查双方抽卡/检索时已有手牌保持同一基线和牌序，检查跨区同排、双方标记、两类滚轮滚动、多排窗口增高及缩放后的效果字号；同时检查召唤路径单调、途中卡片尺寸恒定、结束没有跳回；检查弹窗淡入时边界固定、场地查看不会提交；并在桌面与竖屏验证按钮和菜单的实际屏幕尺寸。其他回归覆盖连锁、无效、选择、卡堆、阶段编码、重开清理和停帧处理。素材回归覆盖场上/手牌/墓地/叠放素材分流、必选素材与原始响应编号、普通/精确/溢出等级的手动确认、逐步选素材的待确认状态、结束和取消、右键层级，以及桌面和竖屏的确认按钮尺寸。展示回归覆盖新旧协议、手牌、主卡组顶、额外牌组顶、来源不存在、重复卡、同时列出、窗口滚动、横竖屏尺寸、隐藏状态保持及重开清理。没有测量用户设备的实际帧率。
 
 ## 部署
 
@@ -86,8 +89,8 @@ npm run test:e2e -- tests/e2e/duel-polish.spec.ts tests/e2e/duel-selection-polis
 
 ```bash
 git fetch origin
-git switch feat/mdpro3-duel-parity
-git pull --ff-only origin feat/mdpro3-duel-parity
+git switch feat/mdpro3-neos-animation-parity
+git pull --ff-only origin feat/mdpro3-neos-animation-parity
 docker compose up --build -d --remove-orphans
 ```
 

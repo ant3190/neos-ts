@@ -13,6 +13,7 @@ import { resetAnnounceModal } from "./AnnounceModal";
 import { closeCardListModal } from "./CardListModal";
 import { closeCardModal } from "./CardModal";
 import { resetCheckCounterModal } from "./CheckCounterModal";
+import { resetConfirmCardsModal } from "./ConfirmCardsModal";
 import { resetOptionModal } from "./OptionModal";
 import { resetPositionModal } from "./PositionModal";
 import { cancelSelectActionsModal } from "./SelectActionsModal";
@@ -41,6 +42,7 @@ export function resetDuelDialogs() {
   closeCardListModal();
   closeCardModal();
   resetCheckCounterModal();
+  resetConfirmCardsModal();
   resetOptionModal();
   resetPositionModal();
   cancelSelectActionsModal();

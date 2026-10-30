@@ -251,10 +251,15 @@ export default class GameMsgAdapter implements StocAdapter {
           break;
         }
         case GAME_MSG.MSG_CONFIRM_CARDS:
-        case GAME_MSG.MSG_CONFIRM_DECKTOP: {
+        case GAME_MSG.MSG_CONFIRM_DECKTOP:
+        case GAME_MSG.MSG_CONFIRM_EXTRATOP: {
           gameMsg.confirm_cards = MsgConfirmCardsAdapter(
             gameData,
-            func === GAME_MSG.MSG_CONFIRM_DECKTOP,
+            func === GAME_MSG.MSG_CONFIRM_DECKTOP
+              ? ygopro.CardZone.DECK
+              : func === GAME_MSG.MSG_CONFIRM_EXTRATOP
+              ? ygopro.CardZone.EXTRA
+              : undefined,
           );
           break;
         }

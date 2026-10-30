@@ -1,14 +1,15 @@
 import { Button } from "antd";
-import { type ReactNode, useId, useLayoutEffect } from "react";
+import { type ReactNode, useId, useLayoutEffect, useState } from "react";
 import { useSnapshot } from "valtio";
 
-import { sendSelectSingleResponse } from "@/api";
+import { sendSelectMultiResponse, sendSelectSingleResponse } from "@/api";
 import { getUIContainer } from "@/container/compat";
-import { matStore } from "@/stores";
+import { cardStore, matStore } from "@/stores";
 
 import { duelViewport } from "../layout/viewport";
 import { getDuelEpoch, setDuelPrompt } from "../Message/session";
 import { clearSelectInfo } from "../utils/clearSelectInfo";
+import { registerFieldSelection, resetFieldSelection } from "./fieldSelection";
 import { useDuelRightClick } from "./rightClick";
 import styles from "./SelectionControls.module.scss";
 
@@ -55,6 +56,16 @@ export function IncrementalSelectionControls() {
   const epoch = getDuelEpoch();
   const container = getUIContainer();
   const request = matStore.selectUnselectInfo.selectableList;
+  const [choice, setChoice] = useState<{
+    request: typeof request;
+    uuid: string;
+    response: number;
+  }>();
+  const pending = choice?.request === request ? choice : undefined;
+  const current = () =>
+    epoch === getDuelEpoch() &&
+    container === getUIContainer() &&
+    request === matStore.selectUnselectInfo.selectableList;
   const end = () => {
     const live = matStore.selectUnselectInfo;
     if (
@@ -65,17 +76,70 @@ export function IncrementalSelectionControls() {
     )
       return;
     clearSelectInfo();
+    resetFieldSelection();
     sendSelectSingleResponse(container.conn, -1);
   };
-  useDuelRightClick(active, end, 250);
+  const submit = () => {
+    if (!pending || !current()) return;
+    const card = cardStore.inner.find((card) => card.uuid === pending.uuid);
+    if (!card || card.selectInfo.response !== pending.response) return;
+    clearSelectInfo();
+    resetFieldSelection();
+    sendSelectMultiResponse(container.conn, [pending.response]);
+    setChoice(undefined);
+  };
+  useDuelRightClick(
+    active,
+    () => {
+      if (pending) setChoice(undefined);
+      else end();
+    },
+    250,
+  );
   useLayoutEffect(() => {
+    if (!active) return;
     setDuelPrompt(id, active);
-    return () => setDuelPrompt(id, false);
-  }, [active, id]);
+    const selectable = matStore.selectUnselectInfo.selectableList.map(
+      (location) => cardStore.find(location),
+    );
+    const selected = matStore.selectUnselectInfo.selectedList.map((location) =>
+      cardStore.find(location),
+    );
+    selectable.forEach((card) => {
+      if (card) {
+        card.selectInfo.selectable = true;
+        card.selectInfo.selected = card.uuid === pending?.uuid;
+      }
+    });
+    selected.forEach((card) => {
+      if (card) {
+        card.selectInfo.selectable = false;
+        card.selectInfo.selected = card.uuid !== pending?.uuid;
+      }
+    });
+    const candidates = [...selectable, ...selected];
+    const release = registerFieldSelection((uuid) => {
+      if (!current()) return;
+      const card = candidates.find((card) => card?.uuid === uuid);
+      if (!card || card.selectInfo.response === undefined) return;
+      const response = card.selectInfo.response;
+      setChoice((previous) =>
+        previous?.request === request && previous.uuid === uuid
+          ? undefined
+          : { request, uuid, response },
+      );
+    });
+    return () => {
+      release();
+      setDuelPrompt(id, false);
+    };
+  }, [active, id, request, info.selectedList, pending]);
   if (!active) return null;
   return (
     <SelectionControls
-      title={hint.esSelectHint || "请选择召唤素材"}
+      title={`${hint.esSelectHint || "请选择召唤素材"}${
+        pending ? "（待确认）" : ""
+      }`}
       testId="duel-material-controls"
     >
       {info.cancelable && !info.finishable && (
@@ -86,8 +150,8 @@ export function IncrementalSelectionControls() {
       <Button
         type="primary"
         data-testid="duel-material-confirm"
-        disabled={!info.finishable}
-        onClick={end}
+        disabled={!pending && !info.finishable}
+        onClick={pending ? submit : end}
       >
         确认选择
       </Button>

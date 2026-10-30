@@ -109,7 +109,7 @@ async function expectPacket(page: Page, response: number[] | number | boolean) {
   expect(packets.actual).toEqual(packets.expected);
 }
 
-test("on-field exact-level materials select directly and submit once with mandatory responses", async ({
+test("on-field exact-level materials require confirmation and preserve mandatory responses", async ({
   page,
 }) => {
   await mdpro3Fixture(page);
@@ -126,6 +126,10 @@ test("on-field exact-level materials select directly and submit once with mandat
     await page.evaluate(() => (window as any).__parityPackets.length),
   ).toBe(0);
   await page.locator('[data-card-uuid="p0-MZONE-1"]').click();
+  expect(
+    await page.evaluate(() => (window as any).__parityPackets.length),
+  ).toBe(0);
+  await page.getByTestId("duel-select-card-submit").click();
   await expectPacket(page, [4, 7]);
   await expect(page.getByTestId("duel-field-selection")).toHaveCount(0);
   await expect(page.locator('[data-card-selected="true"]')).toHaveCount(0);
@@ -149,7 +153,10 @@ for (const zone of ["HAND", "GRAVE", "OVERLAY"]) {
       .getByTestId("duel-select-candidates")
       .locator('[data-card-response="7"]')
       .click();
-    // MDPro3 submits exact sums immediately in both the field and popup views.
+    expect(
+      await page.evaluate(() => (window as any).__parityPackets.length),
+    ).toBe(0);
+    await page.getByTestId("duel-select-card-submit").click();
     await expectPacket(page, [4, 7]);
   });
 }
@@ -200,6 +207,10 @@ test("incremental selections respect forced, cancelable and finishable engine st
     await page.evaluate(() => (window as any).__parityPackets.length),
   ).toBe(0);
   await page.locator('[data-card-uuid="p0-MZONE-0"]').click();
+  expect(
+    await page.evaluate(() => (window as any).__parityPackets.length),
+  ).toBe(0);
+  await page.getByTestId("duel-material-confirm").click();
   await expectPacket(page, [6]);
   await expect(page.getByTestId("duel-material-controls")).toHaveCount(0);
   await page.evaluate(() => (window as any).__parityPackets.splice(0));

@@ -265,7 +265,7 @@ test("battle awaits the complete attack and return before moving its target to t
   );
 });
 
-test("confirming a hidden opponent hand temporarily reveals its face and preserves code zero", async ({
+test("confirming a hidden opponent hand lists its public face without turning the field card", async ({
   page,
 }) => {
   await mdpro3Fixture(page);
@@ -294,11 +294,16 @@ test("confirming a hidden opponent hand temporarily reveals its face and preserv
     ).then(() => ((window as any).__confirmDone = true));
   });
   const card = page.locator('[data-card-uuid="p1-HAND-0"]');
+  await expect(page.getByTestId("duel-confirm-card")).toHaveAttribute(
+    "data-card-code",
+    "46986414",
+  );
   await expect(card.locator("[data-card-face] img")).toHaveAttribute(
     "src",
-    /46986414/,
+    /card_back/,
   );
   await expect(card).toHaveAttribute("data-card-code", "0");
+  await page.getByTestId("duel-confirm-cards-close").click();
   await expect
     .poll(() => page.evaluate(() => (window as any).__confirmDone))
     .toBe(true);
@@ -353,6 +358,10 @@ test("field counters increment per click, reset on right click and send dense co
   await page.locator('[data-card-uuid="p0-MZONE-0"]').click();
   await page.locator('[data-card-uuid="p0-MZONE-0"]').click();
   await page.locator('[data-card-uuid="p0-MZONE-2"]').click();
+  expect(
+    await page.evaluate(() => (window as any).__parityPackets.length),
+  ).toBe(0);
+  await page.getByTestId("duel-counter-submit").click();
   await expect
     .poll(() => page.evaluate(() => (window as any).__parityPackets.length))
     .toBe(1);
@@ -615,6 +624,10 @@ test("popup counters clamp to the remaining amount and keep unselected positions
   await inputs.nth(0).fill("1");
   await inputs.nth(2).fill("9");
   await inputs.nth(2).press("Tab"); // InputNumber clamps an out-of-range edit on blur.
+  expect(
+    await page.evaluate(() => (window as any).__parityPackets.length),
+  ).toBe(0);
+  await page.getByTestId("duel-counter-submit").click();
   await expect
     .poll(() => page.evaluate(() => (window as any).__parityPackets.length))
     .toBe(1);

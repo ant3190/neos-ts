@@ -25,6 +25,7 @@ import {
   CheckCounterModal,
   closeCardListModal,
   closeCardModal,
+  ConfirmCardsModal,
   EndModal,
   HintNotification,
   OptionModal,
@@ -158,6 +159,7 @@ export const Component: React.FC = () => {
       <PositionModal />
       <OptionModal />
       <CheckCounterModal />
+      <ConfirmCardsModal />
       <SortCardModal />
       <SimpleSelectCardsModal />
       <AnnounceModal />

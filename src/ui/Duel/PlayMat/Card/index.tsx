@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { useSnapshot } from "valtio";
 
-import { sendSelectMultiResponse, ygopro } from "@/api";
+import { ygopro } from "@/api";
 import { getUIContainer } from "@/container/compat";
 import { eventbus, Task } from "@/infra";
 import {
@@ -46,7 +46,6 @@ import {
 import { cardPose } from "../../layout/cardPose";
 import { isFaceDownPosition } from "../../layout/geometry";
 import { closeCardListModal, displayCardListModal } from "../../Message";
-import { clearSelectInfo } from "../../utils";
 import { getActionHighlight } from "../../utils/actionHighlight";
 import { ActionFrame } from "../ActionFrame";
 import styles from "./index.module.scss";
@@ -256,17 +255,6 @@ const CardImpl: React.FC<{ idx: number }> = ({ idx }) => {
       return;
     }
     const onCardClick = (card: CardType) => {
-      const selectInfo = card.selectInfo;
-      if (selectInfo.selectable || selectInfo.selected) {
-        if (selectInfo.response !== undefined) {
-          sendSelectMultiResponse(container.conn, [selectInfo.response]);
-          clearSelectInfo();
-          return;
-        } else {
-          console.error("card is selectable but the response is undefined!");
-        }
-      }
-
       // Card inspection and its available commands stay open on repeated clicks.
       displayCardModal(card);
       if (element.current) openCardActions([card], element.current);
