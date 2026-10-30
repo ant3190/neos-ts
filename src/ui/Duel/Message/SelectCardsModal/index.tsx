@@ -1,6 +1,13 @@
+import { CloseOutlined } from "@ant-design/icons";
 import { Button } from "antd";
 import classnames from "classnames";
-import { type ReactNode, useId, useLayoutEffect, useState } from "react";
+import {
+  type ComponentProps,
+  type ReactNode,
+  useId,
+  useLayoutEffect,
+  useState,
+} from "react";
 import { type INTERNAL_Snapshot as Snapshot, useSnapshot } from "valtio";
 
 import { type CardMeta, fetchStrings, Region, ygopro } from "@/api";
@@ -162,15 +169,7 @@ export function SelectCardsModal({
     },
     250,
   );
-  const footer = readOnly ? (
-    <Button
-      type="primary"
-      data-testid="duel-confirm-cards-close"
-      onClick={() => onSubmit([])}
-    >
-      确定
-    </Button>
-  ) : (
+  const footer = readOnly ? null : (
     <div className={styles.footer}>
       {cancelable && (
         <Button data-testid="duel-select-card-cancel" onClick={onCancel}>
@@ -305,8 +304,9 @@ export function SelectCardsModal({
       true,
     ),
   }));
+  const Dialog = readOnly ? PublicCardsPanel : NeosModal;
   return (
-    <NeosModal
+    <Dialog
       title={title}
       duelPosition="selection"
       duelWidth={Math.min(
@@ -321,7 +321,7 @@ export function SelectCardsModal({
       open={isOpen}
       onDuelCancel={
         readOnly
-          ? undefined
+          ? () => onSubmit([])
           : cancelable
           ? onCancel
           : finishable
@@ -397,7 +397,40 @@ export function SelectCardsModal({
           </section>
         )}
       </div>
-    </NeosModal>
+    </Dialog>
+  );
+}
+
+function PublicCardsPanel({
+  open,
+  title,
+  duelWidth,
+  onDuelCancel,
+  children,
+}: ComponentProps<typeof NeosModal>) {
+  if (!open) return null;
+  return (
+    <div className={styles.revealWrap}>
+      <aside
+        className={styles.revealPanel}
+        style={{ width: duelWidth }}
+        aria-label={typeof title === "string" ? title : "展示卡片"}
+        role="region"
+      >
+        <header>
+          <strong>{title}</strong>
+          <button
+            type="button"
+            aria-label="关闭展示"
+            data-testid="duel-public-cards-close"
+            onClick={onDuelCancel}
+          >
+            <CloseOutlined />
+          </button>
+        </header>
+        {children}
+      </aside>
+    </div>
   );
 }
 

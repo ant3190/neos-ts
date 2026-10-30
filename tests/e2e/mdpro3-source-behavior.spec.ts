@@ -303,7 +303,6 @@ test("confirming a hidden opponent hand lists its public face without turning th
     /card_back/,
   );
   await expect(card).toHaveAttribute("data-card-code", "0");
-  await page.getByTestId("duel-confirm-cards-close").click();
   await expect
     .poll(() => page.evaluate(() => (window as any).__confirmDone))
     .toBe(true);

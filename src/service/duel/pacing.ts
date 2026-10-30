@@ -52,7 +52,7 @@ export function getDuelPacing(
     case "new_phase":
       return { minimumMs: 300, settleMs: 0 };
     case "confirm_cards":
-      return undefined; // each card reveal is awaited separately
+      return undefined; // informational lists never pause engine messages
     // State queries, input prompts and chain cleanup have no extra wait.
     default:
       return undefined;

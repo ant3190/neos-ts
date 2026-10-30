@@ -28,6 +28,15 @@ export default async (
     if (code) context.historyStore.putConfirmed(context, code, location);
     return { meta: fetchCard(code), location };
   });
+  const only = confirm.cards.length === 1 ? confirm.cards[0] : undefined;
+  if (
+    only?.location === ygopro.CardZone.HAND &&
+    context.matStore.isMe(only.controller) &&
+    !!only.code &&
+    context.cardStore.at(only.location, only.controller, only.sequence)
+      ?.code === only.code
+  )
+    return;
   playEffect(AudioActionType.SOUND_REVEAL);
-  await displayConfirmCardsModal(cards);
+  void displayConfirmCardsModal(cards);
 };

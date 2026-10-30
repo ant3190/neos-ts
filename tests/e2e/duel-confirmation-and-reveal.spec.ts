@@ -305,6 +305,7 @@ for (const scenario of [
     page,
   }) => {
     await mdpro3Fixture(page);
+    await page.clock.install();
     const codes = [46986414, 100000001, 46986414];
     await reveal(
       page,
@@ -336,16 +337,23 @@ for (const scenario of [
         "src",
         new RegExp(String(codes[i])),
       );
-    expect(await page.evaluate(() => (window as any).__revealDone)).toBe(false);
+    expect(await page.evaluate(() => (window as any).__revealDone)).toBe(true);
+    expect(
+      await page.evaluate(async () => {
+        const { hasDuelPrompt } = await import(
+          "/src/ui/Duel/Message/session.ts"
+        );
+        return hasDuelPrompt();
+      }),
+    ).toBe(false);
+    await expect(page.getByTestId("duel-confirm-cards-close")).toHaveCount(0);
+    await expect(page.locator(".ant-modal-mask:visible")).toHaveCount(0);
     expect(await packets(page)).toEqual([]);
     await privateStateUnchanged(page);
     await cards.nth(0).click();
     await expect(modal).toBeVisible();
     expect(await packets(page)).toEqual([]);
-    await page.getByTestId("duel-confirm-cards-close").click();
-    await expect
-      .poll(() => page.evaluate(() => (window as any).__revealDone))
-      .toBe(true);
+    await page.clock.fastForward(6000);
     await expect(modal).toHaveCount(0);
     await privateStateUnchanged(page);
     expect(await packets(page)).toEqual([]);
@@ -364,10 +372,10 @@ test("an extra card is displayed from the event even when its source is not in t
     "46986414",
   );
   await privateStateUnchanged(page);
-  await page.getByTestId("duel-confirm-cards-close").click();
+  await page.getByTestId("duel-public-cards-close").click();
 });
 
-test("a full extra deck scrolls as one list and leaves confirmation visible on a portrait screen", async ({
+test("a full extra deck scrolls as an informational list on a portrait screen", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -392,7 +400,7 @@ test("a full extra deck scrolls as one list and leaves confirmation visible on a
   await expect
     .poll(() => row.evaluate((node) => node.scrollLeft))
     .toBeGreaterThan(0);
-  const button = page.getByTestId("duel-confirm-cards-close");
+  const button = page.getByTestId("duel-public-cards-close");
   await expect(button).toBeVisible();
   const bounds = (await button.boundingBox())!;
   expect(bounds.x).toBeGreaterThanOrEqual(0);
@@ -403,7 +411,7 @@ test("a full extra deck scrolls as one list and leaves confirmation visible on a
   await button.click();
 });
 
-test("a reveal list keeps its cards and confirmation usable in a short landscape viewport", async ({
+test("a reveal list remains within a short landscape viewport", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 640, height: 360 });
@@ -418,12 +426,12 @@ test("a reveal list keeps its cards and confirmation usable in a short landscape
       sequence: 7 - i,
     })),
   );
-  const modal = page.getByRole("dialog", { name: /确认展示卡片/ });
+  const modal = page.getByRole("region", { name: /展示卡片/ });
   await expect(modal).toBeVisible();
   const bounds = (await modal.boundingBox())!;
   expect(bounds.y).toBeGreaterThanOrEqual(0);
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(360);
-  const button = page.getByTestId("duel-confirm-cards-close");
+  const button = page.getByTestId("duel-public-cards-close");
   await expect(button).toBeVisible();
   await page.screenshot({
     path: test.info().outputPath("revealed-extra-landscape.png"),
@@ -431,14 +439,16 @@ test("a reveal list keeps its cards and confirmation usable in a short landscape
   await button.click();
 });
 
-test("reset closes an old reveal without letting its promise close a new list", async ({
+test("reset closes an old reveal without letting its timer close a new list", async ({
   page,
 }) => {
   await mdpro3Fixture(page);
+  await page.clock.install();
   await reveal(page, 31, [
     { code: 46986414, controller: 1, zone: 2, sequence: 0 },
   ]);
   await expect(page.getByTestId("duel-confirm-cards-modal")).toBeVisible();
+  await page.clock.fastForward(900);
   await page.evaluate(async () => {
     const { resetDuelDialogs } = await import("/src/ui/Duel/Message/reset.ts");
     const { displayConfirmCardsModal } = await import(
@@ -456,7 +466,54 @@ test("reset closes an old reveal without letting its promise close a new list", 
   await expect
     .poll(() => page.evaluate(() => (window as any).__revealDone))
     .toBe(true);
-  await expect(page.getByTestId("duel-confirm-cards-close")).toBeVisible();
-  await page.getByTestId("duel-confirm-cards-close").click();
+  await page.clock.fastForward(600);
+  await expect(page.getByTestId("duel-confirm-card")).toHaveAttribute(
+    "data-card-code",
+    "100000001",
+  );
+  await page.clock.fastForward(1000);
+  await expect(page.getByTestId("duel-confirm-cards-modal")).toHaveCount(0);
   expect(await packets(page)).toEqual([]);
+});
+
+test("revealing an already visible card searched into our hand never opens another prompt", async ({
+  page,
+}) => {
+  await mdpro3Fixture(page);
+  await reveal(page, 31, [
+    { code: 46986414, controller: 0, zone: 2, sequence: 0 },
+  ]);
+  expect(await page.evaluate(() => (window as any).__revealDone)).toBe(true);
+  await expect(page.getByTestId("duel-confirm-cards-modal")).toHaveCount(0);
+  const record = await page.evaluate(async () => {
+    const { historyStore } = await import("/src/stores/index.ts");
+    return historyStore.historys.at(-1);
+  });
+  expect(record).toMatchObject({
+    card: 46986414,
+    operation: 4,
+    opponent: false,
+  });
+  await privateStateUnchanged(page);
+  expect(await packets(page)).toEqual([]);
+});
+
+test("a public list immediately yields to a real card choice which still requires confirmation", async ({
+  page,
+}) => {
+  await mdpro3Fixture(page);
+  await reveal(page, 31, [
+    { code: 46986414, controller: 1, zone: 2, sequence: 0 },
+  ]);
+  await expect(page.getByTestId("duel-confirm-cards-modal")).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__revealDone)).toBe(true);
+  await beginChoice(page, "GRAVE");
+  await expect(page.getByTestId("duel-confirm-cards-modal")).toHaveCount(0);
+  const button = page.getByTestId("duel-select-card-submit");
+  await expect(button).toBeDisabled();
+  await page.getByTestId("duel-select-card-option").click();
+  await expect(button).toBeEnabled();
+  expect(await packets(page)).toEqual([]);
+  await button.click();
+  await expectResponse(page, [7]);
 });

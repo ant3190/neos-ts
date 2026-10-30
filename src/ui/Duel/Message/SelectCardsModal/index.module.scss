@@ -3,6 +3,56 @@
   flex-direction: column;
   gap: 12px;
 }
+.revealWrap {
+  position: absolute;
+  inset: var(--duel-visible-top, 0px) 0 var(--duel-visible-bottom, 0px);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: none;
+}
+.revealPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(100%, calc(100vw - 32px));
+  max-height: calc(var(--duel-dialog-height, 1080px) - 48px);
+  padding: 18px 20px;
+  color: #e7f1f7;
+  background: #0b1a28f7;
+  border: 1px solid #819eae80;
+  border-radius: 8px;
+  box-shadow: 0 12px 40px #0008;
+  pointer-events: auto;
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 26px;
+    line-height: 1.5;
+  }
+  header button {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    color: #b9d5e5;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+  header button:focus-visible {
+    outline: 2px solid #b8ebff;
+    outline-offset: 2px;
+  }
+  .content {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
 .section h3 {
   margin: 0 0 6px;
   color: #bbcedb;
