@@ -135,25 +135,18 @@ async function beginIncremental(page: Page, zone = "MZONE") {
   }, zone);
 }
 
-test("incremental field choices can be corrected or cleared before sending one response", async ({
+test("incremental field choices advance without an intermediate confirmation", async ({
   page,
 }) => {
   await mdpro3Fixture(page);
   await beginIncremental(page);
-  const confirm = page.getByTestId("duel-material-confirm");
   await page.locator('[data-card-uuid="p0-MZONE-1"]').click();
-  await expect(confirm).toBeEnabled();
-  await page.mouse.click(640, 300, { button: "right" });
-  await expect(confirm).toBeDisabled();
-  expect(await packets(page)).toEqual([]);
-  await page.locator('[data-card-uuid="p0-MZONE-1"]').click();
-  await page.locator('[data-card-uuid="p0-MZONE-2"]').click();
-  expect(await packets(page)).toEqual([]);
-  await confirm.click();
-  await expectResponse(page, [13]);
+  await expectResponse(page, [11]);
+  await expect(page.getByTestId("duel-material-confirm")).toBeDisabled();
+  await expect(page.getByTestId("duel-material-cancel")).toBeEnabled();
 });
 
-test("unselecting a material in a popup also waits for confirmation", async ({
+test("a selected material in a popup can be removed directly", async ({
   page,
 }) => {
   await mdpro3Fixture(page);
@@ -162,27 +155,28 @@ test("unselecting a material in a popup also waits for confirmation", async ({
     .getByTestId("duel-select-selected")
     .locator('[data-card-response="6"]');
   await selected.click();
-  await expect(selected).toHaveAttribute("aria-pressed", "true");
-  const confirm = page.getByTestId("duel-select-card-submit");
-  await expect(confirm).toBeEnabled();
-  expect(await packets(page)).toEqual([]);
-  await confirm.click();
+  await expect(selected).toHaveAttribute("aria-pressed", "false");
   await expectResponse(page, [6]);
+  await expect(page.getByTestId("duel-select-card-submit")).toBeDisabled();
 });
 
-test("a replacement incremental request cannot submit a previous pending choice", async ({
+test("a replacement material request cannot replay an old queued choice", async ({
   page,
 }) => {
   await mdpro3Fixture(page);
   await beginIncremental(page);
   await page.locator('[data-card-uuid="p0-MZONE-1"]').click();
-  await expect(page.getByTestId("duel-material-confirm")).toBeEnabled();
+  await page.locator('[data-card-uuid="p0-MZONE-2"]').click();
+  await expectResponse(page, [11]);
   await beginIncremental(page);
   await expect(page.getByTestId("duel-material-confirm")).toBeDisabled();
-  expect(await packets(page)).toEqual([]);
+  await expectResponse(page, [11]);
   await page.locator('[data-card-uuid="p0-MZONE-2"]').click();
-  await page.getByTestId("duel-material-confirm").click();
-  await expectResponse(page, [13]);
+  await expect.poll(async () => (await packets(page)).length).toBe(2);
+  expect((await packets(page)).map((packet) => packet.slice(3))).toEqual([
+    [1, 11],
+    [1, 13],
+  ]);
 });
 
 interface RevealRow {

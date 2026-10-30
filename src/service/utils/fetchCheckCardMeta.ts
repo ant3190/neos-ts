@@ -4,6 +4,8 @@ import { Context } from "@/container";
 import { isCardDisabled } from "@/stores";
 import type { Option } from "@/ui/Duel/Message";
 
+import { getPublicCardCode } from "./publicCardKnowledge";
+
 const helper = async (
   context: Context,
   {
@@ -33,13 +35,11 @@ const helper = async (
   // 这里可能直接用target.meta即可，不用再查一遍DB
   // 但是ygopro后端传回来了code，感觉这里会有些坑，因此求稳这样写
   const newID =
-    code !== 0
-      ? code
-      : target !== undefined
-      ? target.code !== 0
-        ? target.code
-        : target.meta.id
-      : 0;
+    code ||
+    target?.code ||
+    getPublicCardCode(context, location) ||
+    target?.meta.id ||
+    0;
   const meta = fetchCard(newID);
 
   const effectDesc = effect_description

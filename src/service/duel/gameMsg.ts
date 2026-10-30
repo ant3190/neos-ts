@@ -5,10 +5,12 @@ import { Container } from "@/container";
 import { isCurrentUIContainer } from "@/container/compat";
 import { replayStore } from "@/stores";
 import { presentGameMessage } from "@/ui/Duel/animation/present";
+import { resetMaterialSelection } from "@/ui/Duel/interaction/materialSelection";
 import { showWaiting } from "@/ui/Duel/Message";
 import { getDuelEpoch } from "@/ui/Duel/Message/session";
 import { clearAllIdleInteractivities } from "@/ui/Duel/utils";
 
+import { clearPublicCardKnowledge } from "../utils/publicCardKnowledge";
 import onAnnounce from "./announce";
 import onMsgAttack from "./attack";
 import onMsgAttackDisable from "./attackDisable";
@@ -90,6 +92,31 @@ export default async function handleGameMsg(
 ): Promise<void> {
   if (!isCurrentUIContainer(container)) return;
   const msg = pb.stoc_game_msg;
+  if (
+    ![
+      "select_unselect_card",
+      "hint",
+      "update_data",
+      "confirm_cards",
+      "wait",
+      "unimplemented",
+    ].includes(msg.gameMsg)
+  )
+    resetMaterialSelection();
+  if (
+    [
+      "start",
+      "reload_field",
+      "move",
+      "draw",
+      "swap",
+      "swap_grave_deck",
+      "shuffle_deck",
+      "shuffle_hand_extra",
+      "shuffle_set_card",
+    ].includes(msg.gameMsg)
+  )
+    clearPublicCardKnowledge(container.context);
   const notification = getPresentationMessage(msg);
   let pacing = getDuelPacing(
     notification?.kind ?? msg.gameMsg,

@@ -31,7 +31,19 @@ test("protobuf enums, rather than engine bit masks, identify zones and positions
   assert.equal(
     tablePose({ zone: Z.MZONE, sequence: 2, position: P.FACEUP_DEFENSE }, true)
       .rz,
+    -90,
+  );
+  assert.equal(
+    tablePose({ zone: Z.MZONE, sequence: 2, position: P.FACEUP_DEFENSE }, false)
+      .rz,
     90,
+  );
+  assert.equal(
+    tablePose(
+      { zone: Z.MZONE, sequence: 2, position: P.FACEDOWN_DEFENSE },
+      true,
+    ).rz,
+    -90,
   );
   assert.equal(
     tablePose(

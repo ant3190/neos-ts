@@ -1,3 +1,5 @@
+import { clearPublicCardKnowledge } from "@/service/utils/publicCardKnowledge";
+
 import { cardMotionState } from "../animation/motionState";
 import { resetCardOrigins } from "../animation/origins";
 import { resetCombatPresentation } from "../animation/present";
@@ -5,6 +7,7 @@ import { cancelAnimationWaits, duelTimeline } from "../animation/runtime";
 import { closeCardActions } from "../interaction/CardActions";
 import { resetFieldSelection } from "../interaction/fieldSelection";
 import { resetHandInteraction } from "../interaction/hand";
+import { resetMaterialSelection } from "../interaction/materialSelection";
 import { resetDuelPanels } from "../layout/panels";
 import { resetAnimationStall } from "../PlayMat/Card/springs/asyncStart";
 import { closeChatBox } from "../PlayMat/ChatBox";
@@ -25,6 +28,8 @@ import { resetYesNoModal } from "./YesNoModal";
 /** Close prompts from the previous duel before a new session can render. */
 export function resetDuelDialogs() {
   resetDuelPromptSession();
+  resetMaterialSelection();
+  clearPublicCardKnowledge();
   cancelAnimationWaits();
   cardMotionState.moving = {};
   cardMotionState.revealed = {};

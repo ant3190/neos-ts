@@ -3,6 +3,25 @@ interface LevelOption {
   level2?: number;
 }
 
+/** Stable across changing per-request response indices. */
+export function selectionKey(option: {
+  location?: {
+    controller: number;
+    zone: number;
+    sequence: number;
+    is_overlay?: boolean;
+    overlay_sequence?: number;
+  };
+  meta?: { id: number };
+}) {
+  const p = option.location;
+  return p
+    ? `${p.controller}:${p.zone}:${p.sequence}:${
+        p.is_overlay ? p.overlay_sequence : ""
+      }`
+    : `code:${option.meta?.id ?? 0}`;
+}
+
 /** Each material may have two legal levels; mixed choices must also be accepted. */
 export function levelsMatch(
   options: readonly LevelOption[],

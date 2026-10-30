@@ -6,7 +6,7 @@
 
 按最新反馈改为平面场地和平铺手牌，不再使用 MDPro3 的透视相机、扇形手牌、圆形阶段入口或大尺寸阶段弹层。
 
-- 场地采用正交坐标；双方同类卡片尺寸一致，高度只用于遮挡排序，不影响大小。
+- 场地采用正交坐标；双方同类卡片尺寸一致，高度只用于遮挡排序，不影响大小。守备表示按我方逆时针 90°、对方顺时针 90°横置，表侧和里侧共用朝向。
 - 除外区按 YGOPro 的纵向卡堆位置放在墓地上方，双方镜像排列，取消原来的横置与横向偏移。卡片、区域底框和点击区域共用坐标，其余界面位置不变。
 - 手牌水平排列，无旋转、下垂或悬停位移。抽卡、检索及离开手牌时，已有手牌仅沿水平方向补位，保持牌序和遮挡顺序；超过 10 张时逐步压缩间距。长手牌仍支持横向拖动，拖动结束不发送选卡响应。
 - 阶段入口为紧凑横条，显示回合号和当前阶段，点击打开阶段列表。合法性及 idle/battle 回传编码仍由服务端指令决定。
@@ -14,6 +14,7 @@
 - 决斗菜单包含动画质量选择、自动说明开关和投降确认，避免缩放后的按钮配上未缩放的默认下拉菜单。
 - 说明、卡堆、日志、聊天和选择窗口保留原有用途；点击空白场地关闭说明与卡堆并恢复日志。
 - 公开展示的手牌、额外牌组与主卡组卡片一次列出，按双方与区域分组，支持滚轮浏览及卡片说明查看。展示列表与原有候选框共用卡片尺寸和场地缩放，自动收起，不等待确认、不阻塞消息或抢占输入；真正的选牌提示出现时立即让位。自己手里已经可见的单张卡不重复弹出展示，公开记录仍保留在日志中。原区域卡片不翻转，隐藏卡号、位置与元数据保持不变。
+- 公开过的卡面会带入后续候选框，按原始归属、区域与序号对应，避免先展示、选牌时又只剩卡背；未公开位置仍保持隐藏，洗切、移动和重开清除对应记忆。
 - 选牌弹窗取消区域分页，场上、墓地、卡组等候选牌在同一横排展示；相同归属、相同区域的卡片共用一个分组框和标题；我方使用蓝色背景，对方使用红色背景，取消逐张卡片上的归属标签。分组保持首次出现顺序，组内保留服务端顺序，选择回传仍使用原始选项编号。连锁仍先按卡片合并多个效果。
 - 候选、已选择和必选素材的牌列支持鼠标滚轮、触控板及键盘滚动。多排信息出现时弹窗向上增高，屏幕空间足够时完整显示；只有达到可见区域上限后才启用纵向滚动，操作按钮保留在底部。
 - 连锁的多效果与普通效果选择使用一致的可换行大字号，按场地缩放补偿至至少 18 屏幕像素。长效果列表通过鼠标滚轮纵向浏览。
@@ -32,7 +33,7 @@
 
 - 卡片附近的合法操作按发动、攻击、表示形式、特殊召唤、通常召唤、盖放排序；多卡/多效果先选卡，再选效果。
 - 素材选择按 MDPro3 的区域条件分流：候选与必选素材全部在怪兽区、魔陷区且不含叠放素材时直接在场上选；包含手牌、墓地、除外或叠放素材等区域时使用弹窗。无法定位场上卡片时回退弹窗。普通选牌、等级素材、解放、计数物均在用户点击确认后响应；只有一张候选、选满数量或达到精确等级时也保留确认。
-- 场上的素材确认使用右下角紧凑面板，与其他控制统一为屏幕像素尺寸、44px 高按钮及小圆角。逐步选素材时先在本地暂选，可更改或用右键撤销，再点击确认回传原始选项编号。服务端 `finishable` / `cancelable` 继续决定能否结束或取消。
+- 场上的素材确认使用右下角紧凑面板，与其他控制统一为屏幕像素尺寸、44px 高按钮及小圆角。连接、融合等逐步选择支持连续点选和点击已选素材撤选，快速连点按后续合法候选及最新响应编号逐步提交校验；只在整组完成时点击一次确认。“全部取消”和右键会逐一撤回整组选材后退出；强制选择不能退出时清空后继续选择，避免把结束编码误作取消。等待校验时也可请求全部取消。服务端 `finishable` / `cancelable` 继续决定何时能完成或退出。
 - 右键仅处理最上层交互：发动询问回答否，可取消选牌/连锁返回取消，本地操作或效果菜单关闭而不发送协议响应。必须继续的选择保持待答状态；输入框保留原生右键菜单。
 - 超量怪兽可查看素材；卡堆支持单列/三列和滚动。卡堆/附加效果与日志互相让位，关闭后恢复。
 - 连锁时点直接循环智能、全部、忽略；A/S/D 快捷键保留。普通 Tab 保留浏览器焦点导航。
@@ -76,12 +77,12 @@
 npx tsc --noEmit
 npm run lint
 npm run build
-./node_modules/.bin/esbuild tests/duel-pacing.test.mjs tests/mdpro3-experience.test.mjs tests/mdpro3-parity.test.mjs tests/mdpro3-source-behavior.test.mjs tests/card-animation.test.mjs tests/card-reveal.test.mjs tests/eventbus.test.mjs tests/local-id.test.mjs tests/hand-order.test.mjs --bundle --platform=node --format=esm --out-extension:.js=.mjs --outdir=/tmp/neos-parity-tests
+./node_modules/.bin/esbuild tests/duel-pacing.test.mjs tests/mdpro3-experience.test.mjs tests/mdpro3-parity.test.mjs tests/mdpro3-source-behavior.test.mjs tests/card-animation.test.mjs tests/card-reveal.test.mjs tests/public-card-knowledge.test.mjs tests/eventbus.test.mjs tests/local-id.test.mjs tests/hand-order.test.mjs --bundle --platform=node --format=esm --out-extension:.js=.mjs --outdir=/tmp/neos-parity-tests
 node --test /tmp/neos-parity-tests/*.test.mjs
-npm run test:e2e -- tests/e2e/duel-polish.spec.ts tests/e2e/duel-selection-polish.spec.ts tests/e2e/duel-effect-text.spec.ts tests/e2e/duel-material-selection.spec.ts tests/e2e/duel-confirmation-and-reveal.spec.ts tests/e2e/mdpro3-parity.spec.ts tests/e2e/mdpro3-duel.spec.ts tests/e2e/mdpro3-source-behavior.spec.ts tests/e2e/duel-shuffle-regression.spec.ts tests/e2e/duel-pacing.spec.ts tests/e2e/duel-dialog-regression.spec.ts tests/e2e/adaptive-scale.spec.ts tests/e2e/replay-msg-regression.spec.ts --workers=1
+npm run test:e2e -- tests/e2e/duel-polish.spec.ts tests/e2e/duel-selection-polish.spec.ts tests/e2e/duel-effect-text.spec.ts tests/e2e/duel-material-selection.spec.ts tests/e2e/duel-material-groups.spec.ts tests/e2e/duel-confirmation-and-reveal.spec.ts tests/e2e/mdpro3-parity.spec.ts tests/e2e/mdpro3-duel.spec.ts tests/e2e/mdpro3-source-behavior.spec.ts tests/e2e/duel-shuffle-regression.spec.ts tests/e2e/duel-pacing.spec.ts tests/e2e/duel-dialog-regression.spec.ts tests/e2e/adaptive-scale.spec.ts tests/e2e/replay-msg-regression.spec.ts --workers=1
 ```
 
-浏览器回归逐帧检查双方抽卡/检索时已有手牌保持同一基线和牌序，检查跨区同排、双方标记、两类滚轮滚动、多排窗口增高及缩放后的效果字号；同时检查召唤路径单调、途中卡片尺寸恒定、结束没有跳回；检查弹窗淡入时边界固定、场地查看不会提交；并在桌面与竖屏验证按钮和菜单的实际屏幕尺寸。其他回归覆盖连锁、无效、选择、卡堆、阶段编码、重开清理和停帧处理。素材回归覆盖场上/手牌/墓地/叠放素材分流、必选素材与原始响应编号、普通/精确/溢出等级的手动确认、逐步选素材的待确认状态、结束和取消、右键层级，以及桌面和竖屏的确认按钮尺寸。展示回归覆盖新旧协议、手牌、主卡组顶、额外牌组顶、来源不存在、重复卡、同时列出、窗口滚动、横竖屏尺寸、隐藏状态保持及重开清理。没有测量用户设备的实际帧率。
+浏览器回归逐帧检查双方抽卡/检索时已有手牌保持同一基线和牌序，检查跨区同排、双方标记、两类滚轮滚动、多排窗口增高及缩放后的效果字号；同时检查召唤路径单调、途中卡片尺寸恒定、结束没有跳回；检查弹窗淡入时边界固定、场地查看不会提交；并在桌面与竖屏验证按钮和菜单的实际屏幕尺寸。其他回归覆盖连锁、无效、选择、卡堆、阶段编码、重开清理和停帧处理。素材回归覆盖场上/手牌/墓地/叠放素材分流、必选素材与原始响应编号、普通/精确/溢出等级的手动确认、逐步多选、快速连点、候选编号变化、非法候选丢弃、整组确认与取消回滚、右键层级，以及桌面和竖屏的确认按钮尺寸。展示回归覆盖新旧协议、手牌、主卡组顶、额外牌组顶、来源不存在、重复卡、同时列出、窗口滚动、横竖屏尺寸、隐藏状态保持及重开清理。没有测量用户设备的实际帧率。
 
 ## 部署
 

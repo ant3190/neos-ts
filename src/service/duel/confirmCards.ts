@@ -5,6 +5,8 @@ import { AudioActionType, playEffect } from "@/infra/audio";
 import { displayConfirmCardsModal } from "@/ui/Duel/Message/ConfirmCardsModal";
 import { requestCardImage } from "@/ui/Shared/YgoCard/imageCache";
 
+import { rememberPublicCard } from "../utils/publicCardKnowledge";
+
 /** Reveal payloads own their public identities, even without a mounted pile card. */
 export default async (
   container: Container,
@@ -25,6 +27,7 @@ export default async (
       sequence: info.sequence,
     });
     requestCardImage(code);
+    rememberPublicCard(context, location, code);
     if (code) context.historyStore.putConfirmed(context, code, location);
     return { meta: fetchCard(code), location };
   });

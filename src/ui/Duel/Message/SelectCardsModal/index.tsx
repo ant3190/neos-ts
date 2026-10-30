@@ -20,6 +20,7 @@ import { useDuelRightClick } from "../../interaction/rightClick";
 import { SelectionControls } from "../../interaction/SelectionControls";
 import {
   selectionCanComplete,
+  selectionKey,
   selectionValid,
 } from "../../interaction/selectionRules";
 import { useHorizontalWheel } from "../../interaction/useHorizontalWheel";
@@ -47,6 +48,13 @@ export interface SelectCardsModalProps {
   readOnly?: boolean;
   title?: string;
   tribute?: boolean;
+  incremental?: {
+    selectedKeys: readonly string[];
+    canCancel: boolean;
+    canConfirm: boolean;
+    canceling: boolean;
+    onToggle: (option: Snapshot<Option>) => void;
+  };
   onSubmit: (options: Snapshot<Option[]>) => void;
   onCancel: () => void;
   onFinish: () => void;
@@ -76,6 +84,7 @@ export function SelectCardsModal({
   readOnly = false,
   title: customTitle,
   tribute = false,
+  incremental,
   onSubmit,
   onCancel,
   onFinish,
@@ -161,19 +170,41 @@ export function SelectCardsModal({
   const submit = () => {
     if (valid && isOpen) onSubmit([...mustSelects, ...options]);
   };
+  const cancelChoice = () => {
+    if (cancelable) onCancel();
+    else setChosen([]);
+  };
   useDuelRightClick(
     isOpen && fieldSelection,
     () => {
-      if (cancelable) onCancel();
+      if (cancelable || (!isChain && chosen.length)) cancelChoice();
       else if (finishable) onFinish();
     },
     250,
   );
-  const footer = readOnly ? null : (
+  const footer = readOnly ? null : incremental ? (
     <div className={styles.footer}>
-      {cancelable && (
-        <Button data-testid="duel-select-card-cancel" onClick={onCancel}>
-          取消
+      <Button
+        data-testid="duel-select-card-cancel"
+        disabled={!incremental.canCancel || incremental.canceling}
+        onClick={onCancel}
+      >
+        全部取消
+      </Button>
+      <Button
+        type="primary"
+        data-testid="duel-select-card-submit"
+        disabled={!incremental.canConfirm}
+        onClick={onFinish}
+      >
+        确认选择
+      </Button>
+    </div>
+  ) : (
+    <div className={styles.footer}>
+      {(cancelable || (!isChain && chosen.length > 0)) && (
+        <Button data-testid="duel-select-card-cancel" onClick={cancelChoice}>
+          {chosen.length && !isChain ? "全部取消" : "取消"}
         </Button>
       )}
       {finishable && (
@@ -214,14 +245,19 @@ export function SelectCardsModal({
     alreadySelected = false,
     mandatory = false,
   ) => {
-    const picked =
-      (alreadySelected && !single) ||
-      effectCard === key ||
-      indexes.some((idx) => chosen.includes(idx));
+    const picked = incremental
+      ? incremental.selectedKeys.includes(selectionKey(option))
+      : (alreadySelected && !single) ||
+        effectCard === key ||
+        indexes.some((idx) => chosen.includes(idx));
     const origin = originLabel(option);
     const choose = () => {
       showCardModal(option);
       if (readOnly || mandatory) return;
+      if (incremental) {
+        incremental.onToggle(option);
+        return;
+      }
       if (alreadySelected && single) {
         setChosen((values) => (values.includes(index) ? [] : [index]));
         return;
@@ -247,11 +283,13 @@ export function SelectCardsModal({
         }`}
         aria-pressed={readOnly ? undefined : picked}
         disabled={
-          !readOnly &&
-          !mandatory &&
-          !alreadySelected &&
-          indexes.length === 1 &&
-          !selectable(index)
+          incremental
+            ? incremental.canceling
+            : !readOnly &&
+              !mandatory &&
+              !alreadySelected &&
+              indexes.length === 1 &&
+              !selectable(index)
         }
         data-testid={readOnly ? "duel-confirm-card" : "duel-select-card-option"}
         data-card-code={option.meta.id}
@@ -322,6 +360,8 @@ export function SelectCardsModal({
       onDuelCancel={
         readOnly
           ? () => onSubmit([])
+          : incremental
+          ? onCancel
           : cancelable
           ? onCancel
           : finishable
@@ -347,6 +387,7 @@ export function SelectCardsModal({
         data-select-is-chain={isChain}
         data-select-cancelable={cancelable}
         data-select-finishable={finishable}
+        data-select-incremental={!!incremental}
       >
         <CardStrip
           label={readOnly ? "展示卡片" : "可选卡片"}
@@ -388,7 +429,13 @@ export function SelectCardsModal({
         )}
         {!!selecteds.length && (
           <section className={styles.section} aria-label="已选择的卡片">
-            <h3>{single ? "已选择（选中后确认取消）" : "已选择"}</h3>
+            <h3>
+              {incremental
+                ? "已选择（点击取消）"
+                : single
+                ? "已选择（选中后确认取消）"
+                : "已选择"}
+            </h3>
             <CardStrip
               label="已选择的卡片"
               testId="duel-select-selected"

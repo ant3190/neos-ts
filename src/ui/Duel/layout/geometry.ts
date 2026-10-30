@@ -135,7 +135,7 @@ export function tablePose(
       ? -19.5
       : 19.5
     : defense
-    ? 90
+    ? -90
     : 0;
   return {
     x: world.x * WORLD_UNIT,

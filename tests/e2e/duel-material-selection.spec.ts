@@ -50,10 +50,16 @@ async function beginIncremental(
     zone?: string;
     finishable?: boolean;
     cancelable?: boolean;
+    selected?: number[];
   } = {},
 ) {
   await page.evaluate(
-    async ({ zone = "MZONE", finishable = false, cancelable = false }) => {
+    async ({
+      zone = "MZONE",
+      finishable = false,
+      cancelable = false,
+      selected = [0],
+    }) => {
       const { getUIContainer } = await import("/src/container/compat.ts");
       const { ygopro } = await import("/src/api/index.ts");
       const { default: selectUnselect } = await import(
@@ -78,7 +84,7 @@ async function beginIncremental(
           finishable,
           cancelable,
           selectable_cards: [info(1, 11), info(2, 13)],
-          selected_cards: [info(0, 6)],
+          selected_cards: selected.map((sequence) => info(sequence, 6)),
         }),
       );
     },
@@ -177,6 +183,12 @@ test("overflow materials keep a compact confirmation dock at desktop and portrai
     { width: 390, height: 844 },
   ]) {
     await page.setViewportSize(size);
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
     await expect
       .poll(async () => (await submit.boundingBox())!.height)
       .toBeCloseTo(44, 1);
@@ -196,28 +208,22 @@ test("overflow materials keep a compact confirmation dock at desktop and portrai
   await expectPacket(page, [4, 7]);
 });
 
-test("incremental selections respect forced, cancelable and finishable engine states", async ({
+test("incremental material clicks no longer require per-card confirmation", async ({
   page,
 }) => {
   await mdpro3Fixture(page);
   await beginIncremental(page);
   await expect(page.getByTestId("duel-material-confirm")).toBeDisabled();
-  await page.mouse.click(640, 300, { button: "right" });
-  expect(
-    await page.evaluate(() => (window as any).__parityPackets.length),
-  ).toBe(0);
   await page.locator('[data-card-uuid="p0-MZONE-0"]').click();
-  expect(
-    await page.evaluate(() => (window as any).__parityPackets.length),
-  ).toBe(0);
-  await page.getByTestId("duel-material-confirm").click();
   await expectPacket(page, [6]);
-  await expect(page.getByTestId("duel-material-controls")).toHaveCount(0);
-  await page.evaluate(() => (window as any).__parityPackets.splice(0));
-  await beginIncremental(page, { cancelable: true });
-  await expect(page.getByTestId("duel-material-cancel")).toBeVisible();
-  await page.mouse.click(640, 300, { button: "right" });
-  await page.mouse.click(640, 300, { button: "right" });
+  await expect(page.getByTestId("duel-material-controls")).toBeVisible();
+  await page.evaluate(async () => {
+    const { resetDuelDialogs } = await import("/src/ui/Duel/Message/reset.ts");
+    resetDuelDialogs();
+    (window as any).__parityPackets.splice(0);
+  });
+  await beginIncremental(page, { cancelable: true, selected: [] });
+  await page.getByTestId("duel-material-cancel").click();
   await expectPacket(page, -1);
   await page.evaluate(() => (window as any).__parityPackets.splice(0));
   await beginIncremental(page, { finishable: true });
@@ -226,7 +232,7 @@ test("incremental selections respect forced, cancelable and finishable engine st
   await expectPacket(page, -1);
 });
 
-test("incremental hand materials use the popup and right click finishes only when allowed", async ({
+test("right click on popup materials starts cancellation instead of confirming the group", async ({
   page,
 }) => {
   await mdpro3Fixture(page);
@@ -234,7 +240,7 @@ test("incremental hand materials use the popup and right click finishes only whe
   await expect(page.getByTestId("duel-select-cards-modal")).toBeVisible();
   await expect(page.getByTestId("duel-material-controls")).toHaveCount(0);
   await page.mouse.click(640, 300, { button: "right" });
-  await expectPacket(page, -1);
+  await expectPacket(page, [6]);
 });
 
 test("a replacement field request starts empty and right click cancels only the current request", async ({
@@ -289,7 +295,11 @@ test("optional popup selections send one cancel response on right click", async 
   page,
 }) => {
   await mdpro3Fixture(page);
-  await beginIncremental(page, { zone: "GRAVE", cancelable: true });
+  await beginIncremental(page, {
+    zone: "GRAVE",
+    cancelable: true,
+    selected: [],
+  });
   await expect(page.getByTestId("duel-select-cards-modal")).toBeVisible();
   await page.mouse.click(640, 300, { button: "right" });
   await page.mouse.click(640, 300, { button: "right" });
